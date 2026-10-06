@@ -239,8 +239,9 @@ int rtl8735b_spi_init(uint8_t bus, uint32_t mosi_pin, uint32_t miso_pin,
         return RTL8735B_BUS_INVALID;
     }
     memset(&spi_object, 0, sizeof(spi_object));
-    // hal_ssi_init（經 spi_format 呼叫）以 PID_SPI1 註冊 CS/CLK/MISO/MOSI 四腳，NC 會註冊失敗。
-    // 傳入真實 CS 腳讓 SSI 完成初始化。
+    // hal_ssi_init（經 spi_format 呼叫）以 PID_SPI1 註冊 CS/CLK/MISO/MOSI 四腳，NC 會註冊失敗
+    // （Realtek 官方 SDK Ameba-AIoT/ameba-rtos-pro2@eb5c0907c40d，
+    // component/soc/8735b/fwlib/rtl8735b/source/ram/hal_ssi.c:61–121）。傳入真實 CS 腳讓 SSI 完成初始化。
     spi_init(&spi_object, (PinName)mosi_pin, (PinName)miso_pin,
              (PinName)sclk_pin, (PinName)ss_pin);
     if (mode > 3U) {

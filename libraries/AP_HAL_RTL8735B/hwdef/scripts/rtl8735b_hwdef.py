@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 '''
 由 hwdef.dat 產生 RTL8735B 板子的 hwdef.h。
 目前只處理共用的 define、IMU、COMPASS、BARO 列；匯流排與腳位的關鍵字之後加入。

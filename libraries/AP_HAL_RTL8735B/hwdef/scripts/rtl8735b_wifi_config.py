@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 '''
 由本機、不進版本管理的 Wi-Fi STA 設定檔產生 wifi_credentials.c，放在建置目錄。
 AP_HAL_RTL8735B 的 WiFiDriver 讀取其中的位元組陣列；檔案未指定或不存在時產生 SSID 長度 0 的版本，

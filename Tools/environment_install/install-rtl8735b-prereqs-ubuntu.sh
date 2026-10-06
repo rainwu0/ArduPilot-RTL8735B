@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # 安裝建置 RTL8735B 需要的套件（Ubuntu 22.04 或 WSL），並建立 Python 虛擬環境（預設 ~/.venv-rtl8735b）。
 set -euo pipefail
 

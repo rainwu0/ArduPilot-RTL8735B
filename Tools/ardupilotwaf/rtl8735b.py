@@ -9,7 +9,7 @@ libraries/AP_HAL_RTL8735B/targets/cmake 的 cmake 專案與 Realtek SDK 連結�
 SDK 位置由環境變數 AMEBAPRO2_SDK 指定，預設是原始碼樹旁的 ../ambpro2_sdk。
 """
 
-from waflib import Task
+from waflib import Logs, Task
 from waflib.TaskGen import after_method, feature
 from collections import OrderedDict
 
@@ -19,6 +19,7 @@ import sys
 import traceback
 
 import hal_common
+import rtl8735b_upload
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../../libraries/AP_HAL_RTL8735B/hwdef/scripts'))
 import rtl8735b_hwdef
@@ -154,6 +155,26 @@ def pre_build(self):
     self.add_to_group(tsk)
 
 
+class rtl8735b_upload_fw(Task.Task):
+    '''--upload：建置完成後以 uartfwburn 燒錄 flash_ntz.bin（見 rtl8735b_upload.py）'''
+    color = 'BLUE'
+    always_run = True
+
+    def run(self):
+        bld = self.generator.bld
+        try:
+            rtl8735b_upload.upload(
+                image=self.inputs[0].abspath(),
+                port=bld.options.upload_port,
+                sdk=bld.env.AMEBAPRO2_SDK,
+                workdir=bld.bldnode.make_node('pg_tool').abspath(),
+                override=os.environ.get('AP_OVERRIDE_UPLOAD_CMD'))
+        except rtl8735b_upload.UploadError as e:
+            Logs.error(str(e))
+            return 1
+        return 0
+
+
 @feature('rtl8735b_ap_program')
 @after_method('process_source', 'apply_link')
 def rtl8735b_firmware(self):
@@ -165,6 +186,12 @@ def rtl8735b_firmware(self):
 
     build.cmake_build_task.set_run_after(self.link_task)
 
-    if self.bld.options.upload:
-        # TODO(rtl8735b): 燒錄走 SDK 的 uartfwburn，等板子接上後再接進來
-        self.bld.fatal('--upload is not supported yet; flash sdk_build/flash_ntz.bin with uartfwburn')
+    # 所有程式共用同一份 SDK 映像，只燒一次；缺燒錄埠等錯誤在建置開始前就停下
+    if self.bld.options.upload and not getattr(self.bld, 'rtl8735b_upload_posted', False):
+        try:
+            rtl8735b_upload.check_static(self.bld.options.upload_port, os.environ.get('AP_OVERRIDE_UPLOAD_CMD'))
+        except rtl8735b_upload.UploadError as e:
+            self.bld.fatal(str(e))
+        self.bld.rtl8735b_upload_posted = True
+        upload = self.create_task('rtl8735b_upload_fw', src=build.cmake_build_task.outputs[0])
+        upload.set_run_after(build.cmake_build_task)

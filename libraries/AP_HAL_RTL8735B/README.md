@@ -57,6 +57,25 @@ TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
 
 ## 燒錄
 
+### `--upload`
+
+建置時加上 `--upload` 與 `--upload-port`，建置完成後會以 SDK 附的 `uartfwburn`（`tools/Pro2_PG_tool _v1.3.0.zip`）燒錄 `flash_ntz.bin`：
+
+```bash
+./waf copter --upload --upload-port COM7          # WSL：經 interop 執行 Windows 版工具
+./waf copter --upload --upload-port /dev/ttyUSB0  # Linux：執行 Linux 版工具
+```
+
+- 看到「請讓板子進入燒錄模式」時，依開發板的按鍵讓晶片進入燒錄模式（由重置時 PA5 的電位決定）。60 秒內沒有進入會自動重試，逾時則不寫入。看到 `download success` 後重置一次即開機。
+- `COMn` 需要 WSL interop（能在 WSL 執行 Windows 程式）。WSL 開了 systemd 時 interop 可能失效，`--upload` 會在編譯開始前提示。
+- `/dev/ttyXXX` 需要該裝置的讀寫權限（`dialout` 群組）；在 WSL 要先以 usbipd 把 USB 序列裝置掛進 WSL。
+- 環境變數 `AP_OVERRIDE_UPLOAD_CMD` 可改用自訂指令：執行時後面接上映像路徑，有 `--upload-port` 時再接 `--port <埠>`。
+- 只下載、不抹除；燒完不會自動重置。
+
+`--upload` 尚未上板驗證，見〈功能狀態〉；下面的手動燒錄已在 Windows 上使用。
+
+### 手動燒錄
+
 燒錄在 Windows 端進行（WSL2 預設看不到 USB 序列埠）：
 
 1. 把 SDK 的 `tools/Pro2_PG_tool _v1.3.0.zip`（檔名含空白）解開，裡面有 `uartfwburn.exe`。
@@ -98,7 +117,7 @@ TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
 | AnalogIn | 僅建置 | 只有原始取樣，參考電壓未確認 |
 | 參數存在 Flash | 板上驗證 | 重開機與斷電後保留 |
 | SD 卡 | 未實作 | |
-| `--upload` 燒錄 | 未實作 | 以 `uartfwburn` 手動燒錄 |
+| `--upload` 燒錄 | 僅建置 | `COMn`（Windows 版工具）與 `/dev/tty*`（Linux 版工具）都未上板；手動燒錄見〈燒錄〉 |
 | 韌體 OTA 更新 | 未實作 | |
 | 自訂板建置 | 僅建置 | `--extra-hwdef` |
 

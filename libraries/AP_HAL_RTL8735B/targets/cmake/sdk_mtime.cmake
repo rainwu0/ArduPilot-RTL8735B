@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # SDK 的 config.cmake 每次 configure 都以 sed -i 重寫幾個 SDK 檔案（platform_conf.h、
 # partition_rtl8735b.h、連結腳本）。預設值（ASIC、B-cut、DDR 128M）下內容不變，但檔案時間被更新，
 # make 因此把所有依賴它們的 SDK 物件判定過期而整份重編。SDK 由所有 worktree 共用，任何一處

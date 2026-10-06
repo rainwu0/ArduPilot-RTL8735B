@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 '''從 Realtek SDK 的 cmake 檔取出建置需要的片段，印到標準輸出，供 cmake_language(EVAL) 執行。
 
 --region START END：從 START 開始到 END 之前的文字。

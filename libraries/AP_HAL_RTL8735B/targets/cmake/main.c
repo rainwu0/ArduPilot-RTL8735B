@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+
 /*
  * RTL8735B 的韌體入口。
  *

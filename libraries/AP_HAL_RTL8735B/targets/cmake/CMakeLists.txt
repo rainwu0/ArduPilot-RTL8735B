@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # RTL8735B 的 SDK 端建置：把 waf 編好的 ArduPilot 靜態庫與 Realtek SDK 的原始碼、預編譯庫
 # 連結成 application.ntz，再依 SDK 的後處理流程產生可燒錄的 flash_ntz.bin。
 # 由 Tools/ardupilotwaf/rtl8735b.py 呼叫。

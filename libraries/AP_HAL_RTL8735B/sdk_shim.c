@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+
 /*
  * 以 C 編譯的 SDK HAL 包裝，理由見 sdk_shim.h。
  */

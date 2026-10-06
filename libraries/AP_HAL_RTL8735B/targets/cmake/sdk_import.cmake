@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # 建置時從 SDK 的 cmake 檔取出原始檔清單與打包步驟並執行，本庫不重列這些內容。
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 set(_rtl8735b_sdk_extract ${CMAKE_CURRENT_LIST_DIR}/sdk_extract.py)

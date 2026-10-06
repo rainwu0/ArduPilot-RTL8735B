@@ -11,6 +11,8 @@ ArduPilot 在 Realtek RTL8735B 上的硬體抽象層（HAL）。**未經飛行�
 
 ## 取得與建置
 
+以下指令在本儲存庫根目錄執行：
+
 ```bash
 Tools/environment_install/install-rtl8735b-prereqs-ubuntu.sh
 source ~/.venv-rtl8735b/bin/activate
@@ -20,6 +22,8 @@ git submodule update --init --recursive modules/waf modules/mavlink modules/Dron
 ./waf configure --board rtl8735b-empty
 ./waf copter
 ```
+
+SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，執行 `Tools/scripts/rtl8735b_get_sdk.sh <SDK目錄>`，以腳本結尾印出的 export 指令設定 PATH，並設定環境變數 `AMEBAPRO2_SDK=<SDK目錄>`。
 
 工具鏈必須是 SDK 附的 Realtek ASDK（`arm-none-eabi-gcc --version` 顯示 `Realtek ASDK`）；系統套件的 `arm-none-eabi-gcc` 不能用。映像：`build/rtl8735b-empty/sdk_build/flash_ntz.bin`。
 
@@ -72,10 +76,11 @@ TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
 
 - `ArduCopter/takeoff_check.cpp`：本平台沒有 ESC 遙測（`HAL_WITH_ESC_TELEM` 為 0），原本的起飛前檢查整段不編譯，解鎖後馬達會停在地面怠速。改為沒有 ESC 遙測時只略過馬達轉速檢查，CPU 負載檢查照常（本 HAL 尚未提供系統負載，所以目前不會擋）；有 ESC 遙測的建置不受影響。本庫直接採用上游 PR 34070（https://github.com/ArduPilot/ardupilot/pull/34070，作者 yuiseki）的提交。
 - `libraries/AP_HAL/AP_HAL_Boards.h`：`HAL_BOARD_RTL8735B` 為 100，避開上游依序分配的平台編號。
+- `Tools/ardupilotwaf/boards.py`（waf 的板子登記）與 `libraries/AP_Filesystem/AP_Filesystem.h`（本平台的 newlib 沒有 `dirent.h`，在此補上定義）：加入本平台，不改變其他平台的行為。
 
 ## 功能狀態
 
-「板上驗證」表示該功能已在 RTL8735B 開發板上運作；本庫建置的映像尚未上板。
+「板上驗證」：功能已在 RTL8735B 開發板上運作；本版本的映像尚待上板複驗。
 
 | 項目 | 狀態 | 說明 |
 |---|---|---|
@@ -87,7 +92,7 @@ TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
 | Wi-Fi MAVLink（UDP） | 板上驗證 | STA 模式 |
 | Wi-Fi MAVLink（TCP） | 僅建置 | 建置時選擇，與 UDP 二選一 |
 | 主控台／USB MAVLink | 未實作 | |
-| RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol）；地面站的 RC override 已在板上使用 |
+| RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol）。地面站的 RC override 走 MAVLink，不經過 RC 輸入，已在板上使用 |
 | GPS | 僅建置 | |
 | PWM 輸出 | 板上驗證 | 有刷馬達 PWM 已驅動馬達；電調用的一般 PWM 未上板 |
 | AnalogIn | 僅建置 | 只有原始取樣，參考電壓未確認 |
@@ -99,4 +104,4 @@ TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
 
 ## 授權
 
-本儲存庫依 ArduPilot 的 GPL-3.0 授權。Realtek SDK 另有授權條款（SDK 根目錄的 `Realtek_Disclaimer-2019.pdf`），不在本儲存庫內，需自行取得。建置出的韌體含 Realtek 的預編譯函式庫；本儲存庫不提供韌體映像，Releases 與 CI 產物也不提供。散布自行建置的韌體前，請自行確認是否同時符合 GPL-3.0 與 Realtek 的條款。
+本儲存庫依 ArduPilot 的 GPL-3.0-or-later 授權。Realtek SDK 另有授權條款（SDK 根目錄的 `Realtek_Disclaimer-2019.pdf`），不在本儲存庫內，需自行取得。建置出的韌體含 Realtek 的預編譯函式庫；本儲存庫不提供韌體映像，Releases 與 CI 產物也不提供。散布自行建置的韌體前，請自行確認是否同時符合 GPL-3.0 與 Realtek 的條款。

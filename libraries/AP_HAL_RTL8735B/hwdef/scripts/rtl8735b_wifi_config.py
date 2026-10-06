@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 '''
 由本機、不進版本管理的 Wi-Fi STA 設定檔產生 wifi_credentials.c，放在建置目錄。
-AP_HAL_RTL8735B 的 WiFiUdpDriver 讀取其中的位元組陣列；檔案未指定或不存在時產生 SSID 長度 0 的版本，
+AP_HAL_RTL8735B 的 WiFiDriver 讀取其中的位元組陣列；檔案未指定或不存在時產生 SSID 長度 0 的版本，
 建置照常成功、執行時 Wi-Fi 不啟用。設定檔格式（UTF-8，可有 BOM）：
 
     # 註解與空行略過；等號後到行尾（不含換行）的內容原樣使用，不去除空白

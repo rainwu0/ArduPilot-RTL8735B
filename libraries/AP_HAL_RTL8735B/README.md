@@ -37,10 +37,19 @@ git submodule update --init --recursive modules/waf modules/mavlink modules/Dron
 
 建置時以環境變數 `RTL8735B_WIFI_CONFIG` 指向本機設定檔（`ssid=`、`password=` 兩行）；沒有設定時 Wi-Fi 不啟用。帳密只寫進建置目錄。
 
+MAVLink 預設走 UDP：本機埠 14555，還沒有地面站時把 HEARTBEAT 廣播到子網路的 14550。改用 TCP server 時，以 `--extra-hwdef` 加上一行：
+
+```
+define HAL_RTL8735B_WIFI_TCP_PORT 5760
+```
+
+TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
+
 安全限制：
 
 - 帳密以常數陣列編進韌體，拿到映像檔的人可能讀出。含帳密的映像不要分享，回報問題時也不要附上。
 - Wi-Fi 上的 MAVLink（UDP）沒有任何驗證。地面站停止送封包超過 3 秒後，同網段任一主機送來的封包就會被當成新的地面站，包括 RC override；沒有地面站時，HEARTBEAT 會廣播到整個子網路。只在自己控制的專用網路使用。
+- TCP 同樣沒有驗證。地面站停止送資料超過 3 秒後，同網段任一主機的新連線就會取代它。
 
 ## 燒錄
 
@@ -76,7 +85,7 @@ git submodule update --init --recursive modules/waf modules/mavlink modules/Dron
 | I²C | 板上驗證 | 開機時氣壓計偶發初始化失敗，原因未明 |
 | UART | 板上驗證 | 只支援 8N1 |
 | Wi-Fi MAVLink（UDP） | 板上驗證 | STA 模式 |
-| Wi-Fi MAVLink（TCP） | 未實作 | |
+| Wi-Fi MAVLink（TCP） | 僅建置 | 建置時選擇，與 UDP 二選一 |
 | 主控台／USB MAVLink | 未實作 | |
 | RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol）；地面站的 RC override 已在板上使用 |
 | GPS | 僅建置 | |

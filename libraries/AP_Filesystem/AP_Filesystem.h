@@ -32,11 +32,21 @@
 #define MAX_NAME_LEN 255
 #endif
 
-#if (CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS) || (CONFIG_HAL_BOARD == HAL_BOARD_ESP32)
+#if (CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS) || (CONFIG_HAL_BOARD == HAL_BOARD_ESP32) || (CONFIG_HAL_BOARD == HAL_BOARD_RTL8735B)
 #define DT_REG 0
 #define DT_DIR 1
 #define DT_LNK 10
 #endif
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_RTL8735B
+#include <stdio.h>
+#include <sys/stat.h>
+// RTL8735B 的 newlib 沒有 dirent.h，在此自行定義
+struct dirent {
+   char    d_name[MAX_NAME_LEN]; /* filename */
+   uint8_t d_type;
+};
+#endif // HAL_BOARD_RTL8735B
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
 #if AP_FILESYSTEM_FATFS_ENABLED

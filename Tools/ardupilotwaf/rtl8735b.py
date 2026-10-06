@@ -1,4 +1,5 @@
 # encoding: utf-8
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # flake8: noqa
 

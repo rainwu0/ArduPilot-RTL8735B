@@ -4,11 +4,12 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Documentation is in Tradi
 
 本儲存庫是 [ArduPilot](https://github.com/ArduPilot/ardupilot) 加上 Realtek RTL8735B 硬體抽象層（HAL）的非官方移植，由個人維護，與 ArduPilot 開發團隊及 Realtek 無關。**未經飛行驗證，請勿用於飛行。**
 
-- 以 ArduPilot master（2026-09-25）為基線，保留 ArduPilot 的完整歷史，之後是本移植的提交。
+- 開發與驗證用的板子：HUB 8735 ultra（板商 ideasHatch，主晶片 RTL8735B；[板商資料](https://github.com/ideashatch/HUB-8735)）。通用板 `rtl8735b-empty` 的腳位依這塊板子配置。
+- 以 ArduPilot master 的 `9f648ccabc`（2026-09-25）為基線，保留 ArduPilot 的完整歷史，之後是本移植的提交。
 - 需求、建置、燒錄、自訂板與功能狀態：[libraries/AP_HAL_RTL8735B/README.md](/libraries/AP_HAL_RTL8735B/README.md)
 - 對 ArduPilot 共用程式的修改：同一份 README 的〈對 ArduPilot 共用程式的修改〉。
 - 本平台的問題請在本儲存庫回報，不要回報到 ArduPilot 的論壇或 issue。
 
 ## 授權
 
-ArduPilot 與本移植的程式碼依 GPL-3.0-or-later 授權，見 [COPYING.txt](/COPYING.txt)。建置需要的 Realtek SDK 另有授權條款，不在本儲存庫內，需自行取得；本儲存庫不提供韌體映像。詳見 HAL README 的〈授權〉。
+本儲存庫整體依 GPL-3.0 散布，見 [COPYING.txt](/COPYING.txt)：ArduPilot 與本移植的檔案多為 GPL-3.0-or-later，個別上游檔案另有相容的授權，以各檔檔頭為準。建置需要的 Realtek SDK 另有授權條款，不在本儲存庫內，需自行取得；本儲存庫不提供韌體映像。詳見 HAL README 的〈授權〉。

@@ -709,9 +709,14 @@ def add_dynamic_boards_esp32():
             else:
                 newclass = type(d, (esp32,), {'name': d})
 
+def add_dynamic_boards_rtl8735b():
+    '''add boards based on existence of hwdef.dat in subdirectories for RTL8735B'''
+    add_dynamic_boards_from_hwdef_dir(rtl8735b, 'libraries/AP_HAL_RTL8735B/hwdef')
+
 def get_boards_names():
     add_dynamic_boards_chibios()
     add_dynamic_boards_esp32()
+    add_dynamic_boards_rtl8735b()
     add_dynamic_boards_linux()
     add_dynamic_boards_qurt()
     add_dynamic_boards_sitl()
@@ -1151,6 +1156,72 @@ class esp32s3(esp32):
         if hasattr(self, 'hwdef'):
             cfg.env.HWDEF = self.hwdef
         super(esp32s3, self).configure_env(cfg, env)
+
+class rtl8735b(Board):
+    '''Realtek RTL8735B：ArduPilot 編成靜態庫，再由 SDK 端的 cmake 專案連結成映像。
+    工具與 SDK 位置見 Tools/ardupilotwaf/rtl8735b.py。'''
+    abstract = True
+    toolchain = 'arm-none-eabi'
+
+    def configure_env(self, cfg, env):
+        env.BOARD = self.name
+        env.BOARD_CLASS = "RTL8735B"
+
+        super(rtl8735b, self).configure_env(cfg, env)
+        cfg.load('rtl8735b')
+        env.DEFINES.update(
+            CONFIG_HAL_BOARD = 'HAL_BOARD_RTL8735B',
+            CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_NONE',
+            AP_SIM_ENABLED = 0,
+        )
+
+        env.AP_LIBRARIES += [
+            'AP_HAL_RTL8735B',
+        ]
+
+        # 與 SDK 的 toolchain.cmake 一致；預編譯庫是 softfp，不能改成 hard
+        cpu_flags = [
+            '-march=armv8-m.main+dsp',
+            '-mthumb',
+            '-mcmse',
+            '-mfpu=fpv5-sp-d16',
+            '-mfp16-format=ieee',
+            '-mfloat-abi=softfp',
+        ]
+
+        env.CFLAGS += cpu_flags + [
+            '-Os',
+            '-fsingle-precision-constant',
+        ]
+        # SDK 標頭以 #if 測試未定義的巨集
+        env.CFLAGS.remove('-Werror=undef')
+
+        env.CXXFLAGS += cpu_flags + [
+            '-Os',
+            '-fsingle-precision-constant',
+            '-fno-threadsafe-statics',
+            '-Wno-sign-compare',
+        ]
+        env.CXXFLAGS.remove('-Werror=undef')
+        env.CXXFLAGS.remove('-Werror=shadow')
+
+        env.AP_PROGRAM_AS_STLIB = True
+
+    def pre_build(self, bld):
+        '''pre-build hook that gets called before dynamic sources'''
+        from waflib.Context import load_tool
+        module = load_tool('rtl8735b', [], with_sys_path=True)
+        fun = getattr(module, 'pre_build', None)
+        if fun:
+            fun(bld)
+        super(rtl8735b, self).pre_build(bld)
+
+    def build(self, bld):
+        super(rtl8735b, self).build(bld)
+        bld.load('rtl8735b')
+
+    def get_name(self):
+        return self.name
 
 class chibios(Board):
     abstract = True

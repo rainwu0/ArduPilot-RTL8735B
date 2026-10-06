@@ -33,7 +33,7 @@
 #include "GPIO.h"
 #include "AnalogIn.h"
 #include "RCOutput.h"
-#include "WiFiUdpDriver.h"
+#include "WiFiDriver.h"
 #include "wdt_shim.h"
 
 // UART1（SDK LOG）保留給 SDK；UART2 遙測、UART0 GPS、UART3 序列 RC。
@@ -77,23 +77,29 @@ static RTL8735B::UARTDriver serial9Driver(9, RTL8735B_UART_CONFIGS[9].uart_id,
                                            RTL8735B_UART_CONFIGS[9].tx_pin,
                                            RTL8735B_UART_CONFIGS[9].rx_pin,
                                            RTL8735B_UART_CONFIGS[9].enabled);
-// Wi-Fi STA 上的 MAVLink UDP：板定義指定的 SERIALn 改由 WiFiUdpDriver 提供，該埠的實體 UART 必須停用。
-#ifdef HAL_RTL8735B_WIFI_UDP_SERIAL
+// Wi-Fi STA 上的 MAVLink：板定義指定的 SERIALn 改由 WiFiDriver 提供，該埠的實體 UART 必須停用。
+// 預設 UDP；定義 HAL_RTL8735B_WIFI_TCP_PORT 時改為該埠的 TCP server。
+#ifdef HAL_RTL8735B_WIFI_SERIAL
 #define RTL8735B_SERIAL_ENABLED_(n) HAL_RTL8735B_SERIAL##n##_ENABLED
 #define RTL8735B_SERIAL_ENABLED(n) RTL8735B_SERIAL_ENABLED_(n)
-#if HAL_RTL8735B_WIFI_UDP_SERIAL < 0 || HAL_RTL8735B_WIFI_UDP_SERIAL > 9
-#error "HAL_RTL8735B_WIFI_UDP_SERIAL must be 0-9"
-#elif RTL8735B_SERIAL_ENABLED(HAL_RTL8735B_WIFI_UDP_SERIAL)
-#error "the SERIALn used for WiFi UDP must have its UART disabled in hwdef.dat"
+#if HAL_RTL8735B_WIFI_SERIAL < 0 || HAL_RTL8735B_WIFI_SERIAL > 9
+#error "HAL_RTL8735B_WIFI_SERIAL must be 0-9"
+#elif RTL8735B_SERIAL_ENABLED(HAL_RTL8735B_WIFI_SERIAL)
+#error "the SERIALn used for WiFi must have its UART disabled in hwdef.dat"
 #endif
-static RTL8735B::WiFiUdpDriver wifiUdpDriver(HAL_RTL8735B_WIFI_UDP_LOCAL_PORT, HAL_RTL8735B_WIFI_UDP_GCS_PORT);
+#ifdef HAL_RTL8735B_WIFI_TCP_PORT
+static RTL8735B::WiFiDriver wifiDriver(RTL8735B::WiFiDriver::Protocol::TCP, HAL_RTL8735B_WIFI_TCP_PORT, 0);
+#else
+static RTL8735B::WiFiDriver wifiDriver(RTL8735B::WiFiDriver::Protocol::UDP,
+                                       HAL_RTL8735B_WIFI_UDP_LOCAL_PORT, HAL_RTL8735B_WIFI_UDP_GCS_PORT);
+#endif
 #endif
 
 static AP_HAL::UARTDriver *serial_port(uint8_t index, RTL8735B::UARTDriver &uart)
 {
-#ifdef HAL_RTL8735B_WIFI_UDP_SERIAL
-    if (index == HAL_RTL8735B_WIFI_UDP_SERIAL) {
-        return &wifiUdpDriver;
+#ifdef HAL_RTL8735B_WIFI_SERIAL
+    if (index == HAL_RTL8735B_WIFI_SERIAL) {
+        return &wifiDriver;
     }
 #endif
     (void)index;

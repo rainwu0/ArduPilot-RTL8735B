@@ -3,7 +3,7 @@
 #include <AP_HAL/AP_HAL.h>
 #if CONFIG_HAL_BOARD == HAL_BOARD_RTL8735B
 
-#include "WiFiUdpDriver.h"
+#include "WiFiDriver.h"
 
 #include "wifi_shim.h"
 
@@ -42,12 +42,14 @@ void print_ipv4(const char *prefix, uint32_t address, uint16_t port)
 
 }
 
-WiFiUdpDriver::WiFiUdpDriver(uint16_t local_port, uint16_t gcs_port) :
+WiFiDriver::WiFiDriver(Protocol protocol, uint16_t local_port, uint16_t gcs_port) :
+    _protocol(protocol),
     _local_port(local_port),
     _gcs_port(gcs_port),
     _task(nullptr),
     _disabled_reported(false),
     _fd(-1),
+    _listen_fd(-1),
     _sta_started(false),
     _retry_at_ms(0),
     _last_link_check_ms(0),
@@ -63,24 +65,24 @@ WiFiUdpDriver::WiFiUdpDriver(uint16_t local_port, uint16_t gcs_port) :
     _last_options = 0;
 }
 
-bool WiFiUdpDriver::is_initialized()
+bool WiFiDriver::is_initialized()
 {
     return _initialized.load();
 }
 
-bool WiFiUdpDriver::tx_pending()
+bool WiFiDriver::tx_pending()
 {
     WITH_SEMAPHORE(_write_mutex);
     return _initialized.load() && _writebuf.available() > 0;
 }
 
-uint32_t WiFiUdpDriver::txspace()
+uint32_t WiFiDriver::txspace()
 {
     WITH_SEMAPHORE(_write_mutex);
     return _initialized.load() ? _writebuf.space() : 0;
 }
 
-WiFiUdpDriver::Status WiFiUdpDriver::status() const
+WiFiDriver::Status WiFiDriver::status() const
 {
     Status s {};
     s.state = _state.load();
@@ -104,9 +106,9 @@ WiFiUdpDriver::Status WiFiUdpDriver::status() const
     return s;
 }
 
-void WiFiUdpDriver::_begin(uint32_t baud, uint16_t rx_space, uint16_t tx_space)
+void WiFiDriver::_begin(uint32_t baud, uint16_t rx_space, uint16_t tx_space)
 {
-    (void)baud;   // UDP 沒有鮑率；SERIALn_BAUD 不影響本埠
+    (void)baud;   // 網路埠沒有鮑率；SERIALn_BAUD 不影響本埠
     WITH_SEMAPHORE(_read_mutex);
     WITH_SEMAPHORE(_write_mutex);
 
@@ -149,7 +151,7 @@ void WiFiUdpDriver::_begin(uint32_t baud, uint16_t rx_space, uint16_t tx_space)
     _initialized.store(true);
 }
 
-void WiFiUdpDriver::_end()
+void WiFiDriver::_end()
 {
     // Wi-Fi 連線與 task 保留；只停止本埠的緩衝，task 會丟棄收到的資料。
     WITH_SEMAPHORE(_read_mutex);
@@ -160,18 +162,18 @@ void WiFiUdpDriver::_end()
     _tx_generation++;
 }
 
-void WiFiUdpDriver::_flush()
+void WiFiDriver::_flush()
 {
     // 送出由 APM_WIFI task 進行，每一步都會盡量清空 TX 緩衝區；此處不在呼叫端做網路 I/O。
 }
 
-uint32_t WiFiUdpDriver::_available()
+uint32_t WiFiDriver::_available()
 {
     WITH_SEMAPHORE(_read_mutex);
     return _initialized.load() ? _readbuf.available() : 0;
 }
 
-ssize_t WiFiUdpDriver::_read(uint8_t *buffer, uint16_t count)
+ssize_t WiFiDriver::_read(uint8_t *buffer, uint16_t count)
 {
     WITH_SEMAPHORE(_read_mutex);
     if (!_initialized.load()) {
@@ -183,7 +185,7 @@ ssize_t WiFiUdpDriver::_read(uint8_t *buffer, uint16_t count)
     return _readbuf.read(buffer, count);
 }
 
-size_t WiFiUdpDriver::_write(const uint8_t *buffer, size_t size)
+size_t WiFiDriver::_write(const uint8_t *buffer, size_t size)
 {
     WITH_SEMAPHORE(_write_mutex);
     if (!_initialized.load() || buffer == nullptr || size == 0) {
@@ -192,7 +194,7 @@ size_t WiFiUdpDriver::_write(const uint8_t *buffer, size_t size)
     return _writebuf.write(buffer, size);
 }
 
-bool WiFiUdpDriver::_discard_input()
+bool WiFiDriver::_discard_input()
 {
     WITH_SEMAPHORE(_read_mutex);
     if (!_initialized.load()) {
@@ -202,16 +204,16 @@ bool WiFiUdpDriver::_discard_input()
     return true;
 }
 
-void WiFiUdpDriver::_task_entry(void *arg)
+void WiFiDriver::_task_entry(void *arg)
 {
-    WiFiUdpDriver *self = static_cast<WiFiUdpDriver *>(arg);
+    WiFiDriver *self = static_cast<WiFiDriver *>(arg);
     for (;;) {
         const uint32_t delay_ms = self->_link_step(AP_HAL::millis());
         vTaskDelay(pdMS_TO_TICKS(delay_ms));
     }
 }
 
-void WiFiUdpDriver::_set_state(LinkState state, uint32_t now_ms)
+void WiFiDriver::_set_state(LinkState state, uint32_t now_ms)
 {
     _state.store(state);
     if (state == LinkState::WAIT_RETRY) {
@@ -219,7 +221,7 @@ void WiFiUdpDriver::_set_state(LinkState state, uint32_t now_ms)
     }
 }
 
-void WiFiUdpDriver::_clear_tx()
+void WiFiDriver::_clear_tx()
 {
     WITH_SEMAPHORE(_write_mutex);
     const uint32_t stale = _writebuf.available();
@@ -231,10 +233,31 @@ void WiFiUdpDriver::_clear_tx()
     _tx_incomplete = false;
 }
 
-void WiFiUdpDriver::_link_lost(uint32_t now_ms, const char *reason)
+bool WiFiDriver::_open_sockets()
 {
-    rtl8735b_udp_close(_fd);
+    if (_protocol == Protocol::TCP) {
+        _listen_fd = rtl8735b_tcp_listen(_local_port);
+        return _listen_fd >= 0;
+    }
+    _fd = rtl8735b_udp_open(_local_port);
+    return _fd >= 0;
+}
+
+void WiFiDriver::_close_sockets()
+{
+    if (_protocol == Protocol::TCP) {
+        rtl8735b_tcp_close(_fd);
+        rtl8735b_tcp_close(_listen_fd);
+    } else {
+        rtl8735b_udp_close(_fd);
+    }
     _fd = -1;
+    _listen_fd = -1;
+}
+
+void WiFiDriver::_link_lost(uint32_t now_ms, const char *reason)
+{
+    _close_sockets();
     rtl8735b_wifi_leave();
     _gcs_known.store(false);
     _local_address.store(0);
@@ -243,7 +266,7 @@ void WiFiUdpDriver::_link_lost(uint32_t now_ms, const char *reason)
     _set_state(LinkState::WAIT_RETRY, now_ms);
 }
 
-void WiFiUdpDriver::_refresh_address()
+void WiFiDriver::_refresh_address()
 {
     uint32_t address = 0;
     uint32_t netmask = 0;
@@ -256,12 +279,12 @@ void WiFiUdpDriver::_refresh_address()
     _broadcast_address = (netmask == 0 || (~netmask) <= 1) ? 0xffffffffu : (address | ~netmask);
 }
 
-bool WiFiUdpDriver::_gcs_active(uint32_t now_ms) const
+bool WiFiDriver::_gcs_active(uint32_t now_ms) const
 {
     return _gcs_known.load() && (now_ms - _last_gcs_rx_ms) <= PEER_TIMEOUT_MS;
 }
 
-bool WiFiUdpDriver::_accept_source(uint32_t address, uint16_t port, uint32_t now_ms)
+bool WiFiDriver::_accept_source(uint32_t address, uint16_t port, uint32_t now_ms)
 {
     if (_gcs_known.load() && address == _gcs_address.load() && port == _gcs_port_learned.load()) {
         _last_gcs_rx_ms = now_ms;
@@ -281,7 +304,7 @@ bool WiFiUdpDriver::_accept_source(uint32_t address, uint16_t port, uint32_t now
     return true;
 }
 
-void WiFiUdpDriver::_service_rx(uint32_t now_ms)
+void WiFiDriver::_service_rx(uint32_t now_ms)
 {
     for (uint8_t i = 0; i < MAX_DATAGRAMS_PER_STEP; i++) {
         uint32_t address = 0;
@@ -311,7 +334,7 @@ void WiFiUdpDriver::_service_rx(uint32_t now_ms)
     }
 }
 
-void WiFiUdpDriver::_service_tx(uint32_t now_ms)
+void WiFiDriver::_service_tx(uint32_t now_ms)
 {
     for (uint8_t i = 0; i < MAX_DATAGRAMS_PER_STEP; i++) {
         uint16_t n = 0;
@@ -387,7 +410,7 @@ void WiFiUdpDriver::_service_tx(uint32_t now_ms)
     }
 }
 
-uint32_t WiFiUdpDriver::_link_step(uint32_t now_ms)
+uint32_t WiFiDriver::_link_step(uint32_t now_ms)
 {
     switch (_state.load()) {
     case LinkState::NOT_STARTED:
@@ -418,15 +441,16 @@ uint32_t WiFiUdpDriver::_link_step(uint32_t now_ms)
         printf("WiFi: joining (SSID length %u)\n", (unsigned)rtl8735b_wifi_ssid_len);
         const int join = rtl8735b_wifi_join(rtl8735b_wifi_ssid, rtl8735b_wifi_ssid_len,
                                              rtl8735b_wifi_password, rtl8735b_wifi_password_len);
+        bool opened = false;
         if (join == RTL8735B_WIFI_OK) {
             _refresh_address();
             if (_local_address.load() != 0) {
-                _fd = rtl8735b_udp_open(_local_port);
+                opened = _open_sockets();
             }
         }
-        if (join != RTL8735B_WIFI_OK || _local_address.load() == 0 || _fd < 0) {
+        if (join != RTL8735B_WIFI_OK || _local_address.load() == 0 || !opened) {
             _join_failures.fetch_add(1);
-            _fd = -1;
+            _close_sockets();
             rtl8735b_wifi_leave();
             printf("WiFi: join failed (%d)\n", join);
             _set_state(LinkState::WAIT_RETRY, now_ms);
@@ -453,11 +477,126 @@ uint32_t WiFiUdpDriver::_link_step(uint32_t now_ms)
                 return 10;
             }
         }
-        _service_rx(now_ms);
-        _service_tx(now_ms);
+        if (_protocol == Protocol::TCP) {
+            _service_tcp_accept(now_ms);
+            _service_tcp_rx(now_ms);
+            _service_tcp_tx();
+        } else {
+            _service_rx(now_ms);
+            _service_tx(now_ms);
+        }
         return 1;
     }
     return 10;
+}
+
+void WiFiDriver::_drop_tcp_client(const char *reason)
+{
+    rtl8735b_tcp_close(_fd);
+    _fd = -1;
+    _gcs_known.store(false);
+    printf("WiFi: ground station %s\n", reason);
+}
+
+void WiFiDriver::_service_tcp_accept(uint32_t now_ms)
+{
+    uint32_t address = 0;
+    uint16_t port = 0;
+    const int fd = rtl8735b_tcp_accept(_listen_fd, &address, &port);
+    if (fd < 0) {
+        return;   // 沒有等待中的連線；listen socket 的錯誤由連線檢查處理斷線
+    }
+    if (_fd >= 0) {
+        if (_gcs_active(now_ms)) {
+            // 地面站活躍期間不讓其他主機接手（包含 RC override），與 UDP 相同。
+            rtl8735b_tcp_close(fd);
+            _rx_foreign_datagrams.fetch_add(1);
+            return;
+        }
+        _drop_tcp_client("replaced by a new connection");
+    }
+    _fd = fd;
+    _gcs_address.store(address);
+    _gcs_port_learned.store(port);
+    _gcs_known.store(true);
+    _last_gcs_rx_ms = now_ms;
+    _gcs_changes.fetch_add(1);
+    // 新的地面站不接收上一個連線留下的資料。
+    {
+        WITH_SEMAPHORE(_read_mutex);
+        _readbuf.clear();
+    }
+    _clear_tx();
+    print_ipv4("ground station", address, port);
+}
+
+void WiFiDriver::_service_tcp_rx(uint32_t now_ms)
+{
+    for (uint8_t i = 0; i < MAX_DATAGRAMS_PER_STEP && _fd >= 0; i++) {
+        uint32_t space;
+        {
+            WITH_SEMAPHORE(_read_mutex);
+            space = _initialized.load() ? _readbuf.space() : sizeof(_datagram);
+        }
+        if (space == 0) {
+            return;   // 讀取緩衝區滿：留在 socket 裡，由 TCP 流量控制讓對端等待
+        }
+        const int n = rtl8735b_tcp_recv(_fd, _datagram, (uint16_t)std::min<uint32_t>(space, sizeof(_datagram)));
+        if (n == 0) {
+            return;
+        }
+        if (n < 0) {
+            _drop_tcp_client(n == RTL8735B_WIFI_ERR_CLOSED ? "disconnected" : "connection error");
+            return;
+        }
+        _last_gcs_rx_ms = now_ms;
+        _rx_datagrams.fetch_add(1);
+        _rx_bytes.fetch_add(n);
+        WITH_SEMAPHORE(_read_mutex);
+        if (!_initialized.load()) {
+            _rx_dropped_bytes.fetch_add(n);   // 本埠已 end()
+            continue;
+        }
+        _readbuf.write(_datagram, n);
+    }
+}
+
+void WiFiDriver::_service_tcp_tx()
+{
+    if (_fd < 0) {
+        _clear_tx();   // 沒有地面站：丟棄，連線後只送新的資料
+        return;
+    }
+    for (uint8_t i = 0; i < MAX_DATAGRAMS_PER_STEP; i++) {
+        uint16_t n;
+        uint32_t generation;
+        {
+            WITH_SEMAPHORE(_write_mutex);
+            n = (uint16_t)std::min<uint32_t>(_writebuf.available(), DATAGRAM_MAX);
+            if (n == 0) {
+                return;
+            }
+            _writebuf.peekbytes(_datagram, n);
+            generation = _tx_generation;
+        }
+        const int sent = rtl8735b_tcp_send(_fd, _datagram, n);
+        if (sent < 0) {
+            _tx_errors.fetch_add(1);
+            _drop_tcp_client("connection error");
+            return;
+        }
+        if (sent > 0) {
+            WITH_SEMAPHORE(_write_mutex);
+            if (generation == _tx_generation) {
+                _writebuf.advance(sent);
+            }
+            _tx_datagrams.fetch_add(1);
+            _tx_bytes.fetch_add(sent);
+        }
+        if (sent < n) {
+            return;   // 送出緩衝區滿：剩下的留到下一步
+        }
+    }
 }
 
 #endif // CONFIG_HAL_BOARD == HAL_BOARD_RTL8735B

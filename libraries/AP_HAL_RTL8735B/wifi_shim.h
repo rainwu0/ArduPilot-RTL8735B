@@ -3,7 +3,7 @@
 #pragma once
 
 /*
- * Wi-Fi STA 與 lwIP UDP socket 的 C 包裝。SDK 的 wifi_conf.h、lwip 標頭在 C++ 下有型別衝突，
+ * Wi-Fi STA 與 lwIP UDP、TCP socket 的 C 包裝。SDK 的 wifi_conf.h、lwip 標頭在 C++ 下有型別衝突，
  * 且 lwip/sockets.h 會把 close、read、write 定義成巨集，所以 SDK 呼叫都留在以 C 編譯的 wifi_shim.c。
  * 位址一律用主機位元組序的 IPv4（a.b.c.d 為 (a << 24) | (b << 16) | (c << 8) | d）。
  *
@@ -20,6 +20,8 @@ enum {
     RTL8735B_WIFI_ERR_JOIN = -3,
     RTL8735B_WIFI_ERR_DHCP = -4,
     RTL8735B_WIFI_ERR_SOCKET = -5,
+    RTL8735B_WIFI_NONE = -6,         // 沒有等待中的連線（非錯誤）
+    RTL8735B_WIFI_ERR_CLOSED = -7,   // 對端已關閉 TCP 連線
 };
 
 #ifdef __cplusplus
@@ -58,6 +60,21 @@ int rtl8735b_udp_recvfrom(int fd, uint8_t *buffer, uint16_t length, uint32_t *ad
 int rtl8735b_udp_sendto(int fd, const uint8_t *buffer, uint16_t length, uint32_t address, uint16_t port);
 
 void rtl8735b_udp_close(int fd);
+
+// 建立非阻塞、綁定 port、只排一個等待連線的 TCP listen socket；回傳 fd（>= 0）或錯誤碼。
+int rtl8735b_tcp_listen(uint16_t port);
+
+// 非阻塞接受一個連線：回傳非阻塞、關閉 Nagle 的連線 fd（>= 0），沒有等待中的連線時為
+// RTL8735B_WIFI_NONE，其他錯誤為 < 0。
+int rtl8735b_tcp_accept(int listen_fd, uint32_t *address, uint16_t *port);
+
+// 非阻塞接收：> 0 為位元組數，0 為沒有資料，RTL8735B_WIFI_ERR_CLOSED 為對端已關閉，其他 < 0 為錯誤。
+int rtl8735b_tcp_recv(int fd, uint8_t *buffer, uint16_t length);
+
+// 非阻塞送出：回傳送出的位元組數（送出緩衝區滿時為 0）或 < 0。
+int rtl8735b_tcp_send(int fd, const uint8_t *buffer, uint16_t length);
+
+void rtl8735b_tcp_close(int fd);
 
 #ifdef __cplusplus
 }

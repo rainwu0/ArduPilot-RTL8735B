@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
 /*
- * Wi-Fi STA 與 lwIP UDP 的 C 包裝，理由見 wifi_shim.h。連線流程依 SDK 的初始化與 AT 指令：
+ * Wi-Fi STA 與 lwIP UDP、TCP 的 C 包裝，理由見 wifi_shim.h。連線流程依 SDK 的初始化與 AT 指令：
  * wlan_network.c 的 init_thread 先 LwIP_Init() 再 wifi_on(RTW_MODE_STA)；連線以
  * wifi_connect(&info, 1) 同步等待，再 LwIP_DHCP(0, DHCP_START)。SDK 的 wlan_network() 與
  * wifi_fast_connect_enable() 都不呼叫：前者只做上述兩步，後者會在連線成功時把連線資訊寫進 Flash。
@@ -30,7 +30,7 @@ int rtl8735b_wifi_start_sta(void)
     if (wifi_on(RTW_MODE_STA) < 0) {
         return RTL8735B_WIFI_ERR_START;
     }
-    // wifi_on 在 CONFIG_AUTO_RECONNECT 時會開啟 SDK 自動重連；重連由 WiFiUdpDriver 單一負責，
+    // wifi_on 在 CONFIG_AUTO_RECONNECT 時會開啟 SDK 自動重連；重連由 WiFiDriver 單一負責，
     // 避免兩個連線流程互相回傳 RTW_BUSY。關不掉就回報失敗，由呼叫端重試。
     if (wifi_config_autoreconnect(0, 0, 0) != 0) {
         printf("WiFi: cannot disable SDK auto-reconnect\n");
@@ -169,6 +169,92 @@ int rtl8735b_udp_sendto(int fd, const uint8_t *buffer, uint16_t length, uint32_t
 }
 
 void rtl8735b_udp_close(int fd)
+{
+    if (fd >= 0) {
+        lwip_close(fd);
+    }
+}
+
+static int _would_block(void)
+{
+    return errno == EWOULDBLOCK || errno == EAGAIN;
+}
+
+int rtl8735b_tcp_listen(uint16_t port)
+{
+    struct sockaddr_in local;
+    const int enable = 1;
+    const int fd = lwip_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (fd < 0) {
+        return RTL8735B_WIFI_ERR_SOCKET;
+    }
+    // 重新連線後立刻重新綁定同一埠；組態沒有開 SO_REUSE 時設定會失敗，不影響第一次綁定。
+    (void)lwip_setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+    memset(&local, 0, sizeof(local));
+    local.sin_family = AF_INET;
+    local.sin_port = htons(port);
+    local.sin_addr.s_addr = 0;   // INADDR_ANY
+    if (lwip_bind(fd, (const struct sockaddr *)&local, sizeof(local)) != 0 ||
+        lwip_listen(fd, 1) != 0 ||
+        lwip_fcntl(fd, F_SETFL, O_NONBLOCK) != 0) {
+        lwip_close(fd);
+        return RTL8735B_WIFI_ERR_SOCKET;
+    }
+    return fd;
+}
+
+int rtl8735b_tcp_accept(int listen_fd, uint32_t *address, uint16_t *port)
+{
+    struct sockaddr_in from;
+    socklen_t from_len = sizeof(from);
+    const int enable = 1;
+    if (listen_fd < 0 || address == NULL || port == NULL) {
+        return RTL8735B_WIFI_ERR_ARG;
+    }
+    memset(&from, 0, sizeof(from));
+    const int fd = lwip_accept(listen_fd, (struct sockaddr *)&from, &from_len);
+    if (fd < 0) {
+        return _would_block() ? RTL8735B_WIFI_NONE : RTL8735B_WIFI_ERR_SOCKET;
+    }
+    // MAVLink 訊框小而頻繁，關閉 Nagle 以免延遲。
+    if (lwip_fcntl(fd, F_SETFL, O_NONBLOCK) != 0 ||
+        lwip_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(enable)) != 0) {
+        lwip_close(fd);
+        return RTL8735B_WIFI_ERR_SOCKET;
+    }
+    *address = ntohl(from.sin_addr.s_addr);
+    *port = ntohs(from.sin_port);
+    return fd;
+}
+
+int rtl8735b_tcp_recv(int fd, uint8_t *buffer, uint16_t length)
+{
+    if (fd < 0 || buffer == NULL || length == 0) {
+        return RTL8735B_WIFI_ERR_ARG;
+    }
+    const ssize_t n = lwip_recv(fd, buffer, length, MSG_DONTWAIT);
+    if (n == 0) {
+        return RTL8735B_WIFI_ERR_CLOSED;
+    }
+    if (n < 0) {
+        return _would_block() ? 0 : RTL8735B_WIFI_ERR_SOCKET;
+    }
+    return (int)n;
+}
+
+int rtl8735b_tcp_send(int fd, const uint8_t *buffer, uint16_t length)
+{
+    if (fd < 0 || buffer == NULL || length == 0) {
+        return RTL8735B_WIFI_ERR_ARG;
+    }
+    const ssize_t n = lwip_send(fd, buffer, length, MSG_DONTWAIT);
+    if (n < 0) {
+        return _would_block() ? 0 : RTL8735B_WIFI_ERR_SOCKET;
+    }
+    return (int)n;
+}
+
+void rtl8735b_tcp_close(int fd)
 {
     if (fd >= 0) {
         lwip_close(fd);

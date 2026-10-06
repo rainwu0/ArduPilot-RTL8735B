@@ -17,6 +17,7 @@
 #define HAL_BOARD_ESP32	   12
 #define HAL_BOARD_QURT     13
 #define HAL_BOARD_EMPTY    99
+#define HAL_BOARD_RTL8735B 100
 // @LoggerEnumEnd
 
 // @LoggerEnum: HAL_BOARD_SUBTYPE
@@ -140,6 +141,8 @@
 	#include <AP_HAL/board/chibios.h>
 #elif CONFIG_HAL_BOARD == HAL_BOARD_ESP32
     #include <AP_HAL/board/esp32.h>
+#elif CONFIG_HAL_BOARD == HAL_BOARD_RTL8735B
+    #include <AP_HAL/board/rtl8735b.h>
 #elif CONFIG_HAL_BOARD == HAL_BOARD_QURT
     #include <AP_HAL/board/qurt.h>
 #else

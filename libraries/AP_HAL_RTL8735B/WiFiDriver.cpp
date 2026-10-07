@@ -245,11 +245,16 @@ bool WiFiDriver::_open_sockets()
 
 void WiFiDriver::_close_sockets()
 {
-    if (_protocol == Protocol::TCP) {
-        rtl8735b_tcp_close(_fd);
+    // 只關已開啟的 socket：連線或開 socket 失敗時不呼叫 SDK
+    if (_fd >= 0) {
+        if (_protocol == Protocol::TCP) {
+            rtl8735b_tcp_close(_fd);
+        } else {
+            rtl8735b_udp_close(_fd);
+        }
+    }
+    if (_listen_fd >= 0) {
         rtl8735b_tcp_close(_listen_fd);
-    } else {
-        rtl8735b_udp_close(_fd);
     }
     _fd = -1;
     _listen_fd = -1;

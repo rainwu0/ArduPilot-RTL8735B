@@ -54,6 +54,14 @@ def configure(cfg):
         cfg.fatal("Failed to process hwdef.dat")
     hal_common.process_hwdef_results(cfg, hwdef_obj)
 
+    # 板子的應用程式（選用）：hwdef 以 env RTL8735B_APP_DIR <目錄> 指定，相對路徑以原始碼根目錄為基準
+    if env.RTL8735B_APP_DIR:
+        app_dir = os.path.normpath(os.path.join(env.SRCROOT, env.RTL8735B_APP_DIR))
+        if not os.path.isdir(app_dir):
+            cfg.fatal("RTL8735B_APP_DIR not found: %s" % app_dir)
+        env.RTL8735B_APP_DIR = app_dir
+        cfg.msg('RTL8735B application', app_dir)
+
 
 def generate_hwdef_h(env):
     '''run rtl8735b_hwdef.py'''
@@ -115,6 +123,8 @@ def pre_build(self):
     lib_vars['ARDUPILOT_LIB'] = self.bldnode.find_or_declare('lib/').abspath()
     lib_vars['ARDUPILOT_BIN'] = self.bldnode.find_or_declare('lib/bin').abspath()
     lib_vars['AMEBAPRO2_SDK'] = self.env.AMEBAPRO2_SDK
+    # 沒有應用程式時也傳空字串：cmake 快取會留著先前傳過的值
+    lib_vars['RTL8735B_APP_DIR'] = self.env.RTL8735B_APP_DIR or ''
     lib_vars['CMAKE_TOOLCHAIN_FILE'] = os.path.join(
         self.env.AMEBAPRO2_SDK, 'project/realtek_amebapro2_v0_example/GCC-RELEASE/toolchain.cmake')
     sdk = self.cmake(

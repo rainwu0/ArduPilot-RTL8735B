@@ -7,7 +7,7 @@
  * 此時 FreeRTOS 排程器還沒啟動；SDK 範例的 main 做完初始化後才呼叫 vTaskStartScheduler
  * （見 SDK project/realtek_amebapro2_v0_example/src/main.c）。
  * 這裡只初始化 console，把 ArduPilot 的入口（AP_HAL_MAIN 展開的 ardupilot_main，
- * 見 AP_HAL/board/rtl8735b.h 的 AP_MAIN）放進一個 task，再啟動排程器。
+ * 見 AP_HAL/board/rtl8735b.h 的 AP_MAIN）放進一個 task，呼叫板子的應用程式，再啟動排程器。
  */
 
 #include <stddef.h>
@@ -29,6 +29,13 @@ static void ardupilot_task(void *arg)
     vTaskDelete(NULL);
 }
 
+// 板子的應用程式（hwdef 的 env RTL8735B_APP_DIR，見 CMakeLists.txt）覆寫這個弱符號，
+// 在這裡建立自己的 task；此時排程器還沒啟動。沒有應用程式時什麼都不做。
+void rtl8735b_app_init(void);
+__attribute__((weak)) void rtl8735b_app_init(void)
+{
+}
+
 int main(void)
 {
     console_init();
@@ -40,6 +47,8 @@ int main(void)
         for (;;) {
         }
     }
+
+    rtl8735b_app_init();
 
     vTaskStartScheduler();
     for (;;) {

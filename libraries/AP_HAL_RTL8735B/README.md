@@ -41,6 +41,20 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 
 目前的限制：SPI 裝置表只有一筆 `bmi160`（SPI1，片選腳為 `HAL_RTL8735B_BMI160_CS_PIN`）；GPIO 只有邏輯腳位 7、25、26。
 
+### 板子的應用程式
+
+自訂板可以把 SDK 端的 C 程式編進同一份韌體。在疊加的 hwdef 加一行：
+
+```
+env RTL8735B_APP_DIR <目錄>
+```
+
+- 相對路徑以本儲存庫根目錄為基準；目錄不存在時 configure 失敗。
+- 目錄中的 `.c` 檔與 SDK 原始碼一起編譯，沿用 SDK 的 include 與巨集；目錄中沒有 `.c` 檔時建置失敗。
+- 應用程式要定義 `void rtl8735b_app_init(void)`。韌體在建立 ArduPilot 的 task 之後、啟動排程器之前呼叫它，可以在這裡建立自己的 FreeRTOS task。
+- 應用程式只能使用 SDK，不能存取 ArduPilot 的內部。task 優先權不要高於 3：ArduPilot 主執行緒為 4，見 `Scheduler.h`。
+- 沒有這一行時，韌體不含任何應用程式。
+
 ## Wi-Fi
 
 建置時以環境變數 `RTL8735B_WIFI_CONFIG` 指向本機設定檔（`ssid=`、`password=` 兩行）；沒有設定時 Wi-Fi 不啟用。帳密只寫進建置目錄。

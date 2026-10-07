@@ -12,6 +12,7 @@
 #   CMAKE_TOOLCHAIN_FILE  SDK 的 toolchain.cmake（旗標、-wrap 與 -D 都來自它）
 #   RTL8735B_WIFI_CREDENTIALS_SOURCE  waf 在建置目錄產生的 wifi_credentials.c（hwdef/scripts/rtl8735b_wifi_config.py），
 #                      未設定 Wi-Fi 時是 SSID 長度 0 的版本；內容可能含帳密，只在建置目錄
+#   RTL8735B_APP_DIR   板子的應用程式目錄（hwdef 的 env RTL8735B_APP_DIR，絕對路徑）；空字串表示沒有
 #
 # SDK 的 config.cmake 會在 configure 時以 sed -i 改寫 SDK 內的檔案，但預設值下內容不變；
 # 檔案時間由 sdk_mtime.cmake 在內容未變時還原，避免 SDK 端整份重編。
@@ -106,6 +107,18 @@ add_executable(${app} main.c ${RTL8735B_WIFI_CREDENTIALS_SOURCE} $<TARGET_OBJECT
 target_compile_definitions(${app} PRIVATE ${sdk_defines})
 target_compile_options(${app} PRIVATE $<$<COMPILE_LANGUAGE:C>:${WARN_ERR_FLAGS}>)
 target_include_directories(${app} PUBLIC ${sdk_includes})
+
+# 板子的應用程式（選用）：目錄中的 .c 與入口一起編譯，沿用 SDK 的 include 與巨集，
+# 由 main.c 呼叫其中的 rtl8735b_app_init()
+if(RTL8735B_APP_DIR)
+    file(GLOB app_sources CONFIGURE_DEPENDS "${RTL8735B_APP_DIR}/*.c")
+    if(NOT app_sources)
+        message(FATAL_ERROR "RTL8735B_APP_DIR has no .c files: ${RTL8735B_APP_DIR}")
+    endif()
+    message(STATUS "RTL8735B_APP_DIR=${RTL8735B_APP_DIR}")
+    target_sources(${app} PRIVATE ${app_sources})
+    target_include_directories(${app} PRIVATE ${RTL8735B_APP_DIR})
+endif()
 
 if(NOT DEFINED ARDUPILOT_CMD)
     set(ARDUPILOT_CMD "none")

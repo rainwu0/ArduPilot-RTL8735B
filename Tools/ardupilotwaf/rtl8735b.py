@@ -7,6 +7,7 @@
 RTL8735B 的 waf 工具：ArduPilot 由 waf 編成靜態庫，再交給
 libraries/AP_HAL_RTL8735B/targets/cmake 的 cmake 專案與 Realtek SDK 連結、產生映像。
 SDK 位置由環境變數 AMEBAPRO2_SDK 指定，預設是原始碼樹旁的 ../ambpro2_sdk。
+hwdef 產生與 cmake 設定的部分改寫自 Tools/ardupilotwaf/esp32.py（ArduPilot 9f648ccabc）。
 """
 
 from waflib import Logs, Task

@@ -3,6 +3,7 @@
 '''
 由 hwdef.dat 產生 RTL8735B 板子的 hwdef.h。
 目前只處理共用的 define、IMU、COMPASS、BARO 列；匯流排與腳位的關鍵字之後加入。
+改寫自 libraries/AP_HAL_ESP32/hwdef/scripts/esp32_hwdef.py（ArduPilot 9f648ccabc）。
 
 AP_FLAKE8_CLEAN
 

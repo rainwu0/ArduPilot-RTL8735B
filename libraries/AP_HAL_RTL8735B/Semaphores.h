@@ -11,6 +11,8 @@
  *
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * 改寫自 libraries/AP_HAL_ESP32/Semaphores.h（ArduPilot 9f648ccabc）。
  */
 
 #pragma once

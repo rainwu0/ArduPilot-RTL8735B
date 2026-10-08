@@ -84,8 +84,8 @@ TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
 ./waf copter --upload --upload-port /dev/ttyUSB0  # Linux：執行 Linux 版工具
 ```
 
-- 看到「請讓板子進入燒錄模式」時，依開發板的按鍵讓晶片進入燒錄模式（由重置時 PA5 的電位決定）。60 秒內沒有進入會自動重試，逾時則不寫入。看到 `download success` 後重置一次即開機。
-- `COMn` 需要 WSL interop（能在 WSL 執行 Windows 程式）。WSL 開了 systemd 時 interop 可能失效，`--upload` 會在編譯開始前提示。
+- 看到「請讓板子進入燒錄模式」時，依開發板的按鍵讓晶片進入燒錄模式（由重置時 PA5 的電位決定；HUB 8735 ultra 是按住 upgrade 鍵、短按 reset，再放開 upgrade）。60 秒內沒有進入會自動重試，逾時則不寫入。看到 `download success` 後重置一次即開機。
+- `COMn` 需要 WSL interop（能在 WSL 執行 Windows 程式），沒有時 `--upload` 會在編譯開始前提示。開了 systemd 的 WSL 在發行版閒置關閉、又在同一個 WSL VM 內重新啟動後，interop 可能不會重新註冊：在 Windows 執行 `wsl --shutdown` 讓 WSL 重新開機，並在建置與燒錄期間保持一個 WSL 終端開著。
 - `/dev/ttyXXX` 需要該裝置的讀寫權限（`dialout` 群組）；在 WSL 要先以 usbipd 把 USB 序列裝置掛進 WSL。
 - 環境變數 `AP_OVERRIDE_UPLOAD_CMD` 可改用自訂指令：執行時後面接上映像路徑，有 `--upload-port` 時再接 `--port <埠>`。
 - 只下載、不抹除；燒完不會自動重置。

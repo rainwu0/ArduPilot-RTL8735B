@@ -41,9 +41,12 @@ RETRY_DELAY_S = 3
 # 一次完整下載約 46 秒；超過這個時間沒有結束就視為卡住，不重試
 ATTEMPT_TIMEOUT_S = 180
 
-INTEROP_HINT = ('--upload-port COMn 要從 WSL 執行 Windows 版 uartfwburn.exe，但這個 WSL 沒有啟用 interop'
-                '（/proc/sys/fs/binfmt_misc 下沒有 WSLInterop）。常見原因是 /etc/wsl.conf 開了 systemd，'
-                '開機時 interop 的註冊被清掉。修好 interop，或改用 Linux 的序列裝置 /dev/ttyXXX。')
+INTEROP_HINT = ('--upload-port COMn 要從 WSL 執行 Windows 版 uartfwburn.exe，但目前的 WSL 沒有 interop'
+                '（/proc/sys/fs/binfmt_misc 下沒有 WSLInterop）。開了 systemd 的 WSL 在發行版閒置關閉、'
+                '又在同一個 WSL VM 內重新啟動後，interop 可能不會重新註冊。在 Windows 執行 wsl --shutdown '
+                '讓 WSL 重新開機，並在建置與燒錄期間保持一個 WSL 終端開著；或改用 Linux 的序列裝置 /dev/ttyXXX。')
+# HUB 8735 ultra 的按鍵順序（HUB 8735 ultra User Manual【AIoT Starter Kit for Arduino】20240530 p.15）；其他開發板依各自的說明
+DOWNLOAD_MODE_KEYS = '例如 HUB 8735 ultra：按住 upgrade 鍵，短按 reset，再放開 upgrade'
 
 
 class UploadError(Exception):
@@ -187,7 +190,7 @@ def upload(image, port, sdk, workdir, override=None, *,
 
     cmd = tool_command(kind, port)
     log('RTL8735B 燒錄：%s（工作目錄 %s）' % (' '.join(cmd), tool_dir))
-    log('請讓板子進入燒錄模式（依開發板的按鍵操作）；%d 秒內沒有進入會自動重試' % RETRY_WINDOW_S)
+    log('請讓板子進入燒錄模式（%s）；%d 秒內沒有進入會自動重試' % (DOWNLOAD_MODE_KEYS, RETRY_WINDOW_S))
     deadline = clock() + RETRY_WINDOW_S
     while True:
         rc, output = run_tool(cmd, tool_dir, ATTEMPT_TIMEOUT_S)

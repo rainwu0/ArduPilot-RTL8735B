@@ -20,6 +20,7 @@ import sys
 import traceback
 
 import hal_common
+import rtl8735b_image_check
 import rtl8735b_upload
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../../libraries/AP_HAL_RTL8735B/hwdef/scripts'))
@@ -183,6 +184,26 @@ def pre_build(self):
     self.add_to_group(tsk)
 
 
+class rtl8735b_check_image(Task.Task):
+    '''映像關卡：firmware_ntz.bin 超過 fw1 的長度，或 flash_ntz.bin 的分割記錄與 hwdef 選的 Flash 版面不同，
+    就讓建置失敗（rtl8735b_image_check.py）'''
+    color = 'BLUE'
+    always_run = True
+
+    def run(self):
+        sdk_build = os.path.dirname(self.inputs[0].abspath())
+        try:
+            layout = rtl8735b_flash_layout.get(self.env.RTL8735B_FLASH_LAYOUT)
+            size, limit = rtl8735b_image_check.check(os.path.join(sdk_build, 'firmware_ntz.bin'),
+                                                     (layout['fw1'], layout['fw2']),
+                                                     flash_path=self.inputs[0].abspath())
+        except (rtl8735b_image_check.ImageCheckError, rtl8735b_flash_layout.LayoutError, OSError) as e:
+            Logs.error(str(e))
+            return 1
+        Logs.info('firmware_ntz.bin: %d bytes, limit %d bytes, %d left' % (size, limit, limit - size))
+        return 0
+
+
 class rtl8735b_upload_fw(Task.Task):
     '''--upload：建置完成後以 uartfwburn 燒錄 flash_ntz.bin（見 rtl8735b_upload.py）'''
     color = 'BLUE'
@@ -214,6 +235,12 @@ def rtl8735b_firmware(self):
 
     build.cmake_build_task.set_run_after(self.link_task)
 
+    # 所有程式共用同一份 SDK 映像，關卡只檢查一次；燒錄排在關卡之後
+    if not getattr(self.bld, 'rtl8735b_check_task', None):
+        check = self.create_task('rtl8735b_check_image', src=build.cmake_build_task.outputs[0])
+        check.set_run_after(build.cmake_build_task)
+        self.bld.rtl8735b_check_task = check
+
     # 所有程式共用同一份 SDK 映像，只燒一次；缺燒錄埠等錯誤在建置開始前就停下
     if self.bld.options.upload and not getattr(self.bld, 'rtl8735b_upload_posted', False):
         try:
@@ -223,3 +250,4 @@ def rtl8735b_firmware(self):
         self.bld.rtl8735b_upload_posted = True
         upload = self.create_task('rtl8735b_upload_fw', src=build.cmake_build_task.outputs[0])
         upload.set_run_after(build.cmake_build_task)
+        upload.set_run_after(self.bld.rtl8735b_check_task)

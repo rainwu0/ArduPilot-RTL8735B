@@ -23,6 +23,7 @@ import hal_common
 import rtl8735b_upload
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../../libraries/AP_HAL_RTL8735B/hwdef/scripts'))
+import rtl8735b_flash_layout
 import rtl8735b_hwdef
 import rtl8735b_wifi_config
 
@@ -103,6 +104,21 @@ def generate_wifi_credentials(bld):
     return out
 
 
+def generate_partition_table(bld):
+    '''SDK 打包用的分割表：以使用者 SDK 範例專案的分割表為底，依 hwdef 的 FLASH_LAYOUT 改寫 PARTAB
+    （hwdef/scripts/rtl8735b_flash_layout.py）。每次建置都重寫，SDK 端的 cmake 以它取代 SDK 的那一份'''
+    name = bld.env.RTL8735B_FLASH_LAYOUT
+    sdk_table = os.path.join(bld.env.AMEBAPRO2_SDK,
+                             'project/realtek_amebapro2_v0_example/GCC-RELEASE/mp/amebapro2_partitiontable.json')
+    out = bld.bldnode.make_node('rtl8735b/amebapro2_partitiontable.json').abspath()
+    try:
+        rtl8735b_flash_layout.write_partition_table(sdk_table, name, out)
+    except (rtl8735b_flash_layout.LayoutError, OSError, ValueError) as e:
+        bld.fatal('Flash 版面 %s 的分割表產生失敗：%s' % (name, e))
+    print('Flash 版面：%s' % name)
+    return out
+
+
 def save_build_state_on_hangup():
     '''waf 只在建置結束或收到 Ctrl-C（KeyboardInterrupt）時把各工作的簽章寫進 .wafpickle；
     被其他訊號直接終止時，已完成的編譯都不記錄，下一次從頭整份重編，SDK 端的 cmake configure
@@ -119,6 +135,7 @@ def pre_build(self):
     save_build_state_on_hangup()
     lib_vars = OrderedDict()
     lib_vars['RTL8735B_WIFI_CREDENTIALS_SOURCE'] = generate_wifi_credentials(self)
+    lib_vars['RTL8735B_PARTITION_TABLE'] = generate_partition_table(self)
     lib_vars['ARDUPILOT_CMD'] = self.cmd
     lib_vars['WAF_BUILD_TARGET'] = self.targets
     lib_vars['ARDUPILOT_LIB'] = self.bldnode.find_or_declare('lib/').abspath()

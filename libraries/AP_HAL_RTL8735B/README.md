@@ -55,6 +55,28 @@ env RTL8735B_APP_DIR <目錄>
 - 應用程式只能使用 SDK，不能存取 ArduPilot 的內部。task 優先權不要高於 3：ArduPilot 主執行緒為 4，見 `Scheduler.h`。
 - 沒有這一行時，韌體不含任何應用程式。
 
+### Flash 版面
+
+`flash_ntz.bin` 裡的分割表（韌體槽、ISP IQ、NN 模型區等的位址與長度）依 hwdef 的 `FLASH_LAYOUT` 決定，以 `--extra-hwdef` 疊加：
+
+```
+FLASH_LAYOUT sdk-d1b6426
+```
+
+| 版面 | fw1 | fw2 | 映像上限 | 來源 |
+|---|---|---|---|---|
+| `realtek-ota`（預設） | 0x060000，4 MiB | 0x520000，4 MiB | 4,194,304 bytes | Realtek Arduino 套件 OTA Mode=Enable 的 `amebapro2_partitiontable_OTA.json`（Ameba-AIoT/ameba-arduino-pro2 93d6351），與 Ameba-AIoT/ameba-rtos-pro2 eb5c090 的範例分割相同 |
+| `sdk-d1b6426` | 0x080000，3.5 MiB | 0x4C0000，3.5 MiB | 3,670,016 bytes | ambpro2_sdk d1b6426 範例專案的 `amebapro2_partitiontable.json` |
+| `arduino-default` | 0x060000，4 MiB | 0x520000，64 KiB | 4,194,304 bytes | 同一個 Arduino 套件 OTA Mode=Disable 的 `amebapro2_partitiontable.json` |
+
+- 狀態：僅建置。以本版本建置的映像還沒在這個版面上開過機；先前的版本用的都是 SDK 原本的分割（`sdk-d1b6426`）。
+- 預設是 `realtek-ota`：手動燒錄預設建置的 `flash_ntz.bin` 時，板子的分割表也會換成這個版面。HUB 8735 ultra（ideashatch/HUB-8735 870a7e0 發行的板商套件 4.1.1）與 AMB82-mini（Ameba-AIoT/ameba-arduino-pro2 93d6351）的 Arduino 套件在 OTA Mode=Enable 時，以及新版 SDK（Ameba-AIoT/ameba-rtos-pro2 eb5c090），都用這個版面。要沿用 SDK `d1b6426` 原本的分割，選 `sdk-d1b6426`。
+- 建置時以 SDK 的分割表為底，只改寫各記錄的位址與長度。
+- 映像上限是 fw1 的長度：韌體燒在 fw1。`firmware_ntz.bin` 超過上限，或建出的 `flash_ntz.bin` 的槽記錄與版面不同時，建置失敗。
+- 本儲存庫不提供 Wi-Fi 韌體更新，不會寫入 fw2；fw2 只是分割表中的一筆記錄。
+- 版面在 `./waf configure` 時讀進來：改了 hwdef 或疊加檔的 `FLASH_LAYOUT` 之後要重新 configure。
+- 參數存在 0xF80000–0xFA0000，三種版面都相同。Arduino 套件（93d6351）與新版 SDK（eb5c090）的 NOR 檔案系統區（0xF64000–0x1000000）涵蓋這一段，只在啟用 Flash 檔案系統時會衝突；本移植沒有啟用。
+
 ## Wi-Fi
 
 建置時以環境變數 `RTL8735B_WIFI_CONFIG` 指向本機設定檔（`ssid=`、`password=` 兩行）；沒有設定時 Wi-Fi 不啟用。帳密只寫進建置目錄。
@@ -136,8 +158,9 @@ TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
 | 參數存在 Flash | 板上驗證 | 重開機與斷電後保留 |
 | SD 卡 | 未實作 | |
 | `--upload` 燒錄 | 僅建置 | `COMn`（Windows 版工具）與 `/dev/tty*`（Linux 版工具）都未上板；手動燒錄見〈燒錄〉 |
-| 韌體 OTA 更新 | 未實作 | |
+| 韌體 OTA 更新 | 不提供 | 本儲存庫不提供 Wi-Fi 韌體更新；更新韌體以燒錄進行，見〈燒錄〉 |
 | 自訂板建置 | 僅建置 | `--extra-hwdef` |
+| Flash 版面 | 僅建置 | `FLASH_LAYOUT`，預設 `realtek-ota`，見〈Flash 版面〉 |
 
 ## 授權
 

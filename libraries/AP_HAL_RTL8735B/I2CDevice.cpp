@@ -63,7 +63,7 @@ bool I2CDevice::transfer(const uint8_t *send, uint32_t send_len,
     int result = RTL8735B_BUS_ERROR;
     // timeout_ms 為每個 leg（寫、讀）的上限，不縮減 caller 設定的 retry 次數。
     // timeout_ms 最大 100 ms、RTOS tick 1 ms，寫後讀交易最壞約 2 x 101 ms，uint8_t retry 最壞總上限為 256 倍。
-    // BUS_TIMEOUT 不重試；shim 已封鎖該控制器以保護仍被 SDK 使用的靜態緩衝。
+    // BUS_TIMEOUT 不重試：shim 已重新初始化控制器（連續逾時達上限時封鎖），由驅動決定下一步。
     for (uint16_t attempt = 0; attempt <= _retries; attempt++) {
         result = rtl8735b_i2c_transfer(bus_num(), _address,
                                         send, send_len, recv, recv_len,

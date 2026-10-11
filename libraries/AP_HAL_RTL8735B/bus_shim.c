@@ -8,6 +8,7 @@
 #include <hal_pinmux.h>
 #include <hal_ssi.h>
 #include <gpio_api.h>
+#include <gpio_ex_api.h>
 #include <i2c_api.h>
 #include <objects.h>
 #include <spi_api.h>
@@ -23,10 +24,16 @@
 #define BUS_I2C_MAX_TRANSFER 512U
 #define BUS_SPI_MAX_TRANSFER 4096U
 #define BUS_MAX_TIMEOUT_MS 100U
+// 連續逾時達這個次數就封鎖匯流排；之前的每次逾時都重新初始化控制器。
+#define BUS_I2C_MAX_TIMEOUTS 3U
+// 清除匯流排：SCL 最多送幾個脈衝，以及半週期（10 us 一個脈衝，約 100 kHz）。
+#define BUS_I2C_CLEAR_PULSES 9U
+#define BUS_I2C_CLEAR_HALF_PERIOD_US 5U
 
 static i2c_t i2c_object;
 static uint8_t i2c_initialized;
 static uint8_t i2c_faulted;
+static uint8_t i2c_consecutive_timeouts;
 // 位址中止後重新初始化控制器時沿用的設定。
 static uint8_t i2c_bus_index;
 static uint32_t i2c_sda_pin;
@@ -57,7 +64,7 @@ static int _valid_transfer(const uint8_t *send, uint32_t send_len,
 
 // timeout 從這個 leg 開始時計算。bus task 以 tick 輪詢、可能被高優先 task 延後喚醒；
 // 共用整筆交易的期限時，前一個 leg 晚醒會讓後一個 leg 一開始就超過期限，
-// 剛啟動的接收被誤判為逾時並封鎖匯流排。每次喚醒先看狀態，晚醒本身不會造成逾時。
+// 剛啟動的接收被誤判為逾時。每次喚醒先看狀態，晚醒本身不會造成逾時。
 static int _wait_i2c(uint8_t receive, uint32_t timeout_ms)
 {
     hal_i2c_adapter_t *adapter = &i2c_object.i2c_adp;
@@ -139,6 +146,50 @@ static int _i2c_hw_init(void)
     return RTL8735B_BUS_OK;
 }
 
+static void _i2c_delay_us(uint32_t us)
+{
+    const uint64_t until_us = rtl8735b_systime_us() + us;
+    while (rtl8735b_systime_us() < until_us) {
+    }
+}
+
+// 裝置在傳輸中途被打斷時可能一直拉住 SDA；在 SCL 送脈衝讓它把這個位元組送完、放開 SDA。
+// 推論：hal_i2c_deinit 會解除這兩腳的 I2C 註冊（Realtek ameba-rtos-pro2@eb5c0907c40d 的
+// hal_i2c.c 如此，本 SDK 的 ROM 未查證）；若沒有解除，這裡的 GPIO 設定不會生效。
+// 以「輸出 0／改回輸入」模擬開汲極，高電位靠匯流排上的上拉電阻，需上板確認。
+static void _i2c_clear_bus(void)
+{
+    gpio_t sda;
+    gpio_t scl;
+    gpio_init(&sda, (PinName)i2c_sda_pin);
+    gpio_dir(&sda, PIN_INPUT);
+    if (gpio_read(&sda) == 0) {
+        gpio_init(&scl, (PinName)i2c_scl_pin);
+        gpio_dir(&scl, PIN_INPUT);
+        gpio_write(&scl, 0);
+        for (unsigned i = 0; i < BUS_I2C_CLEAR_PULSES && gpio_read(&sda) == 0; i++) {
+            gpio_dir(&scl, PIN_OUTPUT);
+            _i2c_delay_us(BUS_I2C_CLEAR_HALF_PERIOD_US);
+            gpio_dir(&scl, PIN_INPUT);
+            _i2c_delay_us(BUS_I2C_CLEAR_HALF_PERIOD_US);
+        }
+        gpio_deinit(&scl);
+    }
+    gpio_deinit(&sda);
+}
+
+// 逾時後恢復：停用控制器讓還在進行的中斷模式傳輸停下，deinit，SDA 被拉住時清除匯流排，
+// 再以原設定初始化。緩衝區是靜態的，晚到的中斷不會寫到失效的記憶體。不呼叫 hal_i2c_unreg_irq：
+// 沒有其他 I2C 中斷時它會停用整組 I2C 中斷，而 hal_i2c_init 是否重新啟用沒有查證。
+static int _i2c_recover(void)
+{
+    hal_i2c_adapter_t *adapter = &i2c_object.i2c_adp;
+    (void)hal_i2c_en_ctrl(adapter, I2CDisable);
+    (void)hal_i2c_deinit(adapter);
+    _i2c_clear_bus();
+    return _i2c_hw_init();
+}
+
 int rtl8735b_i2c_transfer(uint8_t bus, uint8_t address,
                            const uint8_t *send, uint32_t send_len,
                            uint8_t *recv, uint32_t recv_len,
@@ -217,16 +268,21 @@ transfer_done:
     hal_i2c_mst_restr_sw_ctrl(adapter, I2CDisable);
     if (result == RTL8735B_BUS_ERROR && adapter->err_type == I2CErrorTxAbort) {
         // 板上實測：位址中止後 SDK 把狀態設回 Idle，但下一筆
-        // 中斷模式傳送會停在 TxReady 直到逾時並封鎖匯流排。以 SDK API 重新初始化控制器；
+        // 中斷模式傳送會停在 TxReady 直到逾時。以 SDK API 重新初始化控制器；
         // 失敗則封鎖，讓上層看到真實狀態。
         (void)hal_i2c_deinit(adapter);
         if (_i2c_hw_init() != RTL8735B_BUS_OK) {
             i2c_faulted = 1U;
         }
     }
-    if (result == RTL8735B_BUS_TIMEOUT) {
-        // SDK 未提供已查證的終止介面；timeout 後保留靜態緩衝並封鎖後續交易。
-        i2c_faulted = 1U;
+    if (result == RTL8735B_BUS_OK) {
+        i2c_consecutive_timeouts = 0U;
+    } else if (result == RTL8735B_BUS_TIMEOUT) {
+        // 恢復不了，或連續逾時達上限，就封鎖後續交易，讓上層看到匯流排失效。
+        i2c_consecutive_timeouts++;
+        if (i2c_consecutive_timeouts >= BUS_I2C_MAX_TIMEOUTS || _i2c_recover() != RTL8735B_BUS_OK) {
+            i2c_faulted = 1U;
+        }
     }
     return result;
 }

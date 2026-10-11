@@ -28,7 +28,8 @@ private:
 RCOutput::RCOutput() :
     _pending_mask(0),
     _fast_mask(0),
-    _brushed_rate_reported_mask(0),
+    _rate_reported_mask(0),
+    _clock_reported_mask(0),
     _corked(false),
     _initialized(false),
     _safety_state(AP_HAL::Util::SAFETY_NONE)
@@ -39,9 +40,34 @@ bool RCOutput::_channel_valid(uint8_t chan) const
     return chan < CHANNELS && rtl8735b_rcout_pin(chan) != RTL8735B_INVALID_PIN;
 }
 
+namespace {
+// 走微秒路徑（G-Timer tick）的模式。OneShot 以連續 PWM 近似：硬體沒有單發觸發。
+bool is_us_mode(AP_HAL::RCOutput::output_mode mode)
+{
+    return mode == AP_HAL::RCOutput::MODE_PWM_NORMAL || mode == AP_HAL::RCOutput::MODE_PWM_ONESHOT;
+}
+
+bool is_supported_mode(AP_HAL::RCOutput::output_mode mode)
+{
+    return is_us_mode(mode) || mode == AP_HAL::RCOutput::MODE_PWM_ONESHOT125 ||
+        mode == AP_HAL::RCOutput::MODE_PWM_BRUSHED;
+}
+}
+
 bool RCOutput::_output_usable(uint8_t chan) const
 {
-    return (_mode[chan] == MODE_PWM_NORMAL || _mode[chan] == MODE_PWM_BRUSHED) && _rate_valid[chan];
+    return is_supported_mode(_mode[chan]) && _rate_valid[chan];
+}
+
+bool RCOutput::_pulse_valid(uint8_t chan, uint16_t pulse_us) const
+{
+    if (is_us_mode(_mode[chan])) {
+        return rtl8735b_rc_pulse_valid(pulse_us, _period_us[chan]);
+    }
+    if (_mode[chan] == MODE_PWM_ONESHOT125) {
+        return rtl8735b_rc_oneshot125_duty_ticks(pulse_us) != 0U;
+    }
+    return true;
 }
 
 void RCOutput::init()
@@ -64,7 +90,8 @@ void RCOutput::init()
     }
     _pending_mask = 0;
     _fast_mask = 0;
-    _brushed_rate_reported_mask = 0;
+    _rate_reported_mask = 0;
+    _clock_reported_mask = 0;
     _corked = false;
     _safety_state = AP_HAL::Util::SAFETY_NONE;
     // 不在此呼叫 pwmout_init；SDK 會在該呼叫中啟動 20 ms PWM 通道。
@@ -90,10 +117,28 @@ void RCOutput::_brushed_hold_low(uint8_t chan)
     static uint32_t reported_hold_low_failures;
     const uint16_t ticks = _rate_valid[chan] ? _period_ticks[chan] :
         rtl8735b_rc_brushed_period_ticks(RTL8735B_RC_BRUSHED_MIN_HZ);
-    if (rtl8735b_pwm_apply_ticks(chan, ticks, 0) != 0 &&
-        (reported_hold_low_failures & (1UL << chan)) == 0) {
+    const int status = rtl8735b_pwm_apply_ticks(chan, ticks, 0);
+    if (status == RTL8735B_PWM_ERR_CLOCK) {
+        _report_clock_conflict(chan);
+    } else if (status != 0 && (reported_hold_low_failures & (1UL << chan)) == 0) {
         reported_hold_low_failures |= 1UL << chan;
         printf("RTL8735B: brushed PWM ch%u could not be set to zero duty\n", (unsigned)chan + 1U);
+    }
+}
+
+// 有刷與 OneShot125 共用 PWM SCLK：另一種模式已占用時，每個通道印一次原因。
+void RCOutput::_report_clock_conflict(uint8_t chan)
+{
+    if ((_clock_reported_mask & (1UL << chan)) != 0) {
+        return;
+    }
+    _clock_reported_mask |= 1UL << chan;
+    if (_mode[chan] == MODE_PWM_BRUSHED) {
+        printf("RTL8735B: brushed PWM ch%u unavailable (PWM clock in use by OneShot125 output); "
+               "output stopped\n", (unsigned)chan + 1U);
+    } else {
+        printf("RTL8735B: OneShot125 ch%u unavailable (PWM clock in use by brushed output); "
+               "output stopped\n", (unsigned)chan + 1U);
     }
 }
 
@@ -129,6 +174,19 @@ void RCOutput::_apply_channel(uint8_t chan)
         }
         return;
     }
+    if (_mode[chan] == MODE_PWM_ONESHOT125) {
+        const int status = rtl8735b_pwm_apply_oneshot125(chan,
+            rtl8735b_rc_oneshot125_duty_ticks(_value_us[chan]));
+        if (status != 0) {
+            if (status == RTL8735B_PWM_ERR_CLOCK) {
+                _report_clock_conflict(chan);
+            }
+            _has_valid_write[chan] = false;
+            _value_us[chan] = 0;
+            _stop_channel(chan);
+        }
+        return;
+    }
     if (rtl8735b_pwm_apply(chan, _period_us[chan], _value_us[chan]) != 0) {
         _has_valid_write[chan] = false;
         _value_us[chan] = 0;
@@ -136,23 +194,27 @@ void RCOutput::_apply_channel(uint8_t chan)
     }
 }
 
-// 依目前模式判斷 _requested_hz 是否支援：一般 PWM 50–490 Hz，有刷 10–32 kHz。
+// 依目前模式判斷 _requested_hz 是否支援：一般 PWM 與 OneShot 50–490 Hz，有刷 10–32 kHz；
+// OneShot125 的頻率固定（RTL8735B_ONESHOT125_HZ），不看要求的頻率。
 // 不支援時保留上一個合法頻率供 get_freq 回報，但通道停止輸出（fail closed）。
 // 這裡不回報不支援的有刷頻率：Copter 開機時 AP_MotorsMatrix::init 先以建構時的速率
 // （主迴圈頻率 400 Hz）呼叫 rc_set_freq，切到有刷模式後 init_rc_out 才套用 RC_SPEED，
-// 這個過渡每次開機都有；改在 write() 真的拒絕寫入時回報（_report_brushed_rate）。
+// 這個過渡每次開機都有；改在 write() 真的拒絕寫入時回報（_report_rate）。
 void RCOutput::_refresh_rate(uint8_t chan)
 {
     const uint16_t freq_hz = _requested_hz[chan];
     const bool brushed = _mode[chan] == MODE_PWM_BRUSHED;
-    const bool valid_rate = brushed ? rtl8735b_rc_brushed_rate_valid(freq_hz) :
-        rtl8735b_rc_rate_valid(freq_hz);
+    const bool oneshot125 = _mode[chan] == MODE_PWM_ONESHOT125;
+    const bool valid_rate = oneshot125 || (brushed ? rtl8735b_rc_brushed_rate_valid(freq_hz) :
+        rtl8735b_rc_rate_valid(freq_hz));
     _pending_mask &= ~(1UL << chan);
     _pending_us[chan] = 0;
     _rate_valid[chan] = valid_rate;
-    if (valid_rate) {
+    if (oneshot125) {
+        _freq_hz[chan] = RTL8735B_ONESHOT125_HZ;
+    } else if (valid_rate) {
         _freq_hz[chan] = freq_hz;
-        _brushed_rate_reported_mask &= ~(1UL << chan);
+        _rate_reported_mask &= ~(1UL << chan);
         if (brushed) {
             _period_ticks[chan] = rtl8735b_rc_brushed_period_ticks(freq_hz);
         } else {
@@ -165,17 +227,24 @@ void RCOutput::_refresh_rate(uint8_t chan)
     _stop_channel(chan);
 }
 
-// 有刷通道因頻率不支援而拒絕寫入時（例如 RC_SPEED 超出範圍），每個通道印一次實際要求的頻率。
-void RCOutput::_report_brushed_rate(uint8_t chan)
+// 因頻率不支援而拒絕寫入時（例如 RC_SPEED 超出範圍），每個通道印一次實際要求的頻率。
+void RCOutput::_report_rate(uint8_t chan)
 {
-    if (_mode[chan] != MODE_PWM_BRUSHED || _rate_valid[chan] ||
-        (_brushed_rate_reported_mask & (1UL << chan)) != 0) {
+    if (_rate_valid[chan] || (_rate_reported_mask & (1UL << chan)) != 0) {
         return;
     }
-    _brushed_rate_reported_mask |= 1UL << chan;
-    printf("RTL8735B: brushed PWM ch%u %u Hz unsupported (%u-%u Hz); output held at zero\n",
-           (unsigned)chan + 1U, (unsigned)_requested_hz[chan],
-           (unsigned)RTL8735B_RC_BRUSHED_MIN_HZ, (unsigned)RTL8735B_RC_BRUSHED_MAX_HZ);
+    if (_mode[chan] == MODE_PWM_BRUSHED) {
+        printf("RTL8735B: brushed PWM ch%u %u Hz unsupported (%u-%u Hz); output held at zero\n",
+               (unsigned)chan + 1U, (unsigned)_requested_hz[chan],
+               (unsigned)RTL8735B_RC_BRUSHED_MIN_HZ, (unsigned)RTL8735B_RC_BRUSHED_MAX_HZ);
+    } else if (is_us_mode(_mode[chan])) {
+        printf("RTL8735B: PWM ch%u %u Hz unsupported (%u-%u Hz); output stopped\n",
+               (unsigned)chan + 1U, (unsigned)_requested_hz[chan],
+               (unsigned)RTL8735B_RC_MIN_HZ, (unsigned)RTL8735B_RC_MAX_HZ);
+    } else {
+        return;
+    }
+    _rate_reported_mask |= 1UL << chan;
 }
 
 void RCOutput::_set_freq_locked(uint32_t chmask, uint16_t freq_hz, bool mark_fast)
@@ -243,7 +312,7 @@ void RCOutput::_commit_write(uint8_t chan, uint16_t pulse_us)
         return;
     }
     if (_safety_state == AP_HAL::Util::SAFETY_DISARMED || !_output_usable(chan) ||
-        (_mode[chan] == MODE_PWM_NORMAL && !rtl8735b_rc_pulse_valid(pulse_us, _period_us[chan]))) {
+        !_pulse_valid(chan, pulse_us)) {
         _value_us[chan] = 0;
         _has_valid_write[chan] = false;
         _stop_channel(chan);
@@ -268,10 +337,8 @@ void RCOutput::write(uint8_t chan, uint16_t pulse_us)
         _stop_channel(chan);
         return;
     }
-    if (pulse_us != 0 && (!_output_usable(chan) ||
-                          (_mode[chan] == MODE_PWM_NORMAL &&
-                           !rtl8735b_rc_pulse_valid(pulse_us, _period_us[chan])))) {
-        _report_brushed_rate(chan);
+    if (pulse_us != 0 && (!_output_usable(chan) || !_pulse_valid(chan, pulse_us))) {
+        _report_rate(chan);
         _pending_mask &= ~(1UL << chan);
         _pending_us[chan] = 0;
         _value_us[chan] = 0;
@@ -354,8 +421,8 @@ void RCOutput::set_output_mode(uint32_t mask, enum output_mode mode)
         if ((mask & (1UL << chan)) == 0) {
             continue;
         }
-        if (mode == MODE_PWM_NORMAL || mode == MODE_PWM_BRUSHED) {
-            if (mode == MODE_PWM_BRUSHED) {
+        if (is_supported_mode(mode)) {
+            if (mode == MODE_PWM_BRUSHED || mode == MODE_PWM_ONESHOT125) {
                 _fast_mask |= 1UL << chan;
             }
             if (_mode[chan] != mode) {

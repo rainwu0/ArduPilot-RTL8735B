@@ -77,6 +77,25 @@ FLASH_LAYOUT sdk-d1b6426
 - 版面在 `./waf configure` 時讀進來：改了 hwdef 或疊加檔的 `FLASH_LAYOUT` 之後要重新 configure。
 - 參數存在 0xF80000–0xFA0000，三種版面都相同。Arduino 套件（93d6351）與新版 SDK（eb5c090）的 NOR 檔案系統區（0xF64000–0x1000000）涵蓋這一段，只在啟用 Flash 檔案系統時會衝突；本移植沒有啟用。
 
+## 馬達輸出
+
+| `MOT_PWM_TYPE` | 輸出 |
+|---|---|
+| 0 Normal、8 PWMRange、9 PWMAngle | `RC_SPEED` 50–490 Hz，脈寬 400–2100 µs |
+| 1 OneShot | 同上的連續 PWM（晶片沒有單發觸發） |
+| 2 OneShot125 | 脈寬 125–250 µs（1000–2000 除以 8），每階 0.25 µs；固定 1 kHz 連續輸出，不看 `RC_SPEED` |
+| 3 Brushed | `RC_SPEED` 10–32 kHz |
+
+- 有刷與 OneShot125 共用 PWM 的時脈（有刷用 40 MHz，OneShot125 用晶片內部的 4 MHz 振盪器），同一次開機只能用其中一種；另一種停止輸出，並在主控台印出原因。
+- 不支援：DShot（4–7），以及 LED 輸出（NeoPixel、ProfiLED）。DShot 需要以 DMA 驅動的 PWM 通道：SDK d1b6426 的 `component/soc/8735b/fwlib/rtl8735b/include/rtl8735b_gdma.h:69-72` 只有 PWM0–PWM3 的 GDMA handshake，而 HUB 8735 ultra 的四路輸出 PF11–PF14 是 PWM5–PWM8（`component/mbed/targets/hal/rtl8735b/pwmout_api.c:77-78` 的腳位表）。
+- OneShot、OneShot125 未上板。OneShot125 上板前未確認的事：
+  - 時脈來自晶片內部的 RC 振盪器，精度與溫度漂移都未量測；切到 4 MHz 後時脈是否立即可用。
+  - 週期與脈寬的暫存器寫法照 Realtek 公開原始碼的有刷寫法推得（Ameba-AIoT/ameba-rtos-pro2 eb5c090 的 `component/soc/8735b/fwlib/rtl8735b/source/ram/hal_pwm.c:333-380`），實際脈寬未量測。
+  - 脈寬為 0 時輸出持續低電位。
+  - ESC 是否接受 1 kHz 的連續 OneShot125。
+
+  裝上 ESC 後先做 ESC 校準。
+
 ## Wi-Fi
 
 建置時以環境變數 `RTL8735B_WIFI_CONFIG` 指向本機設定檔（`ssid=`、`password=` 兩行）；沒有設定時 Wi-Fi 不啟用。帳密只寫進建置目錄。
@@ -153,7 +172,7 @@ TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
 | 主控台／USB MAVLink | 未實作 | |
 | RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol）。地面站的 RC override 走 MAVLink，不經過 RC 輸入，已在板上使用 |
 | GPS | 僅建置 | |
-| PWM 輸出 | 板上驗證 | 有刷馬達 PWM 已驅動馬達；電調用的一般 PWM 未上板 |
+| PWM 輸出 | 板上驗證 | 有刷馬達 PWM 已驅動馬達；電調用的一般 PWM、OneShot、OneShot125 未上板，見〈馬達輸出〉 |
 | AnalogIn | 僅建置 | 只有原始取樣，參考電壓未確認 |
 | 參數存在 Flash | 板上驗證 | 重開機與斷電後保留 |
 | SD 卡 | 未實作 | |

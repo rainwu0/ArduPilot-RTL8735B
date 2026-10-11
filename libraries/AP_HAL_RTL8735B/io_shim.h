@@ -28,6 +28,11 @@ void rtl8735b_pwm_flush(void);
 // duty_ticks 為 0 時通道仍保持啟用、DUTY 暫存器為 0（有刷馬達的停止狀態）。
 // 通道一旦改用 SCLK tick，本次開機內 rtl8735b_pwm_apply 對該通道回傳失敗。
 int rtl8735b_pwm_apply_ticks(uint8_t channel, uint16_t period_ticks, uint16_t duty_ticks);
+// OneShot125：PWM SCLK 4 MHz、週期 RTL8735B_ONESHOT125_PERIOD_TICKS；0 < duty_ticks < 週期。
+// PWM SCLK 是全域的：本次開機已有通道用 40 MHz（有刷）時回傳失敗，反之亦然。
+// 失敗原因是 PWM SCLK 已被另一種模式使用時回傳 RTL8735B_PWM_ERR_CLOCK。
+#define RTL8735B_PWM_ERR_CLOCK (-2)
+int rtl8735b_pwm_apply_oneshot125(uint8_t channel, uint16_t duty_ticks);
 // 一般 PWM 通道：脈寬設 0 後停用。SCLK tick 通道：DUTY 設 0 並保持啟用；寫入失敗時才停用。
 void rtl8735b_pwm_stop(uint8_t channel);
 // 緊急停止（AP_HAL::panic 第一步呼叫）：已初始化的通道全部依 rtl8735b_pwm_stop 歸零，

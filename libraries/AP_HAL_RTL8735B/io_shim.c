@@ -33,15 +33,30 @@ static uint8_t adc_channel;
 static pwmout_t pwm_objects[RTL8735B_RCOUT_CHANNELS];
 static uint8_t pwm_initialized[RTL8735B_RCOUT_CHANNELS];
 static uint8_t pwm_running[RTL8735B_RCOUT_CHANNELS];
-// 1 表示此通道已改用 SCLK tick（hal_pwm_set_duty_ns）；本次開機內不再走微秒路徑（hal_pwm_set_duty）。
+// 1 表示此通道已改用 40 MHz SCLK tick（hal_pwm_set_duty_ns，有刷）；本次開機內不再走微秒路徑（hal_pwm_set_duty）。
 static uint8_t pwm_sclk_mode[RTL8735B_RCOUT_CHANNELS];
 static uint16_t pwm_sclk_period_ticks[RTL8735B_RCOUT_CHANNELS];
-// 一般 PWM：最後寫入硬體的週期與脈寬，以及硬體還沒套用上一次設定時延後的值。
+// PWM SCLK 的頻率是全域的（有刷用 40 MHz、OneShot125 用 4 MHz）：第一次用到時決定，本次開機內不再改。
+#define PWM_SCLK_UNSET 0U
+#define PWM_SCLK_40MHZ 1U
+#define PWM_SCLK_4MHZ 2U
+static uint8_t pwm_sclk_clock;
+// PWM_CTRL 的 CLK_SEL：8 為 SCLK。依據是 SDK rtl8735b_pwm_type.h 的欄位說明，以及 Realtek
+// Ameba-AIoT/ameba-rtos-pro2@eb5c0907c40d 的 component/soc/8735b/fwlib/rtl8735b/source/ram/hal_pwm.c:348
+// （hal_pwm_set_duty_ns 以 8 選 SCLK；有刷已在板上用這個值）。SDK 列舉 PwmClkSrc_SClk 卻是 16，
+// OneShot125 的通道未上板確認。
+#define PWM_CLK_SEL_SCLK 8U
+// 1 表示此通道以 4 MHz SCLK 輸出 OneShot125；最後寫入的 duty tick。
+static uint8_t pwm_oneshot125[RTL8735B_RCOUT_CHANNELS];
+static uint16_t pwm_oneshot125_duty[RTL8735B_RCOUT_CHANNELS];
+// 一般 PWM：最後寫入硬體的週期與脈寬，以及硬體還沒套用上一次設定時延後的值
+// （一般 PWM 延後週期與脈寬，OneShot125 延後 duty tick）。
 static uint16_t pwm_period_us[RTL8735B_RCOUT_CHANNELS];
 static uint16_t pwm_pulse_us[RTL8735B_RCOUT_CHANNELS];
 static uint8_t pwm_deferred[RTL8735B_RCOUT_CHANNELS];
 static uint16_t pwm_deferred_period_us[RTL8735B_RCOUT_CHANNELS];
 static uint16_t pwm_deferred_pulse_us[RTL8735B_RCOUT_CHANNELS];
+static uint16_t pwm_deferred_duty_ticks[RTL8735B_RCOUT_CHANNELS];
 // 1 表示已緊急停止（rtl8735b_pwm_emergency_stop）：本次開機內只接受脈寬／duty 0。
 // 放在 RCOutput 的 mutex 之下、不依賴 FreeRTOS，之後任何執行緒的非零寫入都擋得住。
 static volatile uint8_t pwm_emergency_stopped;
@@ -205,7 +220,8 @@ static int pwm_ensure_initialized(uint8_t channel)
 }
 
 // CTRL_SET：軟體寫入新設定後設為 1，硬體在週期結束套用後清除；通道停用中不清除。
-// 為 1 時呼叫 hal_pwm_set_duty 會在 ROM 裡忙等到週期結束（依 SDK 的暫存器說明推論）。
+// 為 1 時呼叫 hal_pwm_set_duty 會在 ROM 裡忙等到週期結束（推論，依 SDK 的暫存器說明；Realtek
+// ameba-rtos-pro2@eb5c0907c40d 的 hal_pwm.c:355，hal_pwm_set_duty_ns 在通道啟用中先等 ctrl ready）。
 static int pwm_ctrl_pending(uint8_t channel)
 {
     const PWM_TypeDef *regs = pwm_objects[channel].pwm_hal_adp.base_addr;
@@ -231,15 +247,37 @@ static int pwm_write_us(uint8_t channel, uint16_t period_us, uint16_t pulse_us)
     return 0;
 }
 
+// OneShot125 以暫存器寫入週期與 duty（4 MHz SCLK，hal_pwm_set_duty_ns 只接受 40 MHz）。
+// 寫法照 Realtek Ameba-AIoT/ameba-rtos-pro2@eb5c0907c40d 的
+// component/soc/8735b/fwlib/rtl8735b/source/ram/hal_pwm.c:333-380（hal_pwm_set_duty_ns）：
+// PERIOD 欄位寫 tick 數減一（:357；沒有文件，未上板量測），DUTY 寫 tick 數；
+// 通道啟用中先等 ctrl ready（:355）才設 CTRL_SET，停用中由硬體在啟用時套用。呼叫前上一次的設定必須已套用。
+static int pwm_write_oneshot125(uint8_t channel, uint16_t duty_ticks)
+{
+    hal_pwm_adapter_t *adp = &pwm_objects[channel].pwm_hal_adp;
+    pwm_deferred[channel] = 0;
+    hal_pwm_set_period(adp, RTL8735B_ONESHOT125_PERIOD_TICKS - 1U);
+    hal_pwm_set_onduty_start(adp, 0U);
+    hal_pwm_set_duty_size(adp, duty_ticks);
+    pwm_oneshot125_duty[channel] = duty_ticks;
+    if (pwm_running[channel]) {
+        hal_pwm_update_ctrl(adp);
+    } else {
+        hal_pwm_enable(adp);
+        pwm_running[channel] = 1;
+    }
+    return 0;
+}
+
 int rtl8735b_pwm_apply(uint8_t channel, uint16_t period_us, uint16_t pulse_us)
 {
     if (channel >= RTL8735B_RCOUT_CHANNELS || period_us == 0 || pulse_us >= period_us ||
         rtl8735b_rcout_pin(channel) == RTL8735B_INVALID_PIN) {
         return -1;
     }
-    // hal_pwm_set_duty_ns 已把此通道的 tick 來源改成 SCLK；微秒路徑的
+    // 有刷與 OneShot125 已把此通道的 tick 來源改成 SCLK；微秒路徑的
     // hal_pwm_set_duty 是否會改回 G-Timer tick 未查證，因此不混用（MOT_PWM_TYPE 本來就需重開機）。
-    if (pwm_sclk_mode[channel]) {
+    if (pwm_sclk_mode[channel] || pwm_oneshot125[channel]) {
         return -1;
     }
     if (pwm_emergency_stopped && pulse_us != 0U) {
@@ -284,8 +322,10 @@ void rtl8735b_pwm_flush(void)
             pwm_deferred[channel] = 0;
             continue;
         }
-        if (pwm_write_us(channel, pwm_deferred_period_us[channel],
-                         pwm_deferred_pulse_us[channel]) == 0 && pwm_emergency_stopped) {
+        const int status = pwm_oneshot125[channel] ?
+            pwm_write_oneshot125(channel, pwm_deferred_duty_ticks[channel]) :
+            pwm_write_us(channel, pwm_deferred_period_us[channel], pwm_deferred_pulse_us[channel]);
+        if (status == 0 && pwm_emergency_stopped) {
             // 同 rtl8735b_pwm_apply：寫入途中被緊急停止搶先時再歸零一次。
             rtl8735b_pwm_stop(channel);
         }
@@ -299,6 +339,9 @@ int rtl8735b_pwm_apply_ticks(uint8_t channel, uint16_t period_ticks, uint16_t du
         rtl8735b_rcout_pin(channel) == RTL8735B_INVALID_PIN) {
         return -1;
     }
+    if (pwm_sclk_clock == PWM_SCLK_4MHZ) {
+        return RTL8735B_PWM_ERR_CLOCK;
+    }
     if (pwm_emergency_stopped && duty_ticks != 0U) {
         return -1;
     }
@@ -307,6 +350,7 @@ int rtl8735b_pwm_apply_ticks(uint8_t channel, uint16_t period_ticks, uint16_t du
     }
 
     pwmout_t *obj = &pwm_objects[channel];
+    pwm_sclk_clock = PWM_SCLK_40MHZ;
     pwm_sclk_mode[channel] = 1;
     pwm_sclk_period_ticks[channel] = period_ticks;
     // hal_pwm_set_duty_ns 要求 PWM SCLK 為 40 MHz（pwmout_init 在 clk_sel 預設 0 時設定），
@@ -366,6 +410,16 @@ void rtl8735b_pwm_stop(uint8_t channel)
         }
         return;
     }
+    if (pwm_oneshot125[channel]) {
+        // 與有刷相同，停止狀態是「啟用中、DUTY 為 0」：ESC 收不到脈衝即停止（推論：DUTY 0 時輸出持續
+        // 低電位，未上板確認）。停止不延後：
+        // 上一次的設定還沒套用時，等到這個週期結束（最多 1 ms）再寫 0。
+        if (pwm_ctrl_pending(channel)) {
+            hal_pwm_wait_ctrl_ready(&pwm_objects[channel].pwm_hal_adp);
+        }
+        (void)pwm_write_oneshot125(channel, 0U);
+        return;
+    }
     // 停止不延後：通道啟用中而上一次的設定還沒套用時，寫 0 要等到這個週期結束。
     pwmout_t *obj = &pwm_objects[channel];
     pwm_deferred[channel] = 0;
@@ -373,4 +427,57 @@ void rtl8735b_pwm_stop(uint8_t channel)
     pwm_pulse_us[channel] = 0U;
     pwmout_stop(obj);
     pwm_running[channel] = 0;
+}
+
+int rtl8735b_pwm_apply_oneshot125(uint8_t channel, uint16_t duty_ticks)
+{
+    if (channel >= RTL8735B_RCOUT_CHANNELS || duty_ticks == 0U ||
+        duty_ticks >= RTL8735B_ONESHOT125_PERIOD_TICKS ||
+        rtl8735b_rcout_pin(channel) == RTL8735B_INVALID_PIN || pwm_sclk_mode[channel]) {
+        return -1;
+    }
+    if (pwm_sclk_clock == PWM_SCLK_40MHZ) {
+        return RTL8735B_PWM_ERR_CLOCK;
+    }
+    if (pwm_emergency_stopped) {
+        return -1;
+    }
+    if (pwm_ensure_initialized(channel) != 0) {
+        return -1;
+    }
+    // 第一次用的通道必須停用中（pwm_ensure_initialized 或之前的一般 PWM 已停止），才能改 tick 來源。
+    if (!pwm_oneshot125[channel] && pwm_running[channel]) {
+        return -1;
+    }
+    if (pwm_sclk_clock == PWM_SCLK_UNSET) {
+        // pwmout_init 第一次執行時把 PWM SCLK 設成 40 MHz，之後不再設定；所以在它之後才改。
+        // 只改 PWM 的 SCLK，G-Timer（一般 PWM 的 tick 來源）的時鐘不變。
+        // 4 MHz 來自晶片內部的 RC 振盪器（不是 40 MHz 的 PLL），精度與溫度漂移都未量測；
+        // 這個呼叫是否同時開啟該振盪器與 PWM 的 SCLK，也未上板確認。
+        hal_pwm_clk_sel(PWM_Sclk_4M);
+        pwm_sclk_clock = PWM_SCLK_4MHZ;
+    }
+    hal_pwm_adapter_t *adp = &pwm_objects[channel].pwm_hal_adp;
+    if (!pwm_oneshot125[channel]) {
+        hal_pwm_set_clk_sel(adp, PWM_CLK_SEL_SCLK);
+        pwm_oneshot125[channel] = 1;
+    }
+
+    if (pwm_running[channel] && duty_ticks == pwm_oneshot125_duty[channel]) {
+        pwm_deferred[channel] = 0;
+        return 0;
+    }
+    if (pwm_ctrl_pending(channel)) {
+        // 同一般 PWM：上一次的設定還沒套用時不等待，記下最新的值由 rtl8735b_pwm_flush 寫入。
+        pwm_deferred[channel] = 1;
+        pwm_deferred_duty_ticks[channel] = duty_ticks;
+        return 0;
+    }
+    (void)pwm_write_oneshot125(channel, duty_ticks);
+    if (pwm_emergency_stopped) {
+        // 寫入途中被緊急停止搶先：緊急停止的歸零可能早於上面的寫入，這裡再歸零一次。
+        rtl8735b_pwm_stop(channel);
+        return -1;
+    }
+    return 0;
 }

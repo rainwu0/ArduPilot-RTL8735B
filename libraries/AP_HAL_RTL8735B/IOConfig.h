@@ -10,6 +10,10 @@
 #define RTL8735B_ADC_LOGICAL0 2U
 #define RTL8735B_INVALID_PIN UINT32_MAX
 
+// 一般 PWM（含 OneShot 的連續輸出）的頻率範圍。
+#define RTL8735B_RC_MIN_HZ 50U
+#define RTL8735B_RC_MAX_HZ 490U
+
 // 有刷馬達 PWM 以 PWM SCLK（40 MHz，每 tick 25 ns）為時基；PERIOD／DUTY 暫存器為 12 位元。
 // 依據：SDK 的 rtl8735b_pwm_type.h（CLK_SEL 8 為 sclk、DUTY／PERIOD 12 位元），
 // hal_pwm_set_duty_ns 以 25 ns 為單位並拒絕超過 102375 ns 的週期。
@@ -19,6 +23,10 @@
 // 下限取整數且高於硬體下限（40 MHz / 4095 ≈ 9768 Hz）；上限讓每週期至少 1250 階。
 #define RTL8735B_RC_BRUSHED_MIN_HZ 10000U
 #define RTL8735B_RC_BRUSHED_MAX_HZ 32000U
+// OneShot125：PWM SCLK 改用 4 MHz（每 tick 250 ns），以固定 1 kHz 連續輸出。
+#define RTL8735B_ONESHOT125_SCLK_HZ 4000000UL
+#define RTL8735B_ONESHOT125_HZ 1000U
+#define RTL8735B_ONESHOT125_PERIOD_TICKS 4000U
 
 typedef struct {
     uint16_t pulse_us;
@@ -51,6 +59,8 @@ uint16_t rtl8735b_rc_brushed_period_ticks(uint16_t rate_hz);
 // 依 ESC 範圍把脈寬換成 duty tick：pulse <= min 為 0，pulse >= max 為 period_ticks - 1，其間線性（無條件捨去）。
 uint16_t rtl8735b_rc_brushed_duty_ticks(uint16_t pulse_us, uint16_t esc_min_us,
                                          uint16_t esc_max_us, uint16_t period_ticks);
+// OneShot125 的 duty tick：pulse_us / 8 微秒、4 MHz，即 pulse_us / 2；脈寬不在 400–2100 us 時回傳 0。
+uint16_t rtl8735b_rc_oneshot125_duty_ticks(uint16_t pulse_us);
 
 #ifdef __cplusplus
 }

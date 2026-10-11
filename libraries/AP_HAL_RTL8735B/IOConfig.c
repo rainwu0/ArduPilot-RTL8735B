@@ -91,7 +91,7 @@ uint8_t rtl8735b_gpio_pin_count(void)
 
 uint8_t rtl8735b_rc_rate_valid(uint16_t rate_hz)
 {
-    return rate_hz >= 50U && rate_hz <= 490U;
+    return rate_hz >= RTL8735B_RC_MIN_HZ && rate_hz <= RTL8735B_RC_MAX_HZ;
 }
 
 uint8_t rtl8735b_rc_pulse_valid(uint16_t pulse_us, uint16_t period_us)
@@ -137,4 +137,13 @@ uint16_t rtl8735b_rc_brushed_duty_ticks(uint16_t pulse_us, uint16_t esc_min_us,
     const uint32_t duty = ((uint32_t)period_ticks * (uint32_t)(pulse_us - esc_min_us)) /
                           (uint32_t)(esc_max_us - esc_min_us);
     return duty > max_duty ? max_duty : (uint16_t)duty;
+}
+
+uint16_t rtl8735b_rc_oneshot125_duty_ticks(uint16_t pulse_us)
+{
+    // 1000–2000 us 對應 125–250 us（除以 8），4 MHz 每 tick 0.25 us：tick = pulse_us / 8 * 4。
+    if (pulse_us < 400U || pulse_us > 2100U) {
+        return 0;
+    }
+    return (uint16_t)((uint32_t)pulse_us * (RTL8735B_ONESHOT125_SCLK_HZ / 1000000UL) / 8U);
 }

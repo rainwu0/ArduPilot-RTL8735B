@@ -38,10 +38,12 @@ private:
     void _apply_channel(uint8_t chan);
     void _commit_write(uint8_t chan, uint16_t pulse_us);
     void _refresh_rate(uint8_t chan);
-    void _report_brushed_rate(uint8_t chan);
+    void _report_rate(uint8_t chan);
+    void _report_clock_conflict(uint8_t chan);
     void _set_freq_locked(uint32_t chmask, uint16_t freq_hz, bool mark_fast);
     bool _channel_valid(uint8_t chan) const;
     bool _output_usable(uint8_t chan) const;
+    bool _pulse_valid(uint8_t chan, uint16_t pulse_us) const;
 
     uint16_t _freq_hz[CHANNELS];
     // 最後一次 set_freq 要求的頻率；切換輸出模式時依新模式重新判斷是否支援。
@@ -56,10 +58,12 @@ private:
     bool _has_valid_write[CHANNELS];
     bool _rate_valid[CHANNELS];
     uint32_t _pending_mask;
-    // 以 set_freq 設為高於 50 Hz 或設為有刷模式的通道；set_default_rate 不改動它們。
+    // 以 set_freq 設為高於 50 Hz 或設為有刷、OneShot125 模式的通道；set_default_rate 不改動它們。
     uint32_t _fast_mask;
-    // 已回報「有刷頻率不支援、寫入被拒」的通道；該通道收到支援的頻率後清除，之後再失敗會再回報。
-    uint32_t _brushed_rate_reported_mask;
+    // 已回報「頻率不支援、寫入被拒」的通道；該通道收到支援的頻率後清除，之後再失敗會再回報。
+    uint32_t _rate_reported_mask;
+    // 已回報「PWM SCLK 被另一種模式（有刷或 OneShot125）占用」的通道。
+    uint32_t _clock_reported_mask;
     bool _corked;
     bool _initialized;
     AP_HAL::Util::safety_state _safety_state;

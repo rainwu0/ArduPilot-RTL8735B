@@ -19,7 +19,11 @@ void rtl8735b_gpio_irq_detach(uint8_t logical_pin);
 int rtl8735b_adc_init(uint8_t logical_pin);
 int32_t rtl8735b_adc_read_u16(uint8_t logical_pin);
 
+// 一般 PWM：週期與脈寬以微秒一次寫入。值沒變不寫；通道啟用中而上一次的設定還沒被硬體套用時
+// 不等待，記下最新的值，由 rtl8735b_pwm_flush 補寫（回傳 0）。
 int rtl8735b_pwm_apply(uint8_t channel, uint16_t period_us, uint16_t pulse_us);
+// 寫入 rtl8735b_pwm_apply 延後、而硬體已套用上一次設定的通道；RCOutput::push 每次呼叫。
+void rtl8735b_pwm_flush(void);
 // 以 PWM SCLK tick（25 ns）設定週期與 duty；duty_ticks < period_ticks <= RTL8735B_PWM_MAX_TICKS。
 // duty_ticks 為 0 時通道仍保持啟用、DUTY 暫存器為 0（有刷馬達的停止狀態）。
 // 通道一旦改用 SCLK tick，本次開機內 rtl8735b_pwm_apply 對該通道回傳失敗。

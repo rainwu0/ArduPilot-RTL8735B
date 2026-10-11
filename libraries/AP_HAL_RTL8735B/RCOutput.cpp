@@ -317,6 +317,8 @@ void RCOutput::push()
 {
     RCLock lock(_semaphore);
     if (!_corked) {
+        // 不經 cork 的 write() 也可能被延後，這裡同樣補寫。
+        rtl8735b_pwm_flush();
         return;
     }
     const uint32_t pending = _pending_mask;
@@ -337,6 +339,8 @@ void RCOutput::push()
         }
         _pending_us[chan] = 0;
     }
+    // 補寫上一次 push 時硬體還沒套用、因而延後的一般 PWM 值。
+    rtl8735b_pwm_flush();
 }
 
 void RCOutput::set_output_mode(uint32_t mask, enum output_mode mode)

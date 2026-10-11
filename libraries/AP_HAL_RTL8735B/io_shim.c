@@ -33,9 +33,15 @@ static uint8_t adc_channel;
 static pwmout_t pwm_objects[RTL8735B_RCOUT_CHANNELS];
 static uint8_t pwm_initialized[RTL8735B_RCOUT_CHANNELS];
 static uint8_t pwm_running[RTL8735B_RCOUT_CHANNELS];
-// 1 表示此通道已改用 SCLK tick（hal_pwm_set_duty_ns）；本次開機內不再走 mbed 微秒 API。
+// 1 表示此通道已改用 SCLK tick（hal_pwm_set_duty_ns）；本次開機內不再走微秒路徑（hal_pwm_set_duty）。
 static uint8_t pwm_sclk_mode[RTL8735B_RCOUT_CHANNELS];
 static uint16_t pwm_sclk_period_ticks[RTL8735B_RCOUT_CHANNELS];
+// 一般 PWM：最後寫入硬體的週期與脈寬，以及硬體還沒套用上一次設定時延後的值。
+static uint16_t pwm_period_us[RTL8735B_RCOUT_CHANNELS];
+static uint16_t pwm_pulse_us[RTL8735B_RCOUT_CHANNELS];
+static uint8_t pwm_deferred[RTL8735B_RCOUT_CHANNELS];
+static uint16_t pwm_deferred_period_us[RTL8735B_RCOUT_CHANNELS];
+static uint16_t pwm_deferred_pulse_us[RTL8735B_RCOUT_CHANNELS];
 // 1 表示已緊急停止（rtl8735b_pwm_emergency_stop）：本次開機內只接受脈寬／duty 0。
 // 放在 RCOutput 的 mutex 之下、不依賴 FreeRTOS，之後任何執行緒的非零寫入都擋得住。
 static volatile uint8_t pwm_emergency_stopped;
@@ -192,6 +198,35 @@ static int pwm_ensure_initialized(uint8_t channel)
         pwmout_stop(obj);
         pwm_initialized[channel] = 1;
         pwm_running[channel] = 0;
+        pwm_period_us[channel] = 20000U;
+        pwm_pulse_us[channel] = 0U;
+    }
+    return 0;
+}
+
+// CTRL_SET：軟體寫入新設定後設為 1，硬體在週期結束套用後清除；通道停用中不清除。
+// 為 1 時呼叫 hal_pwm_set_duty 會在 ROM 裡忙等到週期結束（依 SDK 的暫存器說明推論）。
+static int pwm_ctrl_pending(uint8_t channel)
+{
+    const PWM_TypeDef *regs = pwm_objects[channel].pwm_hal_adp.base_addr;
+    return pwm_running[channel] && (regs->PWM_CTRL & PWM_BIT_CTRL_SET) != 0U;
+}
+
+// 以整數一次寫入週期與脈寬。不用 mbed 的 pwmout_period_us／pwmout_pulsewidth_us：
+// 它們以 float 換算（部分脈寬少 1 us），而且每次寫入呼叫兩次 ROM。
+static int pwm_write_us(uint8_t channel, uint16_t period_us, uint16_t pulse_us)
+{
+    pwmout_t *obj = &pwm_objects[channel];
+    pwm_deferred[channel] = 0;
+    if (hal_pwm_set_duty(&obj->pwm_hal_adp, period_us, pulse_us, 0U) != HAL_OK) {
+        rtl8735b_pwm_stop(channel);
+        return -1;
+    }
+    pwm_period_us[channel] = period_us;
+    pwm_pulse_us[channel] = pulse_us;
+    if (!pwm_running[channel]) {
+        pwmout_start(obj);
+        pwm_running[channel] = 1;
     }
     return 0;
 }
@@ -202,7 +237,7 @@ int rtl8735b_pwm_apply(uint8_t channel, uint16_t period_us, uint16_t pulse_us)
         rtl8735b_rcout_pin(channel) == RTL8735B_INVALID_PIN) {
         return -1;
     }
-    // hal_pwm_set_duty_ns 已把此通道的 tick 來源改成 SCLK；mbed 微秒 API 的
+    // hal_pwm_set_duty_ns 已把此通道的 tick 來源改成 SCLK；微秒路徑的
     // hal_pwm_set_duty 是否會改回 G-Timer tick 未查證，因此不混用（MOT_PWM_TYPE 本來就需重開機）。
     if (pwm_sclk_mode[channel]) {
         return -1;
@@ -214,13 +249,22 @@ int rtl8735b_pwm_apply(uint8_t channel, uint16_t period_us, uint16_t pulse_us)
         return -1;
     }
 
-    pwmout_t *obj = &pwm_objects[channel];
-
-    pwmout_period_us(obj, (int)period_us);
-    pwmout_pulsewidth_us(obj, (int)pulse_us);
-    if (!pwm_running[channel]) {
-        pwmout_start(obj);
-        pwm_running[channel] = 1;
+    if (pwm_running[channel] && period_us == pwm_period_us[channel] &&
+        pulse_us == pwm_pulse_us[channel]) {
+        // 值沒變就不寫；延後中的值也作廢（寫回了已寫入的值）。
+        pwm_deferred[channel] = 0;
+        return 0;
+    }
+    if (pwm_ctrl_pending(channel)) {
+        // 上一次的設定要到這個週期結束才套用。ESC 每個週期只取樣一次，不必等：
+        // 記下最新的值，由 rtl8735b_pwm_flush 在套用後寫入。
+        pwm_deferred[channel] = 1;
+        pwm_deferred_period_us[channel] = period_us;
+        pwm_deferred_pulse_us[channel] = pulse_us;
+        return 0;
+    }
+    if (pwm_write_us(channel, period_us, pulse_us) != 0) {
+        return -1;
     }
     if (pwm_emergency_stopped && pulse_us != 0U) {
         // 寫入途中被緊急停止搶先：緊急停止的歸零可能早於上面的寫入，這裡再歸零一次。
@@ -228,6 +272,24 @@ int rtl8735b_pwm_apply(uint8_t channel, uint16_t period_us, uint16_t pulse_us)
         return -1;
     }
     return 0;
+}
+
+void rtl8735b_pwm_flush(void)
+{
+    for (uint8_t channel = 0; channel < RTL8735B_RCOUT_CHANNELS; channel++) {
+        if (!pwm_deferred[channel] || pwm_ctrl_pending(channel)) {
+            continue;
+        }
+        if (pwm_emergency_stopped) {
+            pwm_deferred[channel] = 0;
+            continue;
+        }
+        if (pwm_write_us(channel, pwm_deferred_period_us[channel],
+                         pwm_deferred_pulse_us[channel]) == 0 && pwm_emergency_stopped) {
+            // 同 rtl8735b_pwm_apply：寫入途中被緊急停止搶先時再歸零一次。
+            rtl8735b_pwm_stop(channel);
+        }
+    }
 }
 
 int rtl8735b_pwm_apply_ticks(uint8_t channel, uint16_t period_ticks, uint16_t duty_ticks)
@@ -304,7 +366,11 @@ void rtl8735b_pwm_stop(uint8_t channel)
         }
         return;
     }
-    pwmout_pulsewidth_us(&pwm_objects[channel], 0);
-    pwmout_stop(&pwm_objects[channel]);
+    // 停止不延後：通道啟用中而上一次的設定還沒套用時，寫 0 要等到這個週期結束。
+    pwmout_t *obj = &pwm_objects[channel];
+    pwm_deferred[channel] = 0;
+    (void)hal_pwm_set_duty(&obj->pwm_hal_adp, pwm_period_us[channel], 0U, 0U);
+    pwm_pulse_us[channel] = 0U;
+    pwmout_stop(obj);
     pwm_running[channel] = 0;
 }

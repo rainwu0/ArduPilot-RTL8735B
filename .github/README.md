@@ -11,7 +11,7 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Docume
 - ArduPilot master `9f648ccabc`（2026-09-25）加上 RTL8735B 的 HAL，保留 ArduPilot 的完整歷史。
 - 板型：`hub8735ultra`（HUB 8735 ultra，板商 ideasHatch，[板商資料](https://github.com/ideashatch/HUB-8735)），開發都在這塊上做；`amb82-mini` 只建置過。
 - 在 HUB 8735 ultra 上能開機，SPI、I²C、UART、有刷馬達的 PWM 都在板上跑過。
-- 板型本身不含感測器，要自己接、自己寫進疊加檔。沒接氣壓計時開機停在 Config Error，Wi-Fi 會連上熱點，但不會有 MAVLink；沒接 IMU 時停在 `INS: unable to initialise driver`。
+- 板型本身不含感測器，要自己接、自己寫進疊加檔。沒接氣壓計時開機停在 Config Error，Wi-Fi 會連上熱點，但不會有 MAVLink。
 
 每一項的狀態見[〈功能狀態〉][status]。
 

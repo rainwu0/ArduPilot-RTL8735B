@@ -50,6 +50,7 @@ static spi_t spi_object;
 static uint8_t spi_bus_id = BUS_ID_NONE;
 static uint8_t spi_initialized;
 static uint8_t spi_faulted;
+static uint8_t spi_mode;   // 目前 SSI 的 SPI mode（0–3）
 static uint8_t spi_tx_scratch[BUS_SPI_MAX_TRANSFER];
 static uint8_t spi_rx_scratch[BUS_SPI_MAX_TRANSFER];
 static gpio_t cs_objects[4];
@@ -324,6 +325,7 @@ int rtl8735b_spi_init(uint8_t bus, uint8_t sdk_index, uint32_t mosi_pin, uint32_
     }
     spi_enable(&spi_object);
     spi_bus_id = bus;
+    spi_mode = mode;
     spi_initialized = 1U;
     return RTL8735B_BUS_OK;
 }
@@ -335,6 +337,30 @@ int rtl8735b_spi_set_frequency(uint8_t bus, uint32_t clock_hz)
     }
     return hal_ssi_set_sclk(&spi_object.hal_ssi_adaptor, clock_hz) == HAL_OK ?
         RTL8735B_BUS_OK : RTL8735B_BUS_ERROR;
+}
+
+int rtl8735b_spi_set_mode(uint8_t bus, uint8_t mode)
+{
+    if (bus != spi_bus_id || !spi_initialized || spi_faulted || mode > 3U) {
+        return RTL8735B_BUS_INVALID;
+    }
+    if (mode == spi_mode) {
+        return RTL8735B_BUS_OK;
+    }
+    // mode 的 bit 1 是 CPOL、bit 0 是 CPHA。先停用 SSI 再改格式、改完再啟用
+    // （推論：SSI 啟用中不能改格式；SDK 的 hal_ssi.h 沒寫，需上板確認）。
+    if (hal_ssi_disable(&spi_object.hal_ssi_adaptor) != HAL_OK) {
+        return RTL8735B_BUS_ERROR;
+    }
+    const hal_status_t polarity = hal_ssi_set_sclk_polarity(&spi_object.hal_ssi_adaptor,
+        (mode & 2U) != 0U ? ScpolInactiveIsHigh : ScpolInactiveIsLow);
+    const hal_status_t phase = hal_ssi_set_sclk_phase(&spi_object.hal_ssi_adaptor,
+        (mode & 1U) != 0U ? ScphToggleAtStart : ScphToggleInMiddle);
+    if (hal_ssi_enable(&spi_object.hal_ssi_adaptor) != HAL_OK || polarity != HAL_OK || phase != HAL_OK) {
+        return RTL8735B_BUS_ERROR;
+    }
+    spi_mode = mode;
+    return RTL8735B_BUS_OK;
 }
 
 static int _get_cs(uint32_t pin, gpio_t **out)

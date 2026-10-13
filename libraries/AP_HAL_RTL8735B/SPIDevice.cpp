@@ -77,10 +77,16 @@ bool SPIDevice::set_speed(AP_HAL::Device::Speed speed)
     return success;
 }
 
+// 匯流排上可能有 mode 不同的裝置：每次取得匯流排傳輸前換成這個裝置的 mode。
 bool SPIDevice::_begin_transfer(bool &took_lock)
 {
     took_lock = true;
     _bus.semaphore.take_blocking();
+    if (rtl8735b_spi_set_mode(bus_num(), _config.mode) != RTL8735B_BUS_OK) {
+        _bus.semaphore.give();
+        took_lock = false;
+        return false;
+    }
     return true;
 }
 
@@ -231,7 +237,9 @@ bool SPIDevice::set_chip_select(bool set)
             _bus.semaphore.give();
             return false;
         }
-        if (rtl8735b_spi_set_cs(bus_num(), _config.chip_select_pin, 1U) != RTL8735B_BUS_OK) {
+        // 拉 CS 之前先換成這個裝置的 mode，時脈的閒置電位要在 CS 有效前就對
+        if (rtl8735b_spi_set_mode(bus_num(), _config.mode) != RTL8735B_BUS_OK ||
+            rtl8735b_spi_set_cs(bus_num(), _config.chip_select_pin, 1U) != RTL8735B_BUS_OK) {
             _bus.semaphore.give();
             return false;
         }

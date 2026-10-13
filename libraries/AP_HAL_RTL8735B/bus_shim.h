@@ -29,6 +29,8 @@ int rtl8735b_i2c_transfer(uint8_t bus, uint8_t address,
 int rtl8735b_spi_init(uint8_t bus, uint8_t sdk_index, uint32_t mosi_pin, uint32_t miso_pin,
                        uint32_t sclk_pin, uint32_t ss_pin, uint32_t clock_hz, uint8_t mode);
 int rtl8735b_spi_set_frequency(uint8_t bus, uint32_t clock_hz);
+// 換成裝置的 SPI mode（0–3）；和目前相同時不動作。每個裝置傳輸前與手動拉 CS 前呼叫。
+int rtl8735b_spi_set_mode(uint8_t bus, uint8_t mode);
 int rtl8735b_spi_set_cs(uint8_t bus, uint32_t cs_pin, uint8_t asserted);
 int rtl8735b_spi_transfer(uint8_t bus, uint32_t cs_pin,
                            const uint8_t *send, uint32_t send_len,

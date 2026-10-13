@@ -155,15 +155,16 @@ class RTL8735BHWDef(hwdef.HWDef):
 
         k = 'RTL8735B_SPIDEV'
         rows = []
-        for (name, bus, cs, mode, low_hz, high_hz) in self.board[k]:
+        for device_id, (name, bus, cs, mode, low_hz, high_hz) in enumerate(self.board[k]):
             if not re.match(r'^\w+$', name):
                 self.error('%s 的名稱只能用英數字與底線：%s' % (k, name))
             if self.number(k, bus) not in spi_buses:
                 self.error('%s %s 的匯流排 %s 沒有以 RTL8735B_SPIBUS 宣告' % (k, name, bus))
-            # 欄位順序同 BusConfig.h 的 RTL8735BSPIDeviceConfig；device_id 沿用 0
-            rows.append('{"%s", %u, %s, %uU, %uU, HAL_RTL8735B_SPI_TIMEOUT_MS, 0, %u}' % (
+            # 欄位順序同 BusConfig.h 的 RTL8735BSPIDeviceConfig；device_id 是表中的順序，
+            # 讓同一條匯流排上的裝置（例如兩顆同型感測器）在 ArduPilot 的裝置 ID 分得開
+            rows.append('{"%s", %u, %s, %uU, %uU, HAL_RTL8735B_SPI_TIMEOUT_MS, %u, %u}' % (
                 name, self.number(k, bus), self.pin(k, cs), self.number(k, low_hz, 1),
-                self.number(k, high_hz, 1), self.number(k, mode, 0, 3)))
+                self.number(k, high_hz, 1), device_id, self.number(k, mode, 0, 3)))
         self.write_table(f, 'SPI devices', 'HAL_RTL8735B_SPI_DEVICES', 'HAL_RTL8735B_SPI_DEVICE_COUNT', rows)
 
         k = 'RTL8735B_RCOUT'

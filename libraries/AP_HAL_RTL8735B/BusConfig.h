@@ -3,15 +3,20 @@
 
 #include <stdint.h>
 
+// 欄位順序與 rtl8735b_hwdef.py 產生的 HAL_RTL8735B_I2C_BUSES、HAL_RTL8735B_SPI_BUSES 相同。
+// logical_bus 是 ArduPilot 的匯流排編號，sdk_index 是 SDK 的控制器編號。
 typedef struct {
     uint8_t logical_bus;
+    uint8_t sdk_index;
     uint32_t sda_pin;
     uint32_t scl_pin;
     uint32_t clock_hz;
+    uint8_t internal;
 } RTL8735BI2CBusConfig;
 
 typedef struct {
     uint8_t logical_bus;
+    uint8_t sdk_index;
     uint32_t mosi_pin;
     uint32_t miso_pin;
     uint32_t sclk_pin;

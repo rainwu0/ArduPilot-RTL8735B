@@ -4,11 +4,14 @@
 
 #include <stdint.h>
 
-#define RTL8735B_RCOUT_CHANNELS 4U
-#define RTL8735B_GPIO_PIN_COUNT 3U
-#define RTL8735B_ADC_CHANNELS 1U
-#define RTL8735B_ADC_LOGICAL0 2U
+#include "hwdef.h"
+
+// 數量來自板子的 hwdef（RTL8735B_RCOUT、RTL8735B_GPIO、RTL8735B_ADC 關鍵字，由 rtl8735b_hwdef.py 產生）
+#define RTL8735B_RCOUT_CHANNELS HAL_RTL8735B_RCOUT_COUNT
+#define RTL8735B_GPIO_PIN_COUNT HAL_RTL8735B_GPIO_COUNT
+#define RTL8735B_ADC_CHANNELS HAL_RTL8735B_ADC_COUNT
 #define RTL8735B_INVALID_PIN UINT32_MAX
+#define RTL8735B_INVALID_LOGICAL_PIN 0xFFU
 
 // 一般 PWM（含 OneShot 的連續輸出）的頻率範圍。
 #define RTL8735B_RC_MIN_HZ 50U
@@ -45,6 +48,11 @@ uint32_t rtl8735b_rcout_pin(uint8_t channel);
 uint32_t rtl8735b_gpio_pin(uint8_t logical_pin);
 uint8_t rtl8735b_gpio_output_allowed(uint8_t logical_pin);
 uint32_t rtl8735b_analog_pin(uint8_t logical_pin);
+// 第 slot 個 GPIO 的邏輯編號；超出範圍回傳 RTL8735B_INVALID_LOGICAL_PIN。
+uint8_t rtl8735b_gpio_logical_pin(uint8_t slot);
+// 第 index 個類比輸入的邏輯編號，以及邏輯編號對應的 ADC 通道；找不到回傳 RTL8735B_INVALID_LOGICAL_PIN。
+uint8_t rtl8735b_adc_logical_pin(uint8_t index);
+uint8_t rtl8735b_adc_channel(uint8_t logical_pin);
 uint8_t rtl8735b_rcout_channel_count(void);
 uint8_t rtl8735b_adc_channel_count(void);
 uint8_t rtl8735b_gpio_pin_count(void);

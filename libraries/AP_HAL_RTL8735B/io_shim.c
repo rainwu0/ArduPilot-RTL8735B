@@ -17,7 +17,6 @@
 #include <string.h>
 #include <us_ticker_api.h>
 
-static const uint8_t gpio_logical_pins[RTL8735B_GPIO_PIN_COUNT] = {7, 25, 26};
 static gpio_t gpio_objects[RTL8735B_GPIO_PIN_COUNT];
 static uint8_t gpio_initialized[RTL8735B_GPIO_PIN_COUNT];
 static uint8_t gpio_is_output[RTL8735B_GPIO_PIN_COUNT];
@@ -64,7 +63,7 @@ static volatile uint8_t pwm_emergency_stopped;
 static int gpio_slot(uint8_t logical_pin)
 {
     for (uint8_t i = 0; i < RTL8735B_GPIO_PIN_COUNT; i++) {
-        if (gpio_logical_pins[i] == logical_pin &&
+        if (rtl8735b_gpio_logical_pin(i) == logical_pin &&
             rtl8735b_gpio_pin(logical_pin) != RTL8735B_INVALID_PIN) {
             return (int)i;
         }
@@ -164,22 +163,22 @@ int rtl8735b_gpio_irq_attach(uint8_t logical_pin, uint8_t trigger, uint32_t irq_
 
 int rtl8735b_adc_init(uint8_t logical_pin)
 {
-    const uint32_t sdk_pin = rtl8735b_analog_pin(logical_pin);
-    if (sdk_pin == RTL8735B_INVALID_PIN || sdk_pin != (uint32_t)PIN_F0) {
+    // ADC 通道來自板子 hwdef 的 RTL8735B_ADC 表（PF0–PF3 是通道 0–3）
+    const uint8_t channel = rtl8735b_adc_channel(logical_pin);
+    if (rtl8735b_analog_pin(logical_pin) == RTL8735B_INVALID_PIN || channel > 3U) {
         return -1;
     }
     if (!adc_initialized) {
         memset(&adc_adapter, 0, sizeof(adc_adapter));
         hal_adc_load_default(&adc_adapter);
-        // 此板 profile 的 PF0 對應 ADC0。
-        adc_adapter.plft_dat.pin_en.w |= 1UL;
+        adc_adapter.plft_dat.pin_en.w |= 1UL << channel;
         hal_status_t status = hal_adc_init(&adc_adapter);
         if (status != HAL_OK) {
             return (int)status;
         }
         hal_delay_ms(20);
         hal_adc_set_in_type_all(&adc_adapter, HP_ADC_INPUT_ALL_SINGLE);
-        adc_channel = 0;
+        adc_channel = channel;
         status = hal_adc_set_cvlist(&adc_adapter, &adc_channel, 1);
         if (status != HAL_OK) {
             hal_adc_deinit(&adc_adapter);
@@ -197,7 +196,7 @@ int32_t rtl8735b_adc_read_u16(uint8_t logical_pin)
         return -1;
     }
     // 與 SDK analogin_read_u16 相同，回傳 12 位元原始碼；讀取 API 不提供失敗狀態。
-    return (int32_t)hal_adc_single_read(&adc_adapter, 0);
+    return (int32_t)hal_adc_single_read(&adc_adapter, adc_channel);
 }
 
 static int pwm_ensure_initialized(uint8_t channel)

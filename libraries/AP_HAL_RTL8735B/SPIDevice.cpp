@@ -257,7 +257,7 @@ SPIDeviceManager::SPIDeviceManager() :
     }
     const RTL8735BSPIBusConfig &bus = RTL8735B_SPI_BUS_CONFIGS[0];
     // SSI 初始化需要一隻可註冊的 CS 腳；借用第一個裝置的片選腳，shim 註冊後即交還 GPIO。
-    _ready = rtl8735b_spi_init(bus.logical_bus, bus.mosi_pin, bus.miso_pin,
+    _ready = rtl8735b_spi_init(bus.logical_bus, bus.sdk_index, bus.mosi_pin, bus.miso_pin,
                                 bus.sclk_pin, RTL8735B_SPI_DEVICE_CONFIGS[0].chip_select_pin,
                                 bus.default_clock_hz,
                                 RTL8735B_SPI_DEVICE_CONFIGS[0].mode) == RTL8735B_BUS_OK;

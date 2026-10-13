@@ -124,10 +124,11 @@ I2CDeviceManager::I2CDeviceManager() :
     _ready(false),
     _bus("APM_I2C1")
 {
-    const RTL8735BI2CBusConfig *cfg = find_i2c_bus(1U);
-    if (cfg != nullptr) {
-        _ready = rtl8735b_i2c_init(cfg->logical_bus, cfg->sda_pin,
-                                    cfg->scl_pin, cfg->clock_hz) == RTL8735B_BUS_OK;
+    // 板子 hwdef 的 RTL8735B_I2CBUS 只有一條（rtl8735b_hwdef.py 檢查）
+    if (RTL8735B_I2C_BUS_CONFIG_COUNT == 1U) {
+        const RTL8735BI2CBusConfig &cfg = RTL8735B_I2C_BUS_CONFIGS[0];
+        _ready = rtl8735b_i2c_init(cfg.logical_bus, cfg.sdk_index, cfg.sda_pin,
+                                    cfg.scl_pin, cfg.clock_hz) == RTL8735B_BUS_OK;
     }
 }
 
@@ -146,15 +147,15 @@ AP_HAL::I2CDevice *I2CDeviceManager::get_device_ptr(
 
 uint32_t I2CDeviceManager::get_bus_mask(void) const
 {
-    return _ready ? (1U << 1) : 0U;
+    return _ready ? (1UL << RTL8735B_I2C_BUS_CONFIGS[0].logical_bus) : 0U;
 }
 
 uint32_t I2CDeviceManager::get_bus_mask_external(void) const
 {
-    return get_bus_mask();
+    return RTL8735B_I2C_BUS_CONFIGS[0].internal ? 0U : get_bus_mask();
 }
 
 uint32_t I2CDeviceManager::get_bus_mask_internal(void) const
 {
-    return 0U;
+    return RTL8735B_I2C_BUS_CONFIGS[0].internal ? get_bus_mask() : 0U;
 }

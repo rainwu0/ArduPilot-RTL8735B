@@ -5,39 +5,28 @@
 #include "hwdef.h"
 #include <PinNames.h>
 
-#if HAL_RTL8735B_RCOUT_CHANNELS != RTL8735B_RCOUT_CHANNELS
-#error "RTL8735B RC output class and hwdef channel counts differ"
-#endif
-#if HAL_RTL8735B_ADC_CHANNELS != RTL8735B_ADC_CHANNELS
-#error "RTL8735B ADC class and hwdef channel counts differ"
-#endif
-#if HAL_RTL8735B_ADC_LOGICAL0 != RTL8735B_ADC_LOGICAL0
-#error "RTL8735B ADC logical pin and hwdef map differ"
-#endif
-
-static const uint32_t rcout_pins[RTL8735B_RCOUT_CHANNELS] = {
-    HAL_RTL8735B_RCOUT_PIN0,
-    HAL_RTL8735B_RCOUT_PIN1,
-    HAL_RTL8735B_RCOUT_PIN2,
-    HAL_RTL8735B_RCOUT_PIN3,
-};
+// 表格來自板子的 hwdef（rtl8735b_hwdef.py 產生的 HAL_RTL8735B_* 巨集）。
+static const uint32_t rcout_pins[] = {HAL_RTL8735B_RCOUT_PINS};
 
 static const struct {
     uint8_t logical_pin;
     uint32_t sdk_pin;
     uint8_t output_allowed;
-} gpio_pins[RTL8735B_GPIO_PIN_COUNT] = {
-    {7, HAL_RTL8735B_GPIO_PIN7, 0},
-    {25, HAL_RTL8735B_GPIO_PIN25, 1},
-    {26, HAL_RTL8735B_GPIO_PIN26, 1},
-};
+} gpio_pins[] = {HAL_RTL8735B_GPIO_PINS};
 
 static const struct {
     uint8_t logical_pin;
     uint32_t sdk_pin;
-} adc_pins[RTL8735B_ADC_CHANNELS] = {
-    {HAL_RTL8735B_ADC_LOGICAL0, HAL_RTL8735B_ADC_PIN0},
-};
+    uint8_t channel;
+} adc_pins[] = {HAL_RTL8735B_ADC_PINS};
+
+// 表的長度要等於產生器寫出的數量（手改 hwdef.h 時才可能不一致）
+_Static_assert(sizeof(rcout_pins) / sizeof(rcout_pins[0]) == RTL8735B_RCOUT_CHANNELS,
+               "RTL8735B RC output table and count differ");
+_Static_assert(sizeof(gpio_pins) / sizeof(gpio_pins[0]) == RTL8735B_GPIO_PIN_COUNT,
+               "RTL8735B GPIO table and count differ");
+_Static_assert(sizeof(adc_pins) / sizeof(adc_pins[0]) == RTL8735B_ADC_CHANNELS,
+               "RTL8735B ADC table and count differ");
 
 uint32_t rtl8735b_rcout_pin(uint8_t channel)
 {
@@ -62,6 +51,26 @@ uint8_t rtl8735b_gpio_output_allowed(uint8_t logical_pin)
         }
     }
     return 0;
+}
+
+uint8_t rtl8735b_gpio_logical_pin(uint8_t slot)
+{
+    return slot < RTL8735B_GPIO_PIN_COUNT ? gpio_pins[slot].logical_pin : RTL8735B_INVALID_LOGICAL_PIN;
+}
+
+uint8_t rtl8735b_adc_logical_pin(uint8_t index)
+{
+    return index < RTL8735B_ADC_CHANNELS ? adc_pins[index].logical_pin : RTL8735B_INVALID_LOGICAL_PIN;
+}
+
+uint8_t rtl8735b_adc_channel(uint8_t logical_pin)
+{
+    for (uint8_t i = 0; i < RTL8735B_ADC_CHANNELS; i++) {
+        if (adc_pins[i].logical_pin == logical_pin) {
+            return adc_pins[i].channel;
+        }
+    }
+    return RTL8735B_INVALID_LOGICAL_PIN;
 }
 
 uint32_t rtl8735b_analog_pin(uint8_t logical_pin)

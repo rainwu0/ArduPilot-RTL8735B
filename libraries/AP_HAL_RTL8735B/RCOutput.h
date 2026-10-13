@@ -5,6 +5,7 @@
 #include <AP_HAL/RCOutput.h>
 #include <AP_HAL/Util.h>
 #include "AP_HAL_RTL8735B_Namespace.h"
+#include "IOConfig.h"
 #include "Semaphores.h"
 
 namespace RTL8735B { class RCOutput; }
@@ -32,7 +33,8 @@ public:
     AP_HAL::Util::safety_state safety_switch_state() const;
 
 private:
-    static constexpr uint8_t CHANNELS = 4;
+    // 路數來自板子 hwdef 的 RTL8735B_RCOUT
+    static constexpr uint8_t CHANNELS = RTL8735B_RCOUT_CHANNELS;
     void _stop_channel(uint8_t chan);
     void _brushed_hold_low(uint8_t chan);
     void _apply_channel(uint8_t chan);

@@ -10,9 +10,19 @@ using namespace RTL8735B;
 
 namespace {
 GPIO *irq_owner;
-AP_HAL::GPIO::irq_handler_fn_t irq_handlers[3];
-AP_HAL::Proc irq_procs[3];
-constexpr uint8_t gpio_logical_pins[3] = {7, 25, 26};
+AP_HAL::GPIO::irq_handler_fn_t irq_handlers[RTL8735B_GPIO_PIN_COUNT];
+AP_HAL::Proc irq_procs[RTL8735B_GPIO_PIN_COUNT];
+
+// 邏輯編號在板子 hwdef 的 RTL8735B_GPIO 表中的位置；不在表中回傳 -1。
+int gpio_slot(uint8_t pin)
+{
+    for (uint8_t i = 0; i < RTL8735B_GPIO_PIN_COUNT; i++) {
+        if (rtl8735b_gpio_logical_pin(i) == pin) {
+            return i;
+        }
+    }
+    return -1;
+}
 
 class GPIOIrqLock {
 public:
@@ -29,9 +39,11 @@ private:
 };
 }
 
-GPIO::GPIO() :
-    _sources{Source(*this, 7), Source(*this, 25), Source(*this, 26)}
+GPIO::GPIO()
 {
+    for (uint8_t i = 0; i < RTL8735B_GPIO_PIN_COUNT; i++) {
+        _sources[i].bind(this, rtl8735b_gpio_logical_pin(i));
+    }
     irq_owner = this;
 }
 
@@ -78,16 +90,8 @@ bool GPIO::valid_pin(uint8_t pin) const
 
 AP_HAL::DigitalSource *GPIO::channel(uint16_t pin)
 {
-    if (pin == 7) {
-        return &_sources[0];
-    }
-    if (pin == 25) {
-        return &_sources[1];
-    }
-    if (pin == 26) {
-        return &_sources[2];
-    }
-    return nullptr;
+    const int slot = pin <= UINT8_MAX ? gpio_slot((uint8_t)pin) : -1;
+    return slot < 0 ? nullptr : &_sources[slot];
 }
 
 bool GPIO::usb_connected(void)
@@ -103,7 +107,7 @@ bool GPIO::attach_interrupt(uint8_t pin, irq_handler_fn_t fn, INTERRUPT_TRIGGER_
             return false;
         }
         GPIOIrqLock lock(_irq_semaphore);
-        const uint8_t slot = pin == 7 ? 0 : (pin == 25 ? 1 : 2);
+        const uint8_t slot = (uint8_t)gpio_slot(pin);
         rtl8735b_gpio_irq_detach(pin);
         const uint32_t irq_state = rtl8735b_irq_save_disable();
         irq_handlers[slot] = nullptr;
@@ -121,7 +125,7 @@ bool GPIO::attach_interrupt(uint8_t pin, irq_handler_fn_t fn, INTERRUPT_TRIGGER_
         return false;
     }
     GPIOIrqLock lock(_irq_semaphore);
-    const uint8_t slot = pin == 7 ? 0 : (pin == 25 ? 1 : 2);
+    const uint8_t slot = (uint8_t)gpio_slot(pin);
     rtl8735b_gpio_irq_detach(pin);
     pinMode(pin, HAL_GPIO_INPUT);
     const uint32_t irq_state = rtl8735b_irq_save_disable();
@@ -145,7 +149,7 @@ bool GPIO::attach_interrupt(uint8_t pin, AP_HAL::Proc proc, INTERRUPT_TRIGGER_TY
             return false;
         }
         GPIOIrqLock lock(_irq_semaphore);
-        const uint8_t slot = pin == 7 ? 0 : (pin == 25 ? 1 : 2);
+        const uint8_t slot = (uint8_t)gpio_slot(pin);
         rtl8735b_gpio_irq_detach(pin);
         const uint32_t irq_state = rtl8735b_irq_save_disable();
         irq_handlers[slot] = nullptr;
@@ -163,7 +167,7 @@ bool GPIO::attach_interrupt(uint8_t pin, AP_HAL::Proc proc, INTERRUPT_TRIGGER_TY
         return false;
     }
     GPIOIrqLock lock(_irq_semaphore);
-    const uint8_t slot = pin == 7 ? 0 : (pin == 25 ? 1 : 2);
+    const uint8_t slot = (uint8_t)gpio_slot(pin);
     rtl8735b_gpio_irq_detach(pin);
     pinMode(pin, HAL_GPIO_INPUT);
     const uint32_t irq_state = rtl8735b_irq_save_disable();
@@ -181,13 +185,13 @@ bool GPIO::attach_interrupt(uint8_t pin, AP_HAL::Proc proc, INTERRUPT_TRIGGER_TY
 
 void GPIO::_irq_trampoline(uint32_t irq_id, uint8_t value, uint32_t timestamp_us)
 {
-    if (irq_owner == nullptr || irq_id >= 3) {
+    if (irq_owner == nullptr || irq_id >= RTL8735B_GPIO_PIN_COUNT) {
         return;
     }
     const AP_HAL::GPIO::irq_handler_fn_t handler = irq_handlers[irq_id];
     const AP_HAL::Proc proc = irq_procs[irq_id];
     if (handler) {
-        handler(gpio_logical_pins[irq_id], value != 0, timestamp_us);
+        handler(rtl8735b_gpio_logical_pin((uint8_t)irq_id), value != 0, timestamp_us);
     } else if (proc != nullptr) {
         proc();
     }
@@ -195,20 +199,20 @@ void GPIO::_irq_trampoline(uint32_t irq_id, uint8_t value, uint32_t timestamp_us
 
 void GPIO::Source::mode(uint8_t output)
 {
-    _gpio.pinMode(_pin, output);
+    _gpio->pinMode(_pin, output);
 }
 
 uint8_t GPIO::Source::read()
 {
-    return _gpio.read(_pin);
+    return _gpio->read(_pin);
 }
 
 void GPIO::Source::write(uint8_t value)
 {
-    _gpio.write(_pin, value);
+    _gpio->write(_pin, value);
 }
 
 void GPIO::Source::toggle()
 {
-    _gpio.toggle(_pin);
+    _gpio->toggle(_pin);
 }

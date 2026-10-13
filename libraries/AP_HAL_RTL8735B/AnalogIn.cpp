@@ -115,7 +115,7 @@ void AnalogIn::init()
         return;
     }
     // SDK ADC 首次初始化會等待 20 ms，因此在 ArduPilot 啟動階段完成。
-    const int adc_status = rtl8735b_adc_init(RTL8735B_ADC_LOGICAL0);
+    const int adc_status = rtl8735b_adc_init(rtl8735b_adc_logical_pin(0));
     _adc_ready = adc_status == 0;
     if (!_adc_ready) {
         printf("RTL8735B: ADC initialization failed (%d)\n", adc_status);
@@ -175,7 +175,7 @@ void AnalogIn::_timer_tick()
         return;
     }
 
-    const int32_t sample = rtl8735b_adc_read_u16(RTL8735B_ADC_LOGICAL0);
+    const int32_t sample = rtl8735b_adc_read_u16(rtl8735b_adc_logical_pin(0));
     if (sample < 0 || sample > 4095) {
         return;
     }

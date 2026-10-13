@@ -19,8 +19,8 @@
 #include <FreeRTOS.h>
 #include <task.h>
 
-#define BUS_I2C_ID 1U
-#define BUS_SPI_ID 1U
+// 尚未初始化的匯流排編號；初始化後改成呼叫端給的邏輯匯流排編號（來自板子 hwdef 的表）。
+#define BUS_ID_NONE 0xFFU
 #define BUS_I2C_MAX_TRANSFER 512U
 #define BUS_SPI_MAX_TRANSFER 4096U
 #define BUS_MAX_TIMEOUT_MS 100U
@@ -35,6 +35,7 @@ static uint8_t i2c_initialized;
 static uint8_t i2c_faulted;
 static uint8_t i2c_consecutive_timeouts;
 // 位址中止後重新初始化控制器時沿用的設定。
+static uint8_t i2c_bus_id = BUS_ID_NONE;
 static uint8_t i2c_bus_index;
 static uint32_t i2c_sda_pin;
 static uint32_t i2c_scl_pin;
@@ -44,6 +45,7 @@ static uint8_t i2c_tx_scratch[BUS_I2C_MAX_TRANSFER];
 static uint8_t i2c_rx_scratch[BUS_I2C_MAX_TRANSFER];
 
 static spi_t spi_object;
+static uint8_t spi_bus_id = BUS_ID_NONE;
 static uint8_t spi_initialized;
 static uint8_t spi_faulted;
 static uint8_t spi_tx_scratch[BUS_SPI_MAX_TRANSFER];
@@ -91,10 +93,10 @@ static int _wait_i2c(uint8_t receive, uint32_t timeout_ms)
     }
 }
 
-int rtl8735b_i2c_init(uint8_t bus, uint32_t sda_pin, uint32_t scl_pin,
+int rtl8735b_i2c_init(uint8_t bus, uint8_t sdk_index, uint32_t sda_pin, uint32_t scl_pin,
                        uint32_t clock_hz)
 {
-    if (bus != BUS_I2C_ID || sda_pin == 0U || scl_pin == 0U ||
+    if (bus == BUS_ID_NONE || sdk_index > 3U || sda_pin == 0U || scl_pin == 0U ||
         clock_hz < 1000U || clock_hz % 1000U != 0U || i2c_initialized) {
         return RTL8735B_BUS_INVALID;
     }
@@ -103,12 +105,13 @@ int rtl8735b_i2c_init(uint8_t bus, uint32_t sda_pin, uint32_t scl_pin,
     // 失敗已由本 shim 的回傳碼報告，所以只關閉 SDK 的 I2C 錯誤列印，其他模組的列印不變。
     DBG_ERR_MSG_OFF(_DBG_I2C_);
 
-    i2c_bus_index = bus;
+    i2c_bus_index = sdk_index;
     i2c_sda_pin = sda_pin;
     i2c_scl_pin = scl_pin;
     i2c_clock_hz = clock_hz;
     const int result = _i2c_hw_init();
     if (result == RTL8735B_BUS_OK) {
+        i2c_bus_id = bus;
         i2c_initialized = 1U;
     }
     return result;
@@ -195,7 +198,7 @@ int rtl8735b_i2c_transfer(uint8_t bus, uint8_t address,
                            uint8_t *recv, uint32_t recv_len,
                            uint8_t split_transfers, uint32_t timeout_ms)
 {
-    if (bus != BUS_I2C_ID || address > 0x7FU ||
+    if (bus != i2c_bus_id || address > 0x7FU ||
         !_valid_transfer(send, send_len, recv, recv_len) ||
         send_len > BUS_I2C_MAX_TRANSFER || recv_len > BUS_I2C_MAX_TRANSFER ||
         timeout_ms == 0U || timeout_ms > BUS_MAX_TIMEOUT_MS) {
@@ -287,15 +290,15 @@ transfer_done:
     return result;
 }
 
-int rtl8735b_spi_init(uint8_t bus, uint32_t mosi_pin, uint32_t miso_pin,
+int rtl8735b_spi_init(uint8_t bus, uint8_t sdk_index, uint32_t mosi_pin, uint32_t miso_pin,
                        uint32_t sclk_pin, uint32_t ss_pin, uint32_t clock_hz, uint8_t mode)
 {
-    if (bus != BUS_SPI_ID || mosi_pin == 0U || miso_pin == 0U ||
+    if (bus == BUS_ID_NONE || sdk_index > 1U || mosi_pin == 0U || miso_pin == 0U ||
         sclk_pin == 0U || ss_pin == 0U || clock_hz == 0U || spi_initialized) {
         return RTL8735B_BUS_INVALID;
     }
     memset(&spi_object, 0, sizeof(spi_object));
-    // hal_ssi_init（經 spi_format 呼叫）以 PID_SPI1 註冊 CS/CLK/MISO/MOSI 四腳，NC 會註冊失敗
+    // hal_ssi_init（經 spi_format 呼叫）以 PID_SPIx 註冊 CS/CLK/MISO/MOSI 四腳，NC 會註冊失敗
     // （Realtek 官方 SDK Ameba-AIoT/ameba-rtos-pro2@eb5c0907c40d，
     // component/soc/8735b/fwlib/rtl8735b/source/ram/hal_ssi.c:61–121）。傳入真實 CS 腳讓 SSI 完成初始化。
     spi_init(&spi_object, (PinName)mosi_pin, (PinName)miso_pin,
@@ -305,25 +308,27 @@ int rtl8735b_spi_init(uint8_t bus, uint32_t mosi_pin, uint32_t miso_pin,
         return RTL8735B_BUS_INVALID;
     }
     spi_format(&spi_object, 8, mode, 0);
-    // spi_format 不回報 hal_ssi_init 失敗；CS 腳若未被 SPI1 持有，解除註冊會失敗，藉此偵測。
+    // spi_format 不回報 hal_ssi_init 失敗；CS 腳若未被該 SPI 持有，解除註冊會失敗，藉此偵測。
     // 解除後由 rtl8735b_spi_set_cs 以 GPIO 註冊同一腳做軟體片選，維持跨 transfer 的 CS 語意。
-    if (hal_pinmux_unregister(ss_pin, PID_SPI1) != HAL_OK) {
+    if (hal_pinmux_unregister(ss_pin, sdk_index == 0U ? PID_SPI0 : PID_SPI1) != HAL_OK) {
         spi_free(&spi_object);
         return RTL8735B_BUS_ERROR;
     }
-    if (spi_object.hal_ssi_adaptor.index != 1U ||
+    // SDK 依 SCLK 腳決定 SSI 編號，要和板子 hwdef 寫的一致
+    if (spi_object.hal_ssi_adaptor.index != sdk_index ||
         hal_ssi_set_sclk(&spi_object.hal_ssi_adaptor, clock_hz) != HAL_OK) {
         spi_free(&spi_object);
         return RTL8735B_BUS_ERROR;
     }
     spi_enable(&spi_object);
+    spi_bus_id = bus;
     spi_initialized = 1U;
     return RTL8735B_BUS_OK;
 }
 
 int rtl8735b_spi_set_frequency(uint8_t bus, uint32_t clock_hz)
 {
-    if (bus != BUS_SPI_ID || !spi_initialized || spi_faulted || clock_hz == 0U) {
+    if (bus != spi_bus_id || !spi_initialized || spi_faulted || clock_hz == 0U) {
         return RTL8735B_BUS_INVALID;
     }
     return hal_ssi_set_sclk(&spi_object.hal_ssi_adaptor, clock_hz) == HAL_OK ?
@@ -355,7 +360,7 @@ static int _get_cs(uint32_t pin, gpio_t **out)
 int rtl8735b_spi_set_cs(uint8_t bus, uint32_t cs_pin, uint8_t asserted)
 {
     gpio_t *gpio;
-    if (bus != BUS_SPI_ID || cs_pin == 0U || _get_cs(cs_pin, &gpio) != RTL8735B_BUS_OK) {
+    if (bus != spi_bus_id || cs_pin == 0U || _get_cs(cs_pin, &gpio) != RTL8735B_BUS_OK) {
         return RTL8735B_BUS_INVALID;
     }
     gpio_write(gpio, asserted ? 0 : 1);
@@ -416,7 +421,7 @@ int rtl8735b_spi_transfer(uint8_t bus, uint32_t cs_pin,
                            uint32_t timeout_ms, uint8_t keep_cs)
 {
     gpio_t *gpio;
-    if (bus != BUS_SPI_ID || !_valid_transfer(send, send_len, recv, recv_len) ||
+    if (bus != spi_bus_id || !_valid_transfer(send, send_len, recv, recv_len) ||
         timeout_ms == 0U || timeout_ms > BUS_MAX_TIMEOUT_MS ||
         _get_cs(cs_pin, &gpio) != RTL8735B_BUS_OK) {
         return RTL8735B_BUS_INVALID;
@@ -460,7 +465,7 @@ int rtl8735b_spi_transfer_fullduplex(uint8_t bus, uint32_t cs_pin,
                                      uint32_t timeout_ms, uint8_t keep_cs)
 {
     gpio_t *gpio;
-    if (bus != BUS_SPI_ID || send_recv == NULL || recv == NULL || len == 0U ||
+    if (bus != spi_bus_id || send_recv == NULL || recv == NULL || len == 0U ||
         len > BUS_SPI_MAX_TRANSFER || timeout_ms == 0U || timeout_ms > BUS_MAX_TIMEOUT_MS ||
         _get_cs(cs_pin, &gpio) != RTL8735B_BUS_OK) {
         return RTL8735B_BUS_INVALID;
@@ -490,7 +495,7 @@ int rtl8735b_spi_transfer_fullduplex(uint8_t bus, uint32_t cs_pin,
 int rtl8735b_spi_clock_pulse(uint8_t bus, uint32_t len,
                               uint32_t timeout_ms)
 {
-    if (bus != BUS_SPI_ID || !spi_initialized || spi_faulted || len == 0U ||
+    if (bus != spi_bus_id || !spi_initialized || spi_faulted || len == 0U ||
         len > BUS_SPI_MAX_TRANSFER || timeout_ms == 0U || timeout_ms > BUS_MAX_TIMEOUT_MS) {
         return RTL8735B_BUS_INVALID;
     }

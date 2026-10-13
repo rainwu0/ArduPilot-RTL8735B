@@ -16,7 +16,8 @@ enum rtl8735b_bus_result {
     RTL8735B_BUS_BUSY = -5,
 };
 
-int rtl8735b_i2c_init(uint8_t bus, uint32_t sda_pin, uint32_t scl_pin,
+// bus 是 ArduPilot 的邏輯匯流排編號，sdk_index 是 SDK 的 I2C 控制器編號（0–3）；之後的交易以 bus 指定。
+int rtl8735b_i2c_init(uint8_t bus, uint8_t sdk_index, uint32_t sda_pin, uint32_t scl_pin,
                        uint32_t clock_hz);
 int rtl8735b_i2c_transfer(uint8_t bus, uint8_t address,
                            const uint8_t *send, uint32_t send_len,
@@ -24,7 +25,8 @@ int rtl8735b_i2c_transfer(uint8_t bus, uint8_t address,
                            uint8_t split_transfers, uint32_t timeout_ms);
 
 // ss_pin 只用來滿足 SDK hal_ssi_init 的腳位註冊，註冊後即解除；片選仍由 rtl8735b_spi_set_cs 的 GPIO 控制。
-int rtl8735b_spi_init(uint8_t bus, uint32_t mosi_pin, uint32_t miso_pin,
+// bus 是邏輯匯流排編號，sdk_index 是 SDK 的 SPI 編號（0–1）；之後的呼叫以 bus 指定。
+int rtl8735b_spi_init(uint8_t bus, uint8_t sdk_index, uint32_t mosi_pin, uint32_t miso_pin,
                        uint32_t sclk_pin, uint32_t ss_pin, uint32_t clock_hz, uint8_t mode);
 int rtl8735b_spi_set_frequency(uint8_t bus, uint32_t clock_hz);
 int rtl8735b_spi_set_cs(uint8_t bus, uint32_t cs_pin, uint8_t asserted);

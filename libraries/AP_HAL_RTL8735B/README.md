@@ -31,15 +31,24 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 
 ## 自訂板
 
-`rtl8735b-empty` 的腳位依 HUB 8735 ultra 配置：序列埠、SPI、I²C、PWM 與類比輸入都在排針上，GPIO 7、25、26 沿用板子的 D 編號（25、26 是板上的綠色、藍色 LED）。其他 RTL8735B 板子要以 `--extra-hwdef`（`undef` 後重新 `define`）覆寫腳位。
+`rtl8735b-empty` 的腳位依 HUB 8735 ultra 配置：序列埠、SPI、I²C、PWM 與類比輸入都在排針上，GPIO 7、25、26 沿用板子的 D 編號（25、26 是板上的綠色、藍色 LED）。其他 RTL8735B 板子以 `--extra-hwdef` 覆寫：序列埠以 `undef` 後重新 `define`；匯流排、輸出與腳位用下列關鍵字，先 `undef <關鍵字>` 清空整組再重寫。
+
+| 關鍵字 | 欄位 | `rtl8735b-empty` 的值 |
+|---|---|---|
+| `RTL8735B_I2CBUS` | 邏輯匯流排、SDK 的 I2C 編號（0–3）、SDA、SCL、時脈、`internal` 或 `external` | `1 1 PIN_F2 PIN_F1 400000 external` |
+| `RTL8735B_SPIBUS` | 邏輯匯流排、SDK 的 SPI 編號（0–1）、MOSI、MISO、SCLK、預設時脈 | `1 1 PIN_F7 PIN_F5 PIN_F6 1000000` |
+| `RTL8735B_SPIDEV` | 名稱、邏輯匯流排、CS、mode、低速、高速 | `bmi160 1 PIN_F8 0 1000000 10000000` |
+| `RTL8735B_RCOUT` | 腳位；出現的順序就是輸出通道 1、2、… | `PIN_F14`、`PIN_F11`、`PIN_F12`、`PIN_F13` 各一行 |
+| `RTL8735B_GPIO` | 邏輯編號、腳位、`in` 或 `out` | `7 PIN_D17 in`、`25 PIN_E6 out`、`26 PIN_F9 out` |
+| `RTL8735B_ADC` | 邏輯編號、腳位（PF0–PF3） | `2 PIN_F0` |
+
+I²C、SPI 匯流排與類比輸入各一個，SPI 裝置 1–4 個，PWM 1–12 路；寫錯會在建置時報錯。腳位能不能當該周邊用，由 SDK 初始化時判斷，不行就不輸出。
 
 `rtl8735b-empty` 不含感測器；沒有 IMU 時開機會停在 `INS: unable to initialise driver`。感測器、安裝方向與預設參數寫成另一個 hwdef 檔，以 `--extra-hwdef` 疊加：
 
 ```bash
 ./waf configure --board rtl8735b-empty --extra-hwdef /path/to/myboard.dat
 ```
-
-目前的限制：SPI 裝置表只有一筆 `bmi160`（SPI1，片選腳為 `HAL_RTL8735B_BMI160_CS_PIN`）；GPIO 只有邏輯腳位 7、25、26。
 
 ### 板子的應用程式
 

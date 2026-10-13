@@ -4,6 +4,7 @@
 
 #include <AP_HAL/GPIO.h>
 #include "AP_HAL_RTL8735B_Namespace.h"
+#include "IOConfig.h"
 #include "Semaphores.h"
 
 namespace RTL8735B { class GPIO; }
@@ -29,16 +30,22 @@ private:
     static void _irq_trampoline(uint32_t irq_id, uint8_t value, uint32_t timestamp_us);
     class Source : public AP_HAL::DigitalSource {
     public:
-        Source(GPIO &gpio, uint8_t pin) : _gpio(gpio), _pin(pin) {}
+        Source() : _gpio(nullptr), _pin(RTL8735B_INVALID_LOGICAL_PIN) {}
+        void bind(GPIO *gpio, uint8_t pin)
+        {
+            _gpio = gpio;
+            _pin = pin;
+        }
         void mode(uint8_t output) override;
         uint8_t read() override;
         void write(uint8_t value) override;
         void toggle() override;
     private:
-        GPIO &_gpio;
+        GPIO *_gpio;
         uint8_t _pin;
     };
 
-    Source _sources[3];
+    // 依板子 hwdef 的 RTL8735B_GPIO 順序，一支腳一個
+    Source _sources[RTL8735B_GPIO_PIN_COUNT];
     Semaphore _irq_semaphore;
 };

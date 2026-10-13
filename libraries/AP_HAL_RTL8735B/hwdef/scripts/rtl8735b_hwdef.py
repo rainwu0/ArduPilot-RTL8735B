@@ -135,9 +135,13 @@ class RTL8735BHWDef(hwdef.HWDef):
             if not low <= n <= high:
                 self.error('%s 要有 %u–%u 列，現在 %u 列' % (keyword, low, high, n))
 
+        # 每支腳被哪個設定用到，最後檢查同一支腳有沒有被用兩次
+        uses = []
+
         k = 'RTL8735B_I2CBUS'
         rows = []
         for (bus, index, sda, scl, clock, kind) in self.board[k]:
+            uses += [(sda, '%s %s SDA' % (k, bus)), (scl, '%s %s SCL' % (k, bus))]
             rows.append('{%u, %u, %s, %s, %uU, %u}' % (
                 self.number(k, bus, 0, 31), self.number(k, index, 0, 3), self.pin(k, sda), self.pin(k, scl),
                 self.number(k, clock, 1), self.choice(k, kind, ('internal', 'external')) == 'internal'))
@@ -147,17 +151,24 @@ class RTL8735BHWDef(hwdef.HWDef):
         rows = []
         spi_buses = set()
         for (bus, index, mosi, miso, sclk, clock) in self.board[k]:
-            spi_buses.add(self.number(k, bus))
+            spi_buses.add(self.number(k, bus, 0, 31))
+            uses += [(mosi, '%s %s MOSI' % (k, bus)), (miso, '%s %s MISO' % (k, bus)),
+                     (sclk, '%s %s SCLK' % (k, bus))]
             rows.append('{%u, %u, %s, %s, %s, %uU}' % (
-                self.number(k, bus), self.number(k, index, 0, 1), self.pin(k, mosi), self.pin(k, miso),
+                self.number(k, bus, 0, 31), self.number(k, index, 0, 1), self.pin(k, mosi), self.pin(k, miso),
                 self.pin(k, sclk), self.number(k, clock, 1)))
         self.write_table(f, 'SPI buses', 'HAL_RTL8735B_SPI_BUSES', 'HAL_RTL8735B_SPI_BUS_COUNT', rows)
 
         k = 'RTL8735B_SPIDEV'
         rows = []
+        names = set()
         for device_id, (name, bus, cs, mode, low_hz, high_hz) in enumerate(self.board[k]):
             if not re.match(r'^\w+$', name):
                 self.error('%s 的名稱只能用英數字與底線：%s' % (k, name))
+            if name in names:
+                self.error('%s 的名稱 %s 重複' % (k, name))
+            names.add(name)
+            uses.append((cs, '%s %s CS' % (k, name)))
             if self.number(k, bus) not in spi_buses:
                 self.error('%s %s 的匯流排 %s 沒有以 RTL8735B_SPIBUS 宣告' % (k, name, bus))
             # 欄位順序同 BusConfig.h 的 RTL8735BSPIDeviceConfig；device_id 是表中的順序，
@@ -169,13 +180,15 @@ class RTL8735BHWDef(hwdef.HWDef):
 
         k = 'RTL8735B_RCOUT'
         rows = [self.pin(k, p) for (p,) in self.board[k]]
+        uses += [(p, '%s %u' % (k, i + 1)) for i, (p,) in enumerate(self.board[k])]
         self.write_table(f, 'RC outputs', 'HAL_RTL8735B_RCOUT_PINS', 'HAL_RTL8735B_RCOUT_COUNT', rows)
 
         k = 'RTL8735B_GPIO'
         rows = []
         seen = set()
         for (logical, pin, direction) in self.board[k]:
-            n = self.number(k, logical)
+            n = self.number(k, logical, 0, 255)
+            uses.append((pin, '%s %s' % (k, logical)))
             if n in seen:
                 self.error('%s 的邏輯編號 %u 重複' % (k, n))
             seen.add(n)
@@ -187,8 +200,21 @@ class RTL8735BHWDef(hwdef.HWDef):
         for (logical, pin) in self.board[k]:
             if self.pin(k, pin) not in ADC_CHANNELS:
                 self.error('%s 只支援 PIN_F0–PIN_F3：%s' % (k, pin))
-            rows.append('{%u, %s, %u}' % (self.number(k, logical), pin, ADC_CHANNELS[pin]))
+            # 254、255 是 ArduPilot 的 ANALOG_INPUT_BOARD_VCC、ANALOG_INPUT_NONE
+            rows.append('{%u, %s, %u}' % (self.number(k, logical, 0, 253), pin, ADC_CHANNELS[pin]))
+            uses.append((pin, '%s %s' % (k, logical)))
         self.write_table(f, 'ADC pins', 'HAL_RTL8735B_ADC_PINS', 'HAL_RTL8735B_ADC_COUNT', rows)
+
+        # 啟用中的序列埠腳位（停用的序列埠不占腳位）
+        for line in self.alllines:
+            m = re.match(r'define\s+(HAL_RTL8735B_SERIAL(\d)_(?:TX|RX)_PIN)\s+(PIN_\w+)', line)
+            if m and self.intdefines.get('HAL_RTL8735B_SERIAL%s_ENABLED' % m.group(2), 0) == 1:
+                uses.append((m.group(3), m.group(1)))
+        owner = {}
+        for pin, source in uses:
+            if pin in owner:
+                self.error('%s 同時用在 %s 與 %s' % (pin, owner[pin], source))
+            owner[pin] = source
 
     def write_table(self, f, description, define_name, count_name, rows):
         self.write_device_table(f, description, define_name, rows)

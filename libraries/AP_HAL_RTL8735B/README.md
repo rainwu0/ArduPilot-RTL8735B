@@ -60,7 +60,7 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 其他說明：
 
 - I²C 一律用 SDK 的編號：`variant.h` 把 PE4／PE3 標成 I2C0、PA1／PA0 標成 I2C2，SDK 的腳位表相反（`component/mbed/targets/hal/rtl8735b/i2c_api.c`）。
-- 產生器不檢查同一支腳是否被兩個關鍵字用到；改用 D3、D4 或其他腳時，要自己確認沒有和上表衝突。
+- 同一支腳被兩個設定用到（包括啟用中的序列埠）時，建置會報錯並指出衝突的兩個來源；改用 D3、D4 或其他腳時，先把原本用到它的設定拿掉。
 - `rtl8735b-empty` 的接法和 `hub8735ultra` 相同，保留給既有的建置；映像在 `build/rtl8735b-empty/`。
 
 ### AMB82-mini
@@ -83,7 +83,7 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 | `RTL8735B_GPIO` | 邏輯編號、腳位、`in` 或 `out` | `7 PIN_D17 in`、`25 PIN_E6 out`、`26 PIN_F9 out` |
 | `RTL8735B_ADC` | 邏輯編號、腳位（PF0–PF3） | `2 PIN_F0` |
 
-I²C、SPI 匯流排與類比輸入各一個，SPI 裝置 1–4 個，PWM 1–12 路；寫錯會在建置時報錯。腳位能不能當該周邊用，由 SDK 初始化時判斷，不行就不輸出。
+I²C、SPI 匯流排與類比輸入各一個，SPI 裝置 1–4 個，PWM 1–12 路；寫錯會在建置時報錯。邏輯編號的範圍：匯流排 0–31、GPIO 0–255、類比輸入 0–253；SPI 裝置名稱不能重複。腳位能不能當該周邊用，由 SDK 初始化時判斷，不行就不輸出。
 
 - `RTL8735B_I2CBUS` 的時脈：驅動向匯流排要求的時脈必須等於這一欄，否則取不到裝置（`I2CDevice.cpp` 的 `get_device_ptr` 回傳 `nullptr`）。驅動沒有指定時，ArduPilot 要求的是 400000。
 - 舊的寫法已經移除：`HAL_RTL8735B_I2C1_*`、`HAL_RTL8735B_SPI1_*`、`HAL_RTL8735B_BMI160_CS_PIN`、`HAL_RTL8735B_RCOUT_CHANNELS`、`HAL_RTL8735B_RCOUT_PIN0`–`PIN3`、`HAL_RTL8735B_GPIO_PIN7`／`PIN25`／`PIN26`、`HAL_RTL8735B_ADC_CHANNELS`、`HAL_RTL8735B_ADC_PIN0`、`HAL_RTL8735B_ADC_LOGICAL0` 這些 `define` 不再有作用。疊加檔若還在用，建置不會報錯，設定只會悄悄失效，要改成上表的關鍵字。

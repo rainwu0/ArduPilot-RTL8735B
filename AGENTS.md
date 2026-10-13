@@ -6,8 +6,24 @@ ArduPilot is safety-critical autopilot software controlling real vehicles. Every
 
 ---
 
+## 0. This repository: the RTL8735B port
+
+This is not the ArduPilot repository. It is an unofficial, individually maintained port of ArduPilot to the Realtek RTL8735B SoC, based on ArduPilot master `9f648ccabc`. The rest of this file is ArduPilot's own guide, kept as it is because it still applies to the code here. Where it disagrees with this section, this section wins.
+
+- **Scope**: the HAL in `libraries/AP_HAL_RTL8735B/`, and only what the chip needs to fit into ArduPilot (waf, hwdef, scripts under `Tools/`). Keep changes to ArduPilot's shared code minimal, and list them in the HAL README section 〈對 ArduPilot 共用程式的修改〉. Features for a particular vehicle belong in that vehicle's own project.
+- **Where things go**: issues and pull requests for this port go to this repository, against `main`. Do not open RTL8735B issues or pull requests on ArduPilot, and do not use ArduPilot's Discord or Discourse for them. The channels in section 9 are for ArduPilot itself.
+- **Build**: there is no SITL target for this chip. Follow `libraries/AP_HAL_RTL8735B/README.md` (Realtek SDK, Realtek ASDK toolchain), then `./waf configure --board hub8735ultra && ./waf copter`. Board types are in `libraries/AP_HAL_RTL8735B/hwdef/`.
+- **CI**: GitHub Actions is disabled here, so the checks in section 5 do not run on pushes or pull requests. Build the board you changed yourself and run `Tools/scripts/check_branch_conventions.py`.
+- **Testing on hardware**: say exactly what ran on a board and what was only built. The feature status table in the HAL README separates 板上驗證 (verified on a board), 待複驗 (to be rechecked) and 僅建置 (build only). Do not move an item up without a board result.
+- **Language**: the HAL README and code comments in this port are Traditional Chinese (Taiwan). Commit messages are English, `Subsystem: summary`, one subsystem per commit (section 7).
+- **Secrets**: Wi-Fi credentials are compiled into the image. Never commit them, and never attach an image built with them.
+- **Sources**: when code is adapted from another public project, name it with a fixed commit in the file header, as the existing files do for `AP_HAL_ESP32`.
+
+---
+
 ## Table of Contents
 
+- [0. This repository: the RTL8735B port](#0-this-repository-the-rtl8735b-port)
 - [1. Code of Conduct & Ethics](#1-code-of-conduct--ethics)
 - [2. Repository Structure](#2-repository-structure)
 - [3. Coding Style](#3-coding-style)

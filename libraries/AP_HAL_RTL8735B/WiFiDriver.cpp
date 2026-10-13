@@ -12,6 +12,9 @@
 #include <algorithm>
 #include <stdio.h>
 
+// 主控台訊息在成員函式裡一律寫成 ::printf：WiFiDriver 繼承 AP_HAL::BetterStream，不帶 :: 的 printf
+// 會呼叫它的 printf 成員，把文字寫進這個 Wi-Fi 序列埠本身，而不是 LOG UART。
+
 using namespace RTL8735B;
 
 namespace {
@@ -115,7 +118,7 @@ void WiFiDriver::_begin(uint32_t baud, uint16_t rx_space, uint16_t tx_space)
     if (rtl8735b_wifi_ssid_len == 0) {
         _state.store(LinkState::DISABLED);
         if (!_disabled_reported) {
-            printf("WiFi: no STA credentials in this image; WiFi MAVLink port disabled\n");
+            ::printf("WiFi: no STA credentials in this image; WiFi MAVLink port disabled\n");
             _disabled_reported = true;
         }
         return;
@@ -143,7 +146,7 @@ void WiFiDriver::_begin(uint32_t baud, uint16_t rx_space, uint16_t tx_space)
             _writebuf.set_size(0);
             _initialized.store(false);
             _state.store(LinkState::DISABLED);
-            printf("WiFi: failed to create APM_WIFI task\n");
+            ::printf("WiFi: failed to create APM_WIFI task\n");
             return;
         }
         _state.store(LinkState::STARTING);
@@ -267,7 +270,7 @@ void WiFiDriver::_link_lost(uint32_t now_ms, const char *reason)
     _gcs_known.store(false);
     _local_address.store(0);
     _link_losses.fetch_add(1);
-    printf("WiFi: link lost (%s), reconnecting\n", reason);
+    ::printf("WiFi: link lost (%s), reconnecting\n", reason);
     _set_state(LinkState::WAIT_RETRY, now_ms);
 }
 
@@ -382,7 +385,7 @@ void WiFiDriver::_service_tx(uint32_t now_ms)
         } else {
             if (_gcs_known.load()) {
                 _gcs_known.store(false);
-                printf("WiFi: ground station silent, broadcasting heartbeats\n");
+                ::printf("WiFi: ground station silent, broadcasting heartbeats\n");
             }
             if (is_heartbeat(_datagram, n)) {
                 sent = rtl8735b_udp_sendto(_fd, _datagram, n, _broadcast_address, _gcs_port);
@@ -425,7 +428,7 @@ uint32_t WiFiDriver::_link_step(uint32_t now_ms)
     case LinkState::STARTING:
         if (rtl8735b_wifi_start_sta() != RTL8735B_WIFI_OK) {
             _start_failures.fetch_add(1);
-            printf("WiFi: STA start failed\n");
+            ::printf("WiFi: STA start failed\n");
             _set_state(LinkState::WAIT_RETRY, now_ms);
             return 10;
         }
@@ -443,7 +446,7 @@ uint32_t WiFiDriver::_link_step(uint32_t now_ms)
 
     case LinkState::CONNECTING: {
         _join_attempts.fetch_add(1);
-        printf("WiFi: joining (SSID length %u)\n", (unsigned)rtl8735b_wifi_ssid_len);
+        ::printf("WiFi: joining (SSID length %u)\n", (unsigned)rtl8735b_wifi_ssid_len);
         const int join = rtl8735b_wifi_join(rtl8735b_wifi_ssid, rtl8735b_wifi_ssid_len,
                                              rtl8735b_wifi_password, rtl8735b_wifi_password_len);
         bool opened = false;
@@ -457,7 +460,7 @@ uint32_t WiFiDriver::_link_step(uint32_t now_ms)
             _join_failures.fetch_add(1);
             _close_sockets();
             rtl8735b_wifi_leave();
-            printf("WiFi: join failed (%d)\n", join);
+            ::printf("WiFi: join failed (%d)\n", join);
             _set_state(LinkState::WAIT_RETRY, now_ms);
             return 10;
         }
@@ -500,7 +503,7 @@ void WiFiDriver::_drop_tcp_client(const char *reason)
     rtl8735b_tcp_close(_fd);
     _fd = -1;
     _gcs_known.store(false);
-    printf("WiFi: ground station %s\n", reason);
+    ::printf("WiFi: ground station %s\n", reason);
 }
 
 void WiFiDriver::_service_tcp_accept(uint32_t now_ms)

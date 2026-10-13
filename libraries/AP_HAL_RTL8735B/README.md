@@ -204,6 +204,8 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 
 「板上驗證」：功能已在 HUB 8735 ultra 上運作。本版本的映像（`hub8735ultra` 板型、預設 Flash 版面 `realtek-ota`）已在沒有接感測器的 HUB 8735 ultra 上開機，Wi-Fi 會連上熱點；但開機停在氣壓計的 Config Error，Wi-Fi 的 MAVLink 通道沒有建立（見〈Wi-Fi〉），所以 Wi-Fi MAVLink（UDP、TCP）與參數保存還沒以本版本驗證。其他項目也尚待以本版本複驗。
 
+「待複驗」：先前的上板結果經 Wi-Fi MAVLink 取得，但當時的工具沒有確認封包來自受測的板子（同一個網路上可能有其他飛控），要重新驗證。
+
 | 項目 | 狀態 | 說明 |
 |---|---|---|
 | 建置系統 | 板上驗證 | |
@@ -211,14 +213,14 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 | SPI | 板上驗證 | |
 | I²C | 板上驗證 | 開機時氣壓計偶發初始化失敗，原因未明。傳輸逾時後重新初始化控制器、必要時清除匯流排，連續 3 次逾時才停用該匯流排（未上板） |
 | UART | 板上驗證 | 只支援 8N1 |
-| Wi-Fi MAVLink（UDP） | 板上驗證 | STA 模式 |
+| Wi-Fi MAVLink（UDP） | 待複驗 | STA 模式 |
 | Wi-Fi MAVLink（TCP） | 僅建置 | 建置時選擇，與 UDP 二選一 |
 | 主控台／USB MAVLink | 未實作 | |
 | RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol）。地面站的 RC override 走 MAVLink，不經過 RC 輸入，已在板上使用 |
 | GPS | 僅建置 | |
 | PWM 輸出 | 板上驗證 | 有刷馬達 PWM 已驅動馬達；電調用的一般 PWM、OneShot、OneShot125 未上板，見〈馬達輸出〉 |
 | AnalogIn | 僅建置 | 只有原始取樣，參考電壓未確認 |
-| 參數存在 Flash | 板上驗證 | 重開機與斷電後保留 |
+| 參數存在 Flash | 待複驗 | 重開機與斷電後保留 |
 | SD 卡 | 未實作 | |
 | `--upload` 燒錄 | 僅建置 | `COMn`（Windows 版工具）與 `/dev/tty*`（Linux 版工具）都未上板；手動燒錄見〈燒錄〉 |
 | 韌體 OTA 更新 | 不提供 | 本儲存庫不提供 Wi-Fi 韌體更新；更新韌體以燒錄進行，見〈燒錄〉 |

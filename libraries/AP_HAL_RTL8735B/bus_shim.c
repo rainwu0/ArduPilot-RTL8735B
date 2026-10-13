@@ -21,6 +21,8 @@
 
 // 尚未初始化的匯流排編號；初始化後改成呼叫端給的邏輯匯流排編號（來自板子 hwdef 的表）。
 #define BUS_ID_NONE 0xFFU
+// 沒有接腳位：SDK 的 NC（PinNames.h）。0 是合法的 PIN_A0（I2C0 的 SCL），不能拿來表示「沒設定」。
+#define BUS_PIN_NONE ((uint32_t)0xFFFFFFFFU)
 #define BUS_I2C_MAX_TRANSFER 512U
 #define BUS_SPI_MAX_TRANSFER 4096U
 #define BUS_MAX_TIMEOUT_MS 100U
@@ -96,7 +98,7 @@ static int _wait_i2c(uint8_t receive, uint32_t timeout_ms)
 int rtl8735b_i2c_init(uint8_t bus, uint8_t sdk_index, uint32_t sda_pin, uint32_t scl_pin,
                        uint32_t clock_hz)
 {
-    if (bus == BUS_ID_NONE || sdk_index > 3U || sda_pin == 0U || scl_pin == 0U ||
+    if (bus == BUS_ID_NONE || sdk_index > 3U || sda_pin == BUS_PIN_NONE || scl_pin == BUS_PIN_NONE ||
         clock_hz < 1000U || clock_hz % 1000U != 0U || i2c_initialized) {
         return RTL8735B_BUS_INVALID;
     }
@@ -293,8 +295,8 @@ transfer_done:
 int rtl8735b_spi_init(uint8_t bus, uint8_t sdk_index, uint32_t mosi_pin, uint32_t miso_pin,
                        uint32_t sclk_pin, uint32_t ss_pin, uint32_t clock_hz, uint8_t mode)
 {
-    if (bus == BUS_ID_NONE || sdk_index > 1U || mosi_pin == 0U || miso_pin == 0U ||
-        sclk_pin == 0U || ss_pin == 0U || clock_hz == 0U || spi_initialized) {
+    if (bus == BUS_ID_NONE || sdk_index > 1U || mosi_pin == BUS_PIN_NONE || miso_pin == BUS_PIN_NONE ||
+        sclk_pin == BUS_PIN_NONE || ss_pin == BUS_PIN_NONE || clock_hz == 0U || spi_initialized) {
         return RTL8735B_BUS_INVALID;
     }
     memset(&spi_object, 0, sizeof(spi_object));
@@ -360,7 +362,7 @@ static int _get_cs(uint32_t pin, gpio_t **out)
 int rtl8735b_spi_set_cs(uint8_t bus, uint32_t cs_pin, uint8_t asserted)
 {
     gpio_t *gpio;
-    if (bus != spi_bus_id || cs_pin == 0U || _get_cs(cs_pin, &gpio) != RTL8735B_BUS_OK) {
+    if (bus != spi_bus_id || cs_pin == BUS_PIN_NONE || _get_cs(cs_pin, &gpio) != RTL8735B_BUS_OK) {
         return RTL8735B_BUS_INVALID;
     }
     gpio_write(gpio, asserted ? 0 : 1);

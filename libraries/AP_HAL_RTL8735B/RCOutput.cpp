@@ -104,15 +104,17 @@ void RCOutput::_stop_channel(uint8_t chan)
     if (!_channel_valid(chan)) {
         return;
     }
-    if (_mode[chan] == MODE_PWM_BRUSHED) {
-        _brushed_hold_low(chan);
+    if (_mode[chan] == MODE_PWM_BRUSHED && _brushed_hold_low(chan)) {
         return;
     }
+    // 有刷歸零失敗（例如 PWM 時脈仍由 OneShot125 占用）時，依硬體目前的狀態停止輸出，
+    // 不能讓舊的輸出留著。
     rtl8735b_pwm_stop(chan);
 }
 
 // 有刷馬達由高電位導通的低側開關驅動，停止狀態要主動輸出 duty 0，而不是停用通道。
-void RCOutput::_brushed_hold_low(uint8_t chan)
+// 回傳是否已以 duty 0 驅動。
+bool RCOutput::_brushed_hold_low(uint8_t chan)
 {
     static uint32_t reported_hold_low_failures;
     const uint16_t ticks = _rate_valid[chan] ? _period_ticks[chan] :
@@ -124,6 +126,7 @@ void RCOutput::_brushed_hold_low(uint8_t chan)
         reported_hold_low_failures |= 1UL << chan;
         printf("RTL8735B: brushed PWM ch%u could not be set to zero duty\n", (unsigned)chan + 1U);
     }
+    return status == 0;
 }
 
 // 有刷與 OneShot125 共用 PWM SCLK：另一種模式已占用時，每個通道印一次原因。
@@ -426,6 +429,9 @@ void RCOutput::set_output_mode(uint32_t mask, enum output_mode mode)
                 _fast_mask |= 1UL << chan;
             }
             if (_mode[chan] != mode) {
+                // 先依舊模式停止輸出，再改模式：新模式可能因 PWM 時脈衝突而無法驅動腳位，不能讓舊的
+                // 輸出留著。舊模式是有刷時先以 duty 0 驅動（停止狀態），失敗才停用通道。
+                _stop_channel(chan);
                 _mode[chan] = mode;
                 // 依新模式重新判斷頻率；進入有刷模式時立即以 duty 0 驅動腳位。
                 _refresh_rate(chan);

@@ -14,6 +14,8 @@ Issues and pull requests are welcome here, in Chinese or English. This is not th
 
 「我照 README 做、在某塊板子上成功了」也值得回報，功能狀態表就是靠這些更新的。
 
+安全問題（例如能讓別人控制飛控、讀出帳密）不要開公開的 issue，請到本儲存庫的 Security 分頁，用「Report a vulnerability」私下回報。
+
 ## 送 PR
 
 - 照 ArduPilot 的慣例：一個提交只動一個子系統（例如 `AP_HAL_RTL8735B:`、`hwdef:`、`waf:`、`Tools:`），提交訊息用英文寫成 `Subsystem: summary`。

@@ -4,6 +4,8 @@ ArduPilot 在 Realtek RTL8735B 上的硬體抽象層（HAL）。**未經飛行�
 
 開發與驗證用的板子是 HUB 8735 ultra（板商 ideasHatch，主晶片 RTL8735B；板商資料：https://github.com/ideashatch/HUB-8735）。
 
+各功能目前能用到哪裡，見〈功能狀態〉。
+
 本儲存庫是個人維護的非官方移植，與 ArduPilot 開發團隊無關。本平台的問題請在本儲存庫回報，不要回報到 ArduPilot 的論壇或 issue。
 
 ## 需求
@@ -45,12 +47,28 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 | SERIAL4（UART3，RC 輸入） | D6（PE1，TX）、D5（PE2，RX） |
 | 類比輸入，邏輯編號 2 | D2（PF0，ADC 通道 0） |
 | GPIO | 7（D7，PD17，輸入）、25（D25，PE6，綠色 LED，輸出）、26（D26，PF9，藍色 LED，輸出） |
-| 保留 | D12（PF15）：板上按鍵（`variant.h` 的 `PUSH_BTN`）；D13（PF10）：保留，本板型不設定。實測上它控制板上的白色補光燈；詳見板商公開的原理圖（ideashatch/HUB-8735 `870a7e08de7a` 的 `HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf`）；D14（PA5）：`variant.h` 標為 Sensor power on，重置時的電位也決定是否進入燒錄模式（見〈燒錄〉）；D16（PF3）、D17（PF4）：LOG UART（SERIAL0，停用） |
+| 保留 | D12、D13、D14、D16、D17，見下方 |
 | 未設定 | D3（PE4）、D4（PE3）：疊加檔可改成 SDK 的 I2C2（SDA、SCL），或 SPI0 的 CS、MOSI（SPI0 的 SCLK、MISO 是 PE1、PE2，要先停用 SERIAL4） |
+
+保留的腳：
+
+- D12（PF15）：板上按鍵（`variant.h` 的 `PUSH_BTN`）。
+- D13（PF10）：本板型不設定。實測上它控制板上的白色補光燈；詳見板商公開的原理圖（ideashatch/HUB-8735 `870a7e08de7a` 的 `HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf`）。
+- D14（PA5）：`variant.h` 標為 Sensor power on；重置時的電位也決定是否進入燒錄模式（見〈燒錄〉）。
+- D16（PF3）、D17（PF4）：LOG UART（SERIAL0，停用）。
+
+其他說明：
 
 - I²C 一律用 SDK 的編號：`variant.h` 把 PE4／PE3 標成 I2C0、PA1／PA0 標成 I2C2，SDK 的腳位表相反（`component/mbed/targets/hal/rtl8735b/i2c_api.c`）。
 - 產生器不檢查同一支腳是否被兩個關鍵字用到；改用 D3、D4 或其他腳時，要自己確認沒有和上表衝突。
 - `rtl8735b-empty` 的接法和 `hub8735ultra` 相同，保留給既有的建置；映像在 `build/rtl8735b-empty/`。
+
+### AMB82-mini
+
+`--board amb82-mini`（`hwdef/amb82-mini/hwdef.dat`）：AMB82-mini 和 HUB 8735 ultra 是同一顆晶片，周邊腳位相同（依 Realtek Ameba-AIoT/ameba-arduino-pro2 9de560f6af 的 `Arduino_package/hardware/variants/ameba_amb82-mini/variant.cpp`）。這個板型只把 GPIO 的邏輯編號改成 AMB82-mini 的 D 編號：17（PD17，輸入）、24（PE6，綠色 LED）、23（PF9，藍色 LED）。Flash 版面同樣用預設的 `realtek-ota`。
+
+- 狀態：僅建置，未上板。
+- 四路 PWM 輸出 PF11–PF14 中，PF12、PF13 在上述檔案裡另標為 `*LOG_RX`、`*LOG_TX`，能不能當 PWM 輸出用尚未確認。
 
 ### 自訂板
 
@@ -70,18 +88,11 @@ I²C、SPI 匯流排與類比輸入各一個，SPI 裝置 1–4 個，PWM 1–12
 - `RTL8735B_I2CBUS` 的時脈：驅動向匯流排要求的時脈必須等於這一欄，否則取不到裝置（`I2CDevice.cpp` 的 `get_device_ptr` 回傳 `nullptr`）。驅動沒有指定時，ArduPilot 要求的是 400000。
 - 舊的寫法已經移除：`HAL_RTL8735B_I2C1_*`、`HAL_RTL8735B_SPI1_*`、`HAL_RTL8735B_BMI160_CS_PIN`、`HAL_RTL8735B_RCOUT_CHANNELS`、`HAL_RTL8735B_RCOUT_PIN0`–`PIN3`、`HAL_RTL8735B_GPIO_PIN7`／`PIN25`／`PIN26`、`HAL_RTL8735B_ADC_CHANNELS`、`HAL_RTL8735B_ADC_PIN0`、`HAL_RTL8735B_ADC_LOGICAL0` 這些 `define` 不再有作用。疊加檔若還在用，建置不會報錯，設定只會悄悄失效，要改成上表的關鍵字。
 
-板型都不含感測器；沒有 IMU 時開機會停在 `INS: unable to initialise driver`。感測器、安裝方向與預設參數寫成另一個 hwdef 檔，以 `--extra-hwdef` 疊加：
+板型都不含感測器；沒有氣壓計時開機會停在 `Config Error: Baro: unable to initialise driver`，這時 Wi-Fi 也不會有 MAVLink（見〈Wi-Fi〉）。感測器、安裝方向與預設參數寫成另一個 hwdef 檔，以 `--extra-hwdef` 疊加：
 
 ```bash
 ./waf configure --board hub8735ultra --extra-hwdef /path/to/myboard.dat
 ```
-
-### AMB82-mini
-
-`--board amb82-mini`（`hwdef/amb82-mini/hwdef.dat`）：AMB82-mini 和 HUB 8735 ultra 是同一顆晶片，周邊腳位相同（依 Realtek Ameba-AIoT/ameba-arduino-pro2 9de560f6af 的 `Arduino_package/hardware/variants/ameba_amb82-mini/variant.cpp`）。這個板型只把 GPIO 的邏輯編號改成 AMB82-mini 的 D 編號：17（PD17，輸入）、24（PE6，綠色 LED）、23（PF9，藍色 LED）。Flash 版面同樣用預設的 `realtek-ota`。
-
-- 狀態：僅建置，未上板。
-- 四路 PWM 輸出 PF11–PF14 中，PF12、PF13 在上述檔案裡另標為 `*LOG_RX`、`*LOG_TX`，能不能當 PWM 輸出用尚未確認。
 
 ### 板子的應用程式
 
@@ -202,16 +213,14 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 
 ## 功能狀態
 
-「板上驗證」：功能已在 HUB 8735 ultra 上運作。本版本的映像（`hub8735ultra` 板型、預設 Flash 版面 `realtek-ota`）已在沒有接感測器的 HUB 8735 ultra 上開機，Wi-Fi 會連上熱點；但開機停在氣壓計的 Config Error，Wi-Fi 的 MAVLink 通道沒有建立（見〈Wi-Fi〉），所以 Wi-Fi MAVLink（UDP、TCP）與參數保存還沒以本版本驗證。其他項目也尚待以本版本複驗。
-
-「待複驗」：先前的上板結果經 Wi-Fi MAVLink 取得，但當時的工具沒有確認封包來自受測的板子（同一個網路上可能有其他飛控），要重新驗證。
+「板上驗證」：在 HUB 8735 ultra 上運作過。「待複驗」：先前有板上結果，但無法確認來自受測的這塊板子，要重新驗證。目前的映像（`hub8735ultra`、預設 Flash 版面）沒接感測器時能開機、連上 Wi-Fi，但停在氣壓計的 Config Error，所以不會有 Wi-Fi MAVLink（見〈Wi-Fi〉）。
 
 | 項目 | 狀態 | 說明 |
 |---|---|---|
 | 建置系統 | 板上驗證 | |
 | 排程與號誌 | 待複驗 | 400 Hz 主迴圈 |
 | SPI | 板上驗證 | |
-| I²C | 板上驗證 | 開機時氣壓計偶發初始化失敗，原因未明。傳輸逾時後重新初始化控制器、必要時清除匯流排，連續 3 次逾時才停用該匯流排（未上板） |
+| I²C | 板上驗證 | 開機時氣壓計偶發初始化失敗，原因未明。逾時處理未上板：傳輸逾時後重新初始化控制器、必要時清除匯流排，連續 3 次逾時才停用該匯流排 |
 | UART | 板上驗證 | 只支援 8N1 |
 | Wi-Fi MAVLink（UDP） | 待複驗 | STA 模式 |
 | Wi-Fi MAVLink（TCP） | 僅建置 | 建置時選擇，與 UDP 二選一 |

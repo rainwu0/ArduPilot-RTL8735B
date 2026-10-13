@@ -228,7 +228,7 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 | RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol）。地面站的 RC override 走 MAVLink，不經過 RC 輸入；它在板上的使用待複驗 |
 | GPS | 僅建置 | |
 | PWM 輸出 | 板上驗證 | 有刷馬達 PWM 已驅動馬達；電調用的一般 PWM、OneShot、OneShot125 未上板，見〈馬達輸出〉 |
-| AnalogIn | 僅建置 | 只有原始取樣，參考電壓未確認 |
+| AnalogIn | 僅建置 | 只有原始取樣，參考電壓未確認，不換算電壓。需要電壓的功能（類比電池監測、RSSI、空速、測距）呼叫 `set_pin()` 一律得到失敗，會回報不可用，而不是拿到無效的電壓 |
 | 參數存在 Flash | 待複驗 | 重開機與斷電後保留 |
 | SD 卡 | 未實作 | |
 | `--upload` 燒錄 | 僅建置 | `COMn`（Windows 版工具）與 `/dev/tty*`（Linux 版工具）都未上板；手動燒錄見〈燒錄〉 |

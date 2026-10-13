@@ -22,13 +22,23 @@ AnalogIn::Source::Source(uint8_t pin) :
     _count(0),
     _has_sample(false)
 {
-    if (pin != ANALOG_INPUT_NONE && !set_pin(pin)) {
+    if (pin != ANALOG_INPUT_NONE && !_bind(pin)) {
         _pin = ANALOG_INPUT_NONE;
         _valid = false;
     }
 }
 
+// 上層（電池、RSSI、空速、測距等類比 backend）呼叫 set_pin() 都是為了讀電壓，並把回傳值當作可用與否
+// （例如 AP_BattMonitor_Analog 直接當作 healthy）。電壓換算還沒完成（見 voltage_average()），
+// 回傳成功會讓上層拿到「健康」加上 NaN 電壓，NaN 又不會讓低電壓判斷成立。所以一律回傳失敗，
+// 讓上層明確得到「不可用」；channel() 綁定的原始取樣不受影響。
 bool AnalogIn::Source::set_pin(uint8_t pin)
+{
+    (void)pin;
+    return false;
+}
+
+bool AnalogIn::Source::_bind(uint8_t pin)
 {
     if (rtl8735b_analog_pin(pin) == RTL8735B_INVALID_PIN) {
         return false;

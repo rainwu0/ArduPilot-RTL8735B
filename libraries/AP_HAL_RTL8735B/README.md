@@ -111,7 +111,7 @@ FLASH_LAYOUT sdk-d1b6426
 | `sdk-d1b6426` | 0x080000，3.5 MiB | 0x4C0000，3.5 MiB | 3,670,016 bytes | ambpro2_sdk d1b6426 範例專案的 `amebapro2_partitiontable.json` |
 | `arduino-default` | 0x060000，4 MiB | 0x520000，64 KiB | 4,194,304 bytes | 同一個 Arduino 套件 OTA Mode=Disable 的 `amebapro2_partitiontable.json` |
 
-- 狀態：僅建置。以本版本建置的映像還沒在這個版面上開過機；先前的版本用的都是 SDK 原本的分割（`sdk-d1b6426`）。
+- 狀態：預設的 `realtek-ota` 已在 HUB 8735 ultra 上以本版本的映像（`hub8735ultra` 板型）開機；`sdk-d1b6426`、`arduino-default` 僅建置。
 - 預設是 `realtek-ota`：手動燒錄預設建置的 `flash_ntz.bin` 時，板子的分割表也會換成這個版面。HUB 8735 ultra（ideashatch/HUB-8735 870a7e0 發行的板商套件 4.1.1）與 AMB82-mini（Ameba-AIoT/ameba-arduino-pro2 93d6351）的 Arduino 套件在 OTA Mode=Enable 時，以及新版 SDK（Ameba-AIoT/ameba-rtos-pro2 eb5c090），都用這個版面。要沿用 SDK `d1b6426` 原本的分割，選 `sdk-d1b6426`。
 - 建置時以 SDK 的分割表為底，只改寫各記錄的位址與長度。
 - 映像上限是 fw1 的長度：韌體燒在 fw1。`firmware_ntz.bin` 超過上限，或建出的 `flash_ntz.bin` 的槽記錄與版面不同時，建置失敗。
@@ -148,7 +148,7 @@ MAVLink 預設走 UDP：本機埠 14555，還沒有地面站時把 HEARTBEAT 廣
 define HAL_RTL8735B_WIFI_TCP_PORT 5760
 ```
 
-TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
+TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。目前在板上連得上，但板子不送資料，調查中（見〈功能狀態〉）。
 
 安全限制：
 
@@ -200,7 +200,7 @@ TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
 
 ## 功能狀態
 
-「板上驗證」：功能已在 HUB 8735 ultra 上運作；本版本的映像尚待上板複驗。
+「板上驗證」：功能已在 HUB 8735 ultra 上運作。本版本的映像（`hub8735ultra` 板型、預設 Flash 版面 `realtek-ota`）已在 HUB 8735 ultra 上開機（板上沒有接感測器，開機停在感測器初始化的 Config Error；期間 MAVLink 與參數讀寫正常），並驗證了 Wi-Fi MAVLink（UDP）與參數保存；其他項目尚待以本版本複驗。
 
 | 項目 | 狀態 | 說明 |
 |---|---|---|
@@ -210,7 +210,7 @@ TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
 | I²C | 板上驗證 | 開機時氣壓計偶發初始化失敗，原因未明。傳輸逾時後重新初始化控制器、必要時清除匯流排，連續 3 次逾時才停用該匯流排（未上板） |
 | UART | 板上驗證 | 只支援 8N1 |
 | Wi-Fi MAVLink（UDP） | 板上驗證 | STA 模式 |
-| Wi-Fi MAVLink（TCP） | 僅建置 | 建置時選擇，與 UDP 二選一 |
+| Wi-Fi MAVLink（TCP） | 上板：連得上但不送資料，調查中 | 建置時選擇，與 UDP 二選一 |
 | 主控台／USB MAVLink | 未實作 | |
 | RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol）。地面站的 RC override 走 MAVLink，不經過 RC 輸入，已在板上使用 |
 | GPS | 僅建置 | |
@@ -221,7 +221,7 @@ TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
 | `--upload` 燒錄 | 僅建置 | `COMn`（Windows 版工具）與 `/dev/tty*`（Linux 版工具）都未上板；手動燒錄見〈燒錄〉 |
 | 韌體 OTA 更新 | 不提供 | 本儲存庫不提供 Wi-Fi 韌體更新；更新韌體以燒錄進行，見〈燒錄〉 |
 | 自訂板建置 | 僅建置 | `--extra-hwdef` |
-| Flash 版面 | 僅建置 | `FLASH_LAYOUT`，預設 `realtek-ota`，見〈Flash 版面〉 |
+| Flash 版面 | 預設版面板上驗證 | `FLASH_LAYOUT`，預設 `realtek-ota` 已在板上開機；`sdk-d1b6426`、`arduino-default` 僅建置，見〈Flash 版面〉 |
 
 ## 授權
 

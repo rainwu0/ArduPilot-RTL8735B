@@ -209,14 +209,14 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 | 項目 | 狀態 | 說明 |
 |---|---|---|
 | 建置系統 | 板上驗證 | |
-| 排程與號誌 | 板上驗證 | 400 Hz 主迴圈的長迴圈約 6.6% |
+| 排程與號誌 | 待複驗 | 400 Hz 主迴圈 |
 | SPI | 板上驗證 | |
 | I²C | 板上驗證 | 開機時氣壓計偶發初始化失敗，原因未明。傳輸逾時後重新初始化控制器、必要時清除匯流排，連續 3 次逾時才停用該匯流排（未上板） |
 | UART | 板上驗證 | 只支援 8N1 |
 | Wi-Fi MAVLink（UDP） | 待複驗 | STA 模式 |
 | Wi-Fi MAVLink（TCP） | 僅建置 | 建置時選擇，與 UDP 二選一 |
 | 主控台／USB MAVLink | 未實作 | |
-| RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol）。地面站的 RC override 走 MAVLink，不經過 RC 輸入，已在板上使用 |
+| RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol）。地面站的 RC override 走 MAVLink，不經過 RC 輸入；它在板上的使用待複驗 |
 | GPS | 僅建置 | |
 | PWM 輸出 | 板上驗證 | 有刷馬達 PWM 已驅動馬達；電調用的一般 PWM、OneShot、OneShot125 未上板，見〈馬達輸出〉 |
 | AnalogIn | 僅建置 | 只有原始取樣，參考電壓未確認 |

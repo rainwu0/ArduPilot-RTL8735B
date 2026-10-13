@@ -1,24 +1,31 @@
-ArduPilot Developer Code of Conduct
-===================================
+# ArduPilot Developer Code of Conduct
+
+> **In this repository:** this is an unofficial RTL8735B port maintained
+> by one person, not by the ArduPilot project. The code of conduct below
+> is ArduPilot's and applies here as written, except for where to report:
+> the address under "Enforcement" reaches the ArduPilot team, who do not
+> run this repository. To report behaviour in this repository, open an
+> issue or mention the maintainer (@rainwu0) in the thread; for anything
+> that should not be public, use GitHub's "Report content" on the comment
+> or the user.
+>
+> 本庫的行為問題請開 issue 或在討論中提及維護者（@rainwu0）；不宜公開的請用 GitHub 的「Report content」。下方 Enforcement 的信箱是 ArduPilot 團隊，不處理本庫。
 
 Rev 1.0 Jan 2nd 2018
 
-Our Aim
--------
+## Our Aim
 
 ArduPilot aims to enable the creation and use of trusted, autonomous,
 unmanned vehicle systems for the peaceful benefit of all.
 
-Our Team
---------
+## Our Team
 
 The ArduPilot team is global. It consists of the Development Team plus
 many contributors, from many fields and many places. By choosing to be
 part of the ArduPilot Development Team, you choose to accept this Code
 of Conduct.
 
-Our Pledge
-----------
+## Our Pledge
 
 In the interest of fostering an open and welcoming environment, we as
 developers and maintainers pledge to:
@@ -40,8 +47,7 @@ developers and maintainers pledge to:
     in control of human lives. “In control of human lives” includes but
     isn’t limited to manned aircraft.
 
-Our Standards
--------------
+## Our Standards
 
 Examples of behavior that contributes to achieving the aims of ArduPilot
 include:
@@ -67,8 +73,7 @@ Examples of unacceptable behavior by contributors include:
 - Other conduct which could reasonably be considered inappropriate in
     a public or professional setting
 
-Our Responsibilities
---------------------
+## Our Responsibilities
 
 Project maintainers are responsible for clarifying the standards of
 acceptable behavior and are expected to take appropriate and fair
@@ -80,8 +85,7 @@ contributions that are not aligned to this Code of Conduct, or to ban
 temporarily or permanently any contributor for other behaviors that they
 deem inappropriate, threatening, offensive, or harmful.
 
-Scope
------
+## Scope
 
 This Code of Conduct applies both within project spaces and in public
 spaces when an individual is representing the ArduPilot project or its
@@ -95,8 +99,7 @@ In addition, the rules regarding weaponization and manned vehicles using
 ArduPilot apply regardless of whether you are representing the ArduPilot
 project at the time.
 
-Enforcement
------------
+## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior, and
 other actions not consistent with this Code of Conduct may be reported
@@ -110,8 +113,7 @@ or enforce the Code of Conduct in good faith may face temporary or
 permanent repercussions as determined by other members of the project’s
 leadership team.
 
-Attribution
------------
+## Attribution
 
 This Code of Conduct is adapted from the Contributor Covenant, version
 1.4, available at

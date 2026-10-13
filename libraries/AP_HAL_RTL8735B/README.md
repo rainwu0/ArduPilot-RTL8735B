@@ -148,7 +148,9 @@ MAVLink 預設走 UDP：本機埠 14555，還沒有地面站時把 HEARTBEAT 廣
 define HAL_RTL8735B_WIFI_TCP_PORT 5760
 ```
 
-TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。目前在板上連得上，但板子不送資料，調查中（見〈功能狀態〉）。
+TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
+
+Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通道（`ArduCopter/system.cpp` 的 `init_ardupilot`）。找不到氣壓計時開機停在 Config Error：Wi-Fi 仍會連上熱點，但 UDP 與 TCP 都不會送出或接收 MAVLink。
 
 安全限制：
 
@@ -200,7 +202,7 @@ TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。目�
 
 ## 功能狀態
 
-「板上驗證」：功能已在 HUB 8735 ultra 上運作。本版本的映像（`hub8735ultra` 板型、預設 Flash 版面 `realtek-ota`）已在 HUB 8735 ultra 上開機（板上沒有接感測器，開機停在感測器初始化的 Config Error；期間 MAVLink 與參數讀寫正常），並驗證了 Wi-Fi MAVLink（UDP）與參數保存；其他項目尚待以本版本複驗。
+「板上驗證」：功能已在 HUB 8735 ultra 上運作。本版本的映像（`hub8735ultra` 板型、預設 Flash 版面 `realtek-ota`）已在沒有接感測器的 HUB 8735 ultra 上開機，Wi-Fi 會連上熱點；但開機停在氣壓計的 Config Error，Wi-Fi 的 MAVLink 通道沒有建立（見〈Wi-Fi〉），所以 Wi-Fi MAVLink（UDP、TCP）與參數保存還沒以本版本驗證。其他項目也尚待以本版本複驗。
 
 | 項目 | 狀態 | 說明 |
 |---|---|---|
@@ -210,7 +212,7 @@ TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。目�
 | I²C | 板上驗證 | 開機時氣壓計偶發初始化失敗，原因未明。傳輸逾時後重新初始化控制器、必要時清除匯流排，連續 3 次逾時才停用該匯流排（未上板） |
 | UART | 板上驗證 | 只支援 8N1 |
 | Wi-Fi MAVLink（UDP） | 板上驗證 | STA 模式 |
-| Wi-Fi MAVLink（TCP） | 上板：連得上但不送資料，調查中 | 建置時選擇，與 UDP 二選一 |
+| Wi-Fi MAVLink（TCP） | 僅建置 | 建置時選擇，與 UDP 二選一 |
 | 主控台／USB MAVLink | 未實作 | |
 | RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol）。地面站的 RC override 走 MAVLink，不經過 RC 輸入，已在板上使用 |
 | GPS | 僅建置 | |

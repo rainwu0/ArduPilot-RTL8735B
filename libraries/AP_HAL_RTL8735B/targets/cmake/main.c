@@ -29,12 +29,16 @@ static void ardupilot_task(void *arg)
     vTaskDelete(NULL);
 }
 
-// 板子的應用程式（hwdef 的 env RTL8735B_APP_DIR，見 CMakeLists.txt）覆寫這個弱符號，
-// 在這裡建立自己的 task；此時排程器還沒啟動。沒有應用程式時什麼都不做。
+// 板子的應用程式（hwdef 的 env RTL8735B_APP_DIR，見 CMakeLists.txt）定義這個函式，
+// 在這裡建立自己的 task；此時排程器還沒啟動。沒有應用程式時是空的弱符號。
+// 有應用程式時（CMake 定義 RTL8735B_APP_REQUIRED）不提供弱符號：應用程式漏寫入口就在連結時報錯，
+// 不會悄悄變成什麼都不做。
 void rtl8735b_app_init(void);
+#ifndef RTL8735B_APP_REQUIRED
 __attribute__((weak)) void rtl8735b_app_init(void)
 {
 }
+#endif
 
 int main(void)
 {

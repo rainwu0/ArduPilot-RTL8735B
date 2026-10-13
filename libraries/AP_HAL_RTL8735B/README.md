@@ -104,7 +104,7 @@ env RTL8735B_APP_DIR <目錄>
 
 - 相對路徑以本儲存庫根目錄為基準；目錄不存在時 configure 失敗。
 - 目錄中的 `.c` 檔與 SDK 原始碼一起編譯，沿用 SDK 的 include 與巨集；目錄中沒有 `.c` 檔時建置失敗。
-- 應用程式要定義 `void rtl8735b_app_init(void)`。韌體在建立 ArduPilot 的 task 之後、啟動排程器之前呼叫它，可以在這裡建立自己的 FreeRTOS task。
+- 應用程式要定義 `void rtl8735b_app_init(void)`。韌體在建立 ArduPilot 的 task 之後、啟動排程器之前呼叫它，可以在這裡建立自己的 FreeRTOS task。沒有定義時連結失敗（`undefined reference to rtl8735b_app_init`），不會悄悄變成什麼都不做。
 - 應用程式只能使用 SDK，不能存取 ArduPilot 的內部。task 優先權不要高於 3：ArduPilot 主執行緒為 4，見 `Scheduler.h`。
 - 沒有這一行時，韌體不含任何應用程式。
 

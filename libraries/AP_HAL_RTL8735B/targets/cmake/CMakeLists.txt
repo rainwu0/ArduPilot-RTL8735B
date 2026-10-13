@@ -126,6 +126,8 @@ if(RTL8735B_APP_DIR)
     message(STATUS "RTL8735B_APP_DIR=${RTL8735B_APP_DIR}")
     target_sources(${app} PRIVATE ${app_sources})
     target_include_directories(${app} PRIVATE ${RTL8735B_APP_DIR})
+    # main.c 不提供空的 rtl8735b_app_init：應用程式漏寫入口時連結失敗，而不是悄悄什麼都不做
+    target_compile_definitions(${app} PRIVATE RTL8735B_APP_REQUIRED=1)
 endif()
 
 if(NOT DEFINED ARDUPILOT_CMD)

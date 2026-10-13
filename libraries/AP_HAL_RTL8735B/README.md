@@ -50,6 +50,13 @@ I²C、SPI 匯流排與類比輸入各一個，SPI 裝置 1–4 個，PWM 1–12
 ./waf configure --board rtl8735b-empty --extra-hwdef /path/to/myboard.dat
 ```
 
+### AMB82-mini
+
+`--board amb82-mini`（`hwdef/amb82-mini/hwdef.dat`）：AMB82-mini 和 HUB 8735 ultra 是同一顆晶片，周邊腳位相同（依 Realtek Ameba-AIoT/ameba-arduino-pro2 9de560f6af 的 `Arduino_package/hardware/variants/ameba_amb82-mini/variant.cpp`）。這個板型只把 GPIO 的邏輯編號改成 AMB82-mini 的 D 編號：17（PD17，輸入）、24（PE6，綠色 LED）、23（PF9，藍色 LED）。Flash 版面同樣用預設的 `realtek-ota`。
+
+- 狀態：僅建置，未上板。
+- 四路 PWM 輸出 PF11–PF14 中，PF12、PF13 在上述檔案裡另標為 `*LOG_RX`、`*LOG_TX`，能不能當 PWM 輸出用尚未確認。
+
 ### 板子的應用程式
 
 自訂板可以把 SDK 端的 C 程式編進同一份韌體。在疊加的 hwdef 加一行：

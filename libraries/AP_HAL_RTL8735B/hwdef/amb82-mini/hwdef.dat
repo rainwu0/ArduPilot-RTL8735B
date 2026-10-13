@@ -1,0 +1,14 @@
+# AMB82-mini：與 rtl8735b-empty 同一顆晶片，周邊腳位相同（SPI1 在 PF5–PF8、I²C1 在 PF1／PF2、
+# PWM 在 PF11–PF14、序列埠、類比 PF0、LED 在 PF9／PE6），依據 Realtek
+# Ameba-AIoT/ameba-arduino-pro2 9de560f6af 的 Arduino_package/hardware/variants/ameba_amb82-mini/variant.cpp。
+# 只把 GPIO 的邏輯編號改成 AMB82-mini 的 D 編號（PD17 是 D17、PE6 是 D24、PF9 是 D23）。
+# 未上板。
+include ../rtl8735b-empty/hwdef.dat
+
+undef HAL_RTL8735B_BOARD_NAME
+define HAL_RTL8735B_BOARD_NAME "amb82-mini"
+
+undef RTL8735B_GPIO
+RTL8735B_GPIO 17 PIN_D17 in
+RTL8735B_GPIO 24 PIN_E6 out
+RTL8735B_GPIO 23 PIN_F9 out

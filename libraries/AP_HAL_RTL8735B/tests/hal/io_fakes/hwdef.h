@@ -1,0 +1,18 @@
+#pragma once
+// 產生器（rtl8735b_hwdef.py）輸出的表格巨集。預設是 rtl8735b-empty（HUB 8735 ultra）的值；
+// 以 -DIO_ALT_BOARD 編譯時換成一組非預設的表，證明 HAL 不再寫死腳位、編號與數量。
+#ifndef IO_ALT_BOARD
+#define HAL_RTL8735B_RCOUT_PINS PIN_F14, PIN_F11, PIN_F12, PIN_F13
+#define HAL_RTL8735B_RCOUT_COUNT 4
+#define HAL_RTL8735B_GPIO_PINS {7, PIN_D17, 0}, {25, PIN_E6, 1}, {26, PIN_F9, 1}
+#define HAL_RTL8735B_GPIO_COUNT 3
+#define HAL_RTL8735B_ADC_PINS {2, PIN_F0, 0}
+#define HAL_RTL8735B_ADC_COUNT 1
+#else
+#define HAL_RTL8735B_RCOUT_PINS PIN_F14, PIN_F11, PIN_F12, PIN_F13, PIN_F15
+#define HAL_RTL8735B_RCOUT_COUNT 5
+#define HAL_RTL8735B_GPIO_PINS {17, PIN_D17, 0}, {23, PIN_F9, 1}, {24, PIN_E6, 1}
+#define HAL_RTL8735B_GPIO_COUNT 3
+#define HAL_RTL8735B_ADC_PINS {4, PIN_F3, 3}
+#define HAL_RTL8735B_ADC_COUNT 1
+#endif

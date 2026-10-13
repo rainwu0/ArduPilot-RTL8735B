@@ -1,0 +1,4 @@
+#pragma once
+
+#define HAL_BOARD_RTL8735B 1
+#define CONFIG_HAL_BOARD HAL_BOARD_RTL8735B

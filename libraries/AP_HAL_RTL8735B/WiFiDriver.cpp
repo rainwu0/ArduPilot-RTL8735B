@@ -59,6 +59,7 @@ WiFiDriver::WiFiDriver(Protocol protocol, uint16_t local_port, uint16_t gcs_port
     _broadcast_address(0),
     _last_gcs_rx_ms(0),
     _tx_incomplete_since_ms(0),
+    _tx_incomplete_generation(0),
     _tx_incomplete(false),
     _tx_generation(0)
 {
@@ -362,9 +363,11 @@ void WiFiDriver::_service_tx(uint32_t now_ms)
 #endif
             if (n == 0) {
                 // 開頭的訊框還不完整：等寫入端補齊；太久沒補齊就丟一個位元組重新對齊。
-                if (!_tx_incomplete) {
+                // end()／begin() 清空過緩衝區（世代號變了）時，開頭已是新的訊框，重新計時。
+                if (!_tx_incomplete || _tx_incomplete_generation != _tx_generation) {
                     _tx_incomplete = true;
                     _tx_incomplete_since_ms = now_ms;
+                    _tx_incomplete_generation = _tx_generation;
                 } else if (now_ms - _tx_incomplete_since_ms > TX_STALL_MS) {
                     _writebuf.advance(1);
                     _tx_dropped_bytes.fetch_add(1);

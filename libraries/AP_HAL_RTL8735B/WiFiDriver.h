@@ -150,6 +150,7 @@ private:
     uint32_t _broadcast_address;
     uint32_t _last_gcs_rx_ms;
     uint32_t _tx_incomplete_since_ms;
+    uint32_t _tx_incomplete_generation;   // 開始計時時的 _tx_generation；清空過緩衝區就重新計時
     bool _tx_incomplete;
     uint8_t _datagram[DATAGRAM_MAX];
 

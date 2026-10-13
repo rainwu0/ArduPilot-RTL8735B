@@ -1,46 +1,31 @@
-# How to contribute to the ArduPilot project?
+# 參與
 
-If you are reading this page, you are possibly interested in contributing to our project.  We have a very active (and friendly) developer group and would love to have the help!  Possible ways you can help:
+Issues and pull requests are welcome here, in Chinese or English. This is not the ArduPilot project; please do not take RTL8735B issues to ArduPilot.
 
-* Testing the code
-* Filing issues on github, when you see a problem (or adding detail to existing issues that effect you)
-* Fixing issues
-* Adding new features
-* Reviewing existing pull requests, and notifying the maintainer if it passes your code review.
+## 回報問題
 
-## How to make a good bug report
+開 issue 時選對應的範本，盡量附上：
 
-* Make sure your bug is not a support issue. Support issues should go to [the support forums](http://discuss.ardupilot.org) and include a .bin log file if possible. If you're not sure you have a bug, you should seek support first.
-* Search for your bug, make sure it is not already reported. If it is already reported, make a comment on that issue.
-* Only report one bug per issue report.
-* Write a clear and concise summary. Be specific about what component of the software you are writing about, and follow the convention: "Copter: blah blah blah"
-* Write a clear and concise description, with **particularly clear steps** to reproduce the problem. Include logs that display the bug. **Try to report only facts in your issue report, keeping your assumptions out of it.**
-* The majority of issues open now are good or acceptable by these guidelines. Please refer to them for examples.
+- 板子與板型（`--board`），有疊加檔的話附上它（拿掉帳密）；
+- 本儲存庫的提交（`git rev-parse --short HEAD`）；
+- 建置指令，以及出錯的那段輸出或 LOG UART 的開機訊息。
 
-## Submitting patches
+**不要附含 Wi-Fi 帳密的映像或設定檔。** 帳密是編進韌體的，拿到映像就可能讀得出來。
 
-Please see our [wiki article](https://ardupilot.org/dev/docs/submitting-patches-back-to-master.html).
+「我照 README 做、在某塊板子上成功了」也值得回報，功能狀態表就是靠這些更新的。
 
-## Addressing ArduPilot github Issues
+## 送 PR
 
-We use github's Issue tracking feature to keep a list of outstanding Bugs and Feature Requests.  We specifically label some issues as [good first issues](https://github.com/ArduPilot/ardupilot/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22) because they are straight forward tasks that someone new to the codebase may be able to deal with.
+- 照 ArduPilot 的慣例：一個提交只動一個子系統（例如 `AP_HAL_RTL8735B:`、`hwdef:`、`waf:`、`Tools:`），提交訊息用英文寫成 `Subsystem: summary`。
+- README 與程式註解用台灣用語的繁體中文。
+- 本儲存庫沒有開 CI，送之前請自己建置一次：
 
-We typically do not assign issues - *particularly* "Good First Issue"s to specific contributors - if you feel you can contribute towards resolving an issue, simply work on it\* and create a PR which addresses it.
+  ```bash
+  ./waf configure --board hub8735ultra
+  ./waf copter
+  ```
 
-> \**Before* working on an issue, check the existing pull requests first (related ones may be linked to the issue, or appear when searching some relevant key words or phrases). If there is one you can review it and join the discussion there, instead of creating your own.
-
-## Development Team
-
-The ArduPilot project is open source and [maintained](https://github.com/ArduPilot/ardupilot#maintainers) by a team of volunteers.
-
-To contribute, you can send a pull request on GitHub.
-
-New developers are recommended to join the `#general` channel on
-[Discord](https://ardupilot.org/discord).
-
-You can also join the
-[development discussion on Discourse](https://discuss.ardupilot.org/c/development-team),
-or [Gitter](https://gitter.im/ArduPilot/ardupilot).
-
-Note that these are NOT for user tech support, and are moderated
-for new users to prevent off-topic discussion.
+- 在 PR 裡寫清楚在哪塊板子上試過、怎麼試的；只建置過也直接寫「只建置」。
+- 範圍只到 HAL，以及讓這顆晶片接上 ArduPilot 所必要的部分；特定機體的功能請放在自己的專案。
+- 對 ArduPilot 共用程式（HAL 以外）的修改盡量少，要改的話寫進 HAL README 的〈對 ArduPilot 共用程式的修改〉。
+- 程式改寫自其他公開來源時，在檔頭註明出處與固定的提交。

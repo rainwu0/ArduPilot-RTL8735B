@@ -1,28 +1,13 @@
-### Summary
+### 改了什麼
 
-<!-- Put a one or two line summary of what your PR does here -->
+<!-- 一兩句就好。 -->
 
-### Classification & Testing (check all that apply and add your own)
+### 怎麼試的
 
-- [ ] Checked by a human programmer
-- [ ] Non-functional change
-- [ ] No-binary change
-- [ ] Infrastructure change (e.g. unit tests, helper scripts)
-- [ ] Automated test(s) verify changes (e.g. unit test, autotest)
-- [ ] Tested manually, description below (e.g. SITL)
-- [ ] Tested on hardware
-- [ ] Logs attached
-- [ ] Logs available on request
+- 板型：<!-- hub8735ultra / amb82-mini / 自訂板（--extra-hwdef） -->
+- [ ] 建置過（`./waf configure --board ... && ./waf copter`）
+- [ ] 在板子上試過：<!-- 哪塊板子、試了什麼、結果 -->
 
-<!-- Put additional testing description for this PR's changes here -->
+### 其他
 
-### Description
-
-<!-- Describe the PR's content here -->
-
-<!--
-Don't overlook our community's expectations for creating a PR:
-https://ardupilot.org/dev/docs/style-guide.html
-https://ardupilot.org/dev/docs/submitting-patches-back-to-master.html
-https://ardupilot.org/dev/docs/porting.html
--->
+<!-- 已知的限制、還沒確認的事。一個提交只動一個子系統，提交訊息用英文 `Subsystem: summary`，見 CONTRIBUTING。 -->

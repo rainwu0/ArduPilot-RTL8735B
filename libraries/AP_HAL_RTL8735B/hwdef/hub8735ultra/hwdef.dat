@@ -1,0 +1,9 @@
+# HUB 8735 ultra：腳位與 rtl8735b-empty 相同，依據板商 ideashatch/HUB-8735 870a7e08de7a 的
+# amebapro2_arduino/Arduino_package/hardware/variants/ameba_hub8735_ultra/variant.cpp、variant.h。
+# 排針 D0–D26 的用途與保留的腳見 README〈板型〉；GPIO 的邏輯編號是板子的 D 編號。
+# I²C 一律用 SDK 的編號：variant.h 把 PE3／PE4 標成 I2C0、PA0／PA1 標成 I2C2，SDK 的腳位表相反。
+# 感測器、安裝方向與預設參數以 ./waf configure --extra-hwdef 疊加。
+include ../rtl8735b-empty/hwdef.dat
+
+undef HAL_RTL8735B_BOARD_NAME
+define HAL_RTL8735B_BOARD_NAME "hub8735ultra"

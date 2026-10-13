@@ -21,19 +21,42 @@ source ~/.venv-rtl8735b/bin/activate
 Tools/scripts/rtl8735b_get_sdk.sh
 export PATH="$PWD/../ambpro2_sdk/tools/asdk-10.3.0/linux/newlib/bin:$PATH"
 git submodule update --init --recursive modules/waf modules/mavlink modules/DroneCAN
-./waf configure --board rtl8735b-empty
+./waf configure --board hub8735ultra
 ./waf copter
 ```
 
 SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，執行 `Tools/scripts/rtl8735b_get_sdk.sh <SDK目錄>`，以腳本結尾印出的 export 指令設定 PATH，並設定環境變數 `AMEBAPRO2_SDK=<SDK目錄>`。
 
-工具鏈必須是 SDK 附的 Realtek ASDK（`arm-none-eabi-gcc --version` 顯示 `Realtek ASDK`）；系統套件的 `arm-none-eabi-gcc` 不能用。映像：`build/rtl8735b-empty/sdk_build/flash_ntz.bin`。
+工具鏈必須是 SDK 附的 Realtek ASDK（`arm-none-eabi-gcc --version` 顯示 `Realtek ASDK`）；系統套件的 `arm-none-eabi-gcc` 不能用。映像：`build/hub8735ultra/sdk_build/flash_ntz.bin`。
 
-## 自訂板
+## 板型
 
-`rtl8735b-empty` 的腳位依 HUB 8735 ultra 配置：序列埠、SPI、I²C、PWM 與類比輸入都在排針上，GPIO 7、25、26 沿用板子的 D 編號（25、26 是板上的綠色、藍色 LED）。其他 RTL8735B 板子以 `--extra-hwdef` 覆寫：序列埠以 `undef` 後重新 `define`；匯流排、輸出與腳位用下列關鍵字，先 `undef <關鍵字>` 清空整組再重寫。
+### HUB 8735 ultra
 
-| 關鍵字 | 欄位 | `rtl8735b-empty` 的值 |
+`--board hub8735ultra`（`hwdef/hub8735ultra/hwdef.dat`）。腳位依板商 ideashatch/HUB-8735 `870a7e08de7a` 的 `amebapro2_arduino/Arduino_package/hardware/variants/ameba_hub8735_ultra/variant.cpp`、`variant.h`；D 編號就是該檔的 `AMB_Dn`，GPIO 的邏輯編號與 D 編號相同。
+
+| 用途 | 排針 |
+|---|---|
+| I²C 匯流排 1（SDK 的 I2C1） | D0（PF2，SDA）、D1（PF1，SCL） |
+| SPI 匯流排 1（SDK 的 SPI1） | D18（PF5，MISO）、D19（PF6，SCLK）、D20（PF7，MOSI）、D21（PF8，SPI 裝置 `bmi160` 的 CS） |
+| PWM 輸出 1–4 | D11（PF14）、D22（PF11）、D23（PF12）、D24（PF13） |
+| SERIAL1（UART2，MAVLink2） | D8（PD15，TX）、D15（PD16，RX） |
+| SERIAL3（UART0） | D9（PA2，TX）、D10（PA3，RX） |
+| SERIAL4（UART3，RC 輸入） | D6（PE1，TX）、D5（PE2，RX） |
+| 類比輸入，邏輯編號 2 | D2（PF0，ADC 通道 0） |
+| GPIO | 7（D7，PD17，輸入）、25（D25，PE6，綠色 LED，輸出）、26（D26，PF9，藍色 LED，輸出） |
+| 保留 | D12（PF15）：板上按鍵（`variant.h` 的 `PUSH_BTN`）；D13（PF10）：保留，本板型不設定。實測上它控制板上的白色補光燈；詳見板商公開的原理圖（ideashatch/HUB-8735 `870a7e08de7a` 的 `HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf`）；D14（PA5）：`variant.h` 標為 Sensor power on，重置時的電位也決定是否進入燒錄模式（見〈燒錄〉）；D16（PF3）、D17（PF4）：LOG UART（SERIAL0，停用） |
+| 未設定 | D3（PE4）、D4（PE3）：疊加檔可改成 SDK 的 I2C2（SDA、SCL），或 SPI0 的 CS、MOSI（SPI0 的 SCLK、MISO 是 PE1、PE2，要先停用 SERIAL4） |
+
+- I²C 一律用 SDK 的編號：`variant.h` 把 PE4／PE3 標成 I2C0、PA1／PA0 標成 I2C2，SDK 的腳位表相反（`component/mbed/targets/hal/rtl8735b/i2c_api.c`）。
+- 產生器不檢查同一支腳是否被兩個關鍵字用到；改用 D3、D4 或其他腳時，要自己確認沒有和上表衝突。
+- `rtl8735b-empty` 的接法和 `hub8735ultra` 相同，保留給既有的建置；映像在 `build/rtl8735b-empty/`。
+
+### 自訂板
+
+其他 RTL8735B 板子以 `--extra-hwdef` 覆寫：序列埠以 `undef` 後重新 `define`；匯流排、輸出與腳位用下列關鍵字，先 `undef <關鍵字>` 清空整組再重寫。
+
+| 關鍵字 | 欄位 | `hub8735ultra` 的值 |
 |---|---|---|
 | `RTL8735B_I2CBUS` | 邏輯匯流排、SDK 的 I2C 編號（0–3）、SDA、SCL、時脈、`internal` 或 `external` | `1 1 PIN_F2 PIN_F1 400000 external` |
 | `RTL8735B_SPIBUS` | 邏輯匯流排、SDK 的 SPI 編號（0–1）、MOSI、MISO、SCLK、預設時脈 | `1 1 PIN_F7 PIN_F5 PIN_F6 1000000` |
@@ -44,10 +67,10 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 
 I²C、SPI 匯流排與類比輸入各一個，SPI 裝置 1–4 個，PWM 1–12 路；寫錯會在建置時報錯。腳位能不能當該周邊用，由 SDK 初始化時判斷，不行就不輸出。
 
-`rtl8735b-empty` 不含感測器；沒有 IMU 時開機會停在 `INS: unable to initialise driver`。感測器、安裝方向與預設參數寫成另一個 hwdef 檔，以 `--extra-hwdef` 疊加：
+板型都不含感測器；沒有 IMU 時開機會停在 `INS: unable to initialise driver`。感測器、安裝方向與預設參數寫成另一個 hwdef 檔，以 `--extra-hwdef` 疊加：
 
 ```bash
-./waf configure --board rtl8735b-empty --extra-hwdef /path/to/myboard.dat
+./waf configure --board hub8735ultra --extra-hwdef /path/to/myboard.dat
 ```
 
 ### AMB82-mini

@@ -67,6 +67,9 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 
 I²C、SPI 匯流排與類比輸入各一個，SPI 裝置 1–4 個，PWM 1–12 路；寫錯會在建置時報錯。腳位能不能當該周邊用，由 SDK 初始化時判斷，不行就不輸出。
 
+- `RTL8735B_I2CBUS` 的時脈：驅動向匯流排要求的時脈必須等於這一欄，否則取不到裝置（`I2CDevice.cpp` 的 `get_device_ptr` 回傳 `nullptr`）。驅動沒有指定時，ArduPilot 要求的是 400000。
+- 舊的寫法已經移除：`HAL_RTL8735B_I2C1_*`、`HAL_RTL8735B_SPI1_*`、`HAL_RTL8735B_BMI160_CS_PIN`、`HAL_RTL8735B_RCOUT_CHANNELS`、`HAL_RTL8735B_RCOUT_PIN0`–`PIN3`、`HAL_RTL8735B_GPIO_PIN7`／`PIN25`／`PIN26`、`HAL_RTL8735B_ADC_CHANNELS`、`HAL_RTL8735B_ADC_PIN0`、`HAL_RTL8735B_ADC_LOGICAL0` 這些 `define` 不再有作用。疊加檔若還在用，建置不會報錯，設定只會悄悄失效，要改成上表的關鍵字。
+
 板型都不含感測器；沒有 IMU 時開機會停在 `INS: unable to initialise driver`。感測器、安裝方向與預設參數寫成另一個 hwdef 檔，以 `--extra-hwdef` 疊加：
 
 ```bash

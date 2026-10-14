@@ -28,16 +28,26 @@ AnalogIn::Source::Source(uint8_t pin) :
     }
 }
 
-// 上層（電池、RSSI、空速、測距等類比 backend）呼叫 set_pin() 都是為了讀電壓，並把回傳值當作可用與否
-// （例如 AP_BattMonitor_Analog 直接當作 healthy）。電壓換算還沒完成（見 voltage_average()），
-// 回傳成功會讓上層拿到「健康」加上 NaN 電壓，NaN 又不會讓低電壓判斷成立。所以一律回傳失敗，
-// 讓上層明確得到「不可用」；channel() 綁定的原始取樣不受影響。
-bool AnalogIn::Source::set_pin(uint8_t pin)
+// 原始取樣換成腳上的電壓：12 位元、滿刻度 3.3 V 的線性換算，偏移為 0。
+// 依據：12 位元見 SDK d1b6426 的 rtl8735b_adc.h（HP_ADC_RESOLUTION）；滿刻度 3.3 V 與同一顆晶片的官方 Arduino 套件相同
+// （Ameba-AIoT/ameba-arduino-pro2 93d6351 的 Arduino_package/hardware/cores/ambpro2/wiring_analog.c 以 3300 mV 為滿刻度）。
+// 換算的精度與零點偏移未經板上量測；零點偏移由上層參數修正（例如 AP_BattMonitor_Analog 的 BATT_VLT_OFFSET）。
+static constexpr float ADC_FULL_SCALE_VOLTS = 3.3f;
+static constexpr float ADC_CODE_MAX = 4095.0f;
+
+static float raw_to_volts(float raw)
 {
-    (void)pin;
-    return false;
+    return raw * (ADC_FULL_SCALE_VOLTS / ADC_CODE_MAX);   // NaN 照樣傳下去
 }
 
+// 上層（電池、RSSI、空速、測距等類比 backend）以 set_pin() 的結果判斷可用與否，
+// 例如 AP_BattMonitor_Analog 直接當作 healthy。只接受板型 hwdef 列出的類比腳。
+bool AnalogIn::Source::set_pin(uint8_t pin)
+{
+    return _bind(pin);
+}
+
+// 目前 _timer_tick 只讀 hwdef 的第一條 RTL8735B_ADC，再餵給所有 Source；板型只列一條時沒有問題。
 bool AnalogIn::Source::_bind(uint8_t pin)
 {
     if (rtl8735b_analog_pin(pin) == RTL8735B_INVALID_PIN) {
@@ -75,18 +85,18 @@ float AnalogIn::Source::read_latest()
 
 float AnalogIn::Source::voltage_average()
 {
-    // 參考電壓尚未由 SDK 文件或目標板量測確認，不換算成伏特。
-    return NAN;
+    return raw_to_volts(read_average());
 }
 
 float AnalogIn::Source::voltage_latest()
 {
-    return NAN;
+    return raw_to_volts(read_latest());
 }
 
+// 沒有 5 V 電源的監測，ratiometric 與一般電壓相同（比照 AP_HAL_ESP32）
 float AnalogIn::Source::voltage_average_ratiometric()
 {
-    return NAN;
+    return voltage_average();
 }
 
 void AnalogIn::Source::add_sample(uint16_t sample)

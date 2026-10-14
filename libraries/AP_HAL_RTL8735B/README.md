@@ -268,7 +268,7 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 | RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol），預設在 SERIAL4；支援 8N1、不反相的協定（CRSF、ELRS 等），不支援 SBUS（接法見〈板型〉）。主機測試涵蓋輪流試格式，沒有接過接收機實測。地面站的 RC override 走 MAVLink，不經過 RC 輸入；它在板上的使用待複驗 |
 | GPS | 僅建置 | 預設在 SERIAL3；接 SERIAL1 要改 `SERIAL1_PROTOCOL`（接法見〈板型〉）。主機測試涵蓋自動換鮑率，沒有接過 GPS 實測 |
 | PWM 輸出 | 待複驗 | 有刷馬達 PWM 先前驅動過馬達；電調用的一般 PWM、OneShot、OneShot125 未上板，見〈馬達輸出〉 |
-| AnalogIn | 僅建置 | 只有原始取樣，參考電壓未確認，不換算電壓。需要電壓的功能（類比電池監測、RSSI、空速、測距）呼叫 `set_pin()` 一律得到失敗，會回報不可用，而不是拿到無效的電壓 |
+| AnalogIn | 僅建置 | 12 位元，以滿刻度 3.3 V 線性換算成電壓，精度與零點偏移未經板上量測（零點可用 `BATT_VLT_OFFSET` 等參數修正）。只有板型 hwdef 列出的類比腳能用，hub8735ultra 是 D2；腳位能承受的電壓上限不明，腳上的電壓不要超過 3.3 V。電池電壓要先經分壓，分壓比設在 `BATT_VOLT_MULT` |
 | 參數存在 Flash | 板上驗證（T2） | 重開機後保留；斷電後保留未驗證。換扇區後那次開機抹除期間斷電，參數會全部回預設，見〈Flash 版面〉 |
 | SD 卡 | 未實作 | |
 | `--upload` 燒錄 | 僅建置 | `COMn`（Windows 版工具）與 `/dev/tty*`（Linux 版工具）都未上板；手動燒錄見〈燒錄〉 |

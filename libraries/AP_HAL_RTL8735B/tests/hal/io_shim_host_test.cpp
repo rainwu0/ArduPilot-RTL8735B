@@ -128,7 +128,13 @@ static void test_gpio_irq_replacement_detach_and_invalid_request()
     assert(io_fake_gpio_irq_init_calls == shim_init_calls);
 }
 
-static void test_adc_init_failure_raw_sample_and_unscaled_voltage()
+static bool near(float a, float b)
+{
+    return fabsf(a - b) < 1e-3f;
+}
+
+// 12 位元、滿刻度 3.3 V 的線性換算（維護者 2026-10-15 確認滿刻度）；偏移由上層參數（例如 BATT_VLT_OFFSET）修正
+static void test_adc_init_failure_raw_sample_and_voltage()
 {
     io_fake_adc_init_status = 7;
     RTL8735B::AnalogIn init_failed;
@@ -150,21 +156,38 @@ static void test_adc_init_failure_raw_sample_and_unscaled_voltage()
     assert(analog.channel(ANALOG_INPUT_BOARD_VCC) == nullptr);
     AP_HAL::AnalogSource *source = analog.channel(2);
     assert(source != nullptr);
+    // 還沒有取樣：原始值與電壓都是 NaN
     assert(isnan(source->read_latest()));
     assert(isnan(source->voltage_latest()));
     assert(isnan(source->voltage_average()));
     assert(isnan(source->voltage_average_ratiometric()));
     assert(isnan(analog.board_voltage()));
-    // 電壓換算還沒完成：需要電壓的使用者呼叫 set_pin() 一律得到失敗，不論腳位合不合法，
-    // 這樣它們回報「不可用」，而不是拿到無效的電壓。channel() 綁定的原始取樣不受影響（見下面）。
+
+    // 只接受板型 hwdef 列出的類比腳
     for (uint8_t pin = 0; pin < 8; pin++) {
-        assert(!source->set_pin(pin));
+        assert(source->set_pin(pin) == (pin == 2));
     }
-    assert(isnan(source->voltage_average()));
+    assert(!source->set_pin(ANALOG_INPUT_BOARD_VCC));
 
     io_fake_adc_value = 2048;
     scheduler.service_io();
     assert(source->read_latest() == 2048.0f);
+    assert(near(source->voltage_latest(), 2048.0f * 3.3f / 4095.0f));
+    // 沒有 5 V 監測：ratiometric 與一般電壓相同（比照 AP_HAL_ESP32）
+    assert(near(source->voltage_average_ratiometric(), 2048.0f * 3.3f / 4095.0f));
+
+    io_fake_adc_value = 4095;
+    scheduler.service_io();
+    assert(near(source->voltage_latest(), 3.3f));
+    io_fake_adc_value = 0;
+    scheduler.service_io();
+    assert(near(source->voltage_latest(), 0.0f));
+    assert(near(source->voltage_average(), (4095.0f + 0.0f) / 2.0f * 3.3f / 4095.0f));
+
+    // set_pin 成功後重新開始累計：新取樣進來前平均是 NaN
+    assert(source->set_pin(2));
+    assert(isnan(source->voltage_average()) && isnan(source->voltage_latest()));
+
     // 預設的表：PF0 是 ADC 通道 0
     assert(io_fake_adc_pin_en == 1U && io_fake_adc_cvlist_channel == 0 && io_fake_adc_read_channel == 0);
     assert(rtl8735b_adc_read_u16(1) == -1);
@@ -578,7 +601,7 @@ int main(int argc, char **argv)
     io_fake_reset();
     test_gpio_whitelist_and_output_order();
     test_gpio_irq_replacement_detach_and_invalid_request();
-    test_adc_init_failure_raw_sample_and_unscaled_voltage();
+    test_adc_init_failure_raw_sample_and_voltage();
     test_pwm_shim_rejects_bad_values_and_stops_sdk_init_default();
     test_pwm_shim_brushed_ticks_use_sclk_duty_ns_path();
     test_pwm_normal_write_once_and_defer_while_pending();

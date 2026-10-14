@@ -32,7 +32,7 @@ private:
         void add_sample(uint16_t sample);
 
     private:
-        bool _bind(uint8_t pin);   // 綁定原始取樣的腳位；set_pin() 在電壓換算完成前一律拒絕
+        bool _bind(uint8_t pin);   // 綁定板型 hwdef 列出的類比腳，並清掉累計的取樣
 
         uint8_t _pin;
         bool _valid;

@@ -35,11 +35,12 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Docume
 
 ## 最近的變動（2026-10-14）
 
-用自訂疊加檔的人，先看前三條。
+用自訂疊加檔或板子應用程式的人，先看前四條。
 
 - **自訂板的寫法改了。** 舊的 `HAL_RTL8735B_I2C1_*`、`HAL_RTL8735B_SPI1_*`、`HAL_RTL8735B_RCOUT_*` 等 `define` 已經拿掉，換成 `RTL8735B_I2CBUS`、`RTL8735B_SPIBUS`、`RTL8735B_SPIDEV`、`RTL8735B_RCOUT`、`RTL8735B_GPIO`、`RTL8735B_ADC` 這些關鍵字。舊的疊加檔建置不會報錯，但設定會悄悄失效，要照[〈自訂板〉][custom]改寫。
 - **hwdef 檢查變嚴了。** 同一支腳被兩個地方用到（例如 GPIO 和 PWM 輸出同一支腳），或邏輯編號超出範圍、SPI 裝置重名，configure 會直接失敗，並指出衝突的兩處。以前能建置的疊加檔，現在可能要改。
 - **多個 SPI 裝置時，每個裝置用自己的 mode 和裝置 ID。** 預設只有一個 SPI 裝置，不受影響。自訂板接了兩個以上的 SPI 感測器的話，第二個以後的裝置 ID 會變，存下來的校準可能對不上，要重做。
+- **板子應用程式少了入口會建置失敗。** 設了 `RTL8735B_APP_DIR`，但目錄裡沒有定義 `rtl8735b_app_init()`（例如函式名稱打錯）時，現在會在連結時失敗，不再悄悄編成一個不會執行的應用程式。見[〈板子的應用程式〉][app]。
 - 新增板型 `hub8735ultra`（建議用這個）與 `amb82-mini`。原本的 `rtl8735b-empty` 接法相同，還留著。
 - 馬達輸出多了 OneShot 和 OneShot125（都還沒上板）。同一次開機中從 OneShot125 切到有刷時，會先停掉舊的輸出。
 - 類比輸入還沒有電壓換算，所以 `set_pin()` 會回報失敗，類比電池監測不會再顯示健康卻讀不到電壓。

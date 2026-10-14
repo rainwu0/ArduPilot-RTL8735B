@@ -1,6 +1,6 @@
 #pragma once
 
-// Realtek RTL8735B 的平台預設值。板子專屬的值由 hwdef.dat 產生的 hwdef.h 提供。
+// Realtek RTL8735B 的平台預設值。開發板專屬的值由 hwdef.dat 產生的 hwdef.h 提供。
 
 #include <hwdef.h>
 

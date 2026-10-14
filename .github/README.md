@@ -22,7 +22,7 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Docume
 
 - 建置 Copter、燒進開發板：[〈取得與建置〉][build]、[〈燒錄〉][flash]。第一次上手，照[〈接上感測器〉][sensors]接三顆模組最快。
 - 替自己的 RTL8735B 開發板寫 hwdef 疊加檔（腳位、匯流排、感測器）：[〈自訂板〉][custom]。
-- 把自己的 SDK 端 C 程式和韌體編在一起：[〈板子的應用程式〉][app]。
+- 把自己的 SDK 端 C 程式和韌體編在一起：[〈開發板的應用程式〉][app]。
 
 ## 還缺什麼
 
@@ -69,7 +69,7 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Docume
 [build]: /libraries/AP_HAL_RTL8735B/README.md#取得與建置
 [flash]: /libraries/AP_HAL_RTL8735B/README.md#燒錄
 [custom]: /libraries/AP_HAL_RTL8735B/README.md#自訂板
-[app]: /libraries/AP_HAL_RTL8735B/README.md#板子的應用程式
+[app]: /libraries/AP_HAL_RTL8735B/README.md#開發板的應用程式
 [license]: /libraries/AP_HAL_RTL8735B/README.md#授權
 [tests]: /libraries/AP_HAL_RTL8735B/tests/README.md
 [tests-board]: /libraries/AP_HAL_RTL8735B/BOARD_TESTS.md

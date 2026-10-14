@@ -63,6 +63,32 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 - 同一支腳被兩個設定用到（包括啟用中的序列埠）時，建置會報錯並指出衝突的兩個來源；改用 D3、D4 或其他腳時，先把原本用到它的設定拿掉。
 - `rtl8735b-empty` 的接法和 `hub8735ultra` 相同，保留給既有的建置；映像在 `build/rtl8735b-empty/`。
 
+#### 接上感測器
+
+板型本身不含感測器，沒有氣壓計時開機會停在 Config Error。下面是在 HUB 8735 ultra 上接 IMU、氣壓計、羅盤的一種接法，已在板上驗證：開機後三個感測器都被偵測到（燒錄後第一次開機曾出現一次氣壓計初始化失敗，見〈功能狀態〉的 I²C 列），Wi-Fi 地面站收得到心跳與參數，參數在重開機後保留，抬起板子前、後端時姿態方向正確（[BOARD_TESTS.md](BOARD_TESTS.md) 的 T2）。
+
+| 感測器 | 模組 | 接到 |
+|---|---|---|
+| IMU | GY-BMI160 | SPI 匯流排 1：D18（MISO，接模組的 SAO／SDO）、D19（SCLK，接 SCL）、D20（MOSI，接 SDA）、D21（CS） |
+| 氣壓計 | BMP280 | I²C 匯流排 1：D0（SDA）、D1（SCL）；SDO 接 GND（位址 0x76），CSB 接 3.3 V（選 I²C 模式） |
+| 羅盤 | GY-271（QMC5883L） | I²C 匯流排 1：和 BMP280 共用 D0、D1 |
+
+- 三個模組都接 3.3 V 與 GND：RTL8735B 的 I/O 是 3.3 V，訊號電位要一致。排針上 3.3 V 與 GND 的位置，請對照板商公開的原理圖（ideashatch/HUB-8735 `870a7e08de7a` 的 `HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf`）。
+- 模組上的腳名依廠商不同，以手上模組的絲印為準。
+
+```bash
+./waf configure --board hub8735ultra --extra-hwdef libraries/AP_HAL_RTL8735B/hwdef/hub8735ultra/sensors-example.dat
+./waf copter
+```
+
+疊加檔是 `hwdef/hub8735ultra/sensors-example.dat`，它不是板型，`./waf list_boards` 不會多出板型。換成別的感測器時，改 `IMU`、`BARO`、`COMPASS` 三行就好，寫法和 ArduPilot 其他平台的 hwdef 相同，例如 ArduPilot `9f648ccabc` 的 `libraries/AP_HAL_ESP32/hwdef/esp32diy/hwdef.dat`。
+
+安裝方向：
+
+- IMU 的 `ROTATION_*` 要實測，不能只看模組的絲印。實測上，元件面朝上的 GY-BMI160 配 `ROTATION_NONE` 時，水平放著的板子會被當成上下顛倒。疊加檔裡的值是範例板實測的結果：元件面朝上，前方是 USB 接頭的另一端。
+- 換了擺法要重測：板子前端抬起時 pitch 要變正，水平放著時 roll、pitch 接近 0。
+- 整片板子在機身上轉了方向時，不改疊加檔，改參數 `AHRS_ORIENTATION`。外接羅盤的方向用參數 `COMPASS_ORIENT`。
+
 ### AMB82-mini
 
 `--board amb82-mini`（`hwdef/amb82-mini/hwdef.dat`）：AMB82-mini 和 HUB 8735 ultra 是同一顆晶片，周邊腳位相同（依 Realtek Ameba-AIoT/ameba-arduino-pro2 9de560f6af 的 `Arduino_package/hardware/variants/ameba_amb82-mini/variant.cpp`）。這個板型只把 GPIO 的邏輯編號改成 AMB82-mini 的 D 編號：17（PD17，輸入）、24（PE6，綠色 LED）、23（PF9，藍色 LED）。Flash 版面同樣用預設的 `realtek-ota`。
@@ -213,28 +239,28 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 
 ## 功能狀態
 
-「板上驗證」：在 HUB 8735 ultra 上運作過。「待複驗」：先前有板上結果，但無法確認來自受測的這塊板子，或沒有和目前版本對應的紀錄，要重新驗證。目前的映像（`hub8735ultra`、預設 Flash 版面）沒接感測器時能開機、連上 Wi-Fi，但停在氣壓計的 Config Error，所以不會有 Wi-Fi MAVLink（見〈Wi-Fi〉）。
+「板上驗證」：在 HUB 8735 ultra 上運作過，紀錄在 [BOARD_TESTS.md](BOARD_TESTS.md)，括號裡是紀錄編號。「待複驗」：先前有板上結果，但無法確認來自受測的這塊板子，或沒有和目前版本對應的紀錄，要重新驗證。只用板型 `hub8735ultra`、沒接感測器時，能開機、連上 Wi-Fi，但停在氣壓計的 Config Error，所以沒有 Wi-Fi MAVLink（T1）；照〈接上感測器〉接好時，有 Wi-Fi MAVLink（T2；氣壓計偶發初始化失敗，見 I²C 列）。
 
 | 項目 | 狀態 | 說明 |
 |---|---|---|
-| 建置系統 | 板上驗證 | |
-| 排程與號誌 | 待複驗 | 400 Hz 主迴圈 |
-| SPI | 待複驗 | |
-| I²C | 待複驗 | 開機時氣壓計偶發初始化失敗，原因未明。逾時處理未上板：傳輸逾時後重新初始化控制器、必要時清除匯流排，連續 3 次逾時才停用該匯流排 |
+| 建置系統 | 板上驗證（T1、T2） | |
+| 排程與號誌 | 板上驗證（T2） | Copter 主迴圈在板上執行（心跳、參數、姿態更新）；400 Hz 的實際頻率未量測 |
+| SPI | 板上驗證（T2） | BMI160 |
+| I²C | 板上驗證（T2） | BMP280、QMC5883L 共用匯流排 1。開機時氣壓計偶發初始化失敗，原因未明（T2 也出現一次）。逾時處理未上板：傳輸逾時後重新初始化控制器、必要時清除匯流排，連續 3 次逾時才停用該匯流排 |
 | UART | 待複驗 | 只支援 8N1 |
-| Wi-Fi MAVLink（UDP） | 待複驗 | STA 模式 |
+| Wi-Fi MAVLink（UDP） | 板上驗證（T2） | STA 模式 |
 | Wi-Fi MAVLink（TCP） | 僅建置 | 建置時選擇，與 UDP 二選一 |
 | 主控台／USB MAVLink | 未實作 | |
 | RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol）。地面站的 RC override 走 MAVLink，不經過 RC 輸入；它在板上的使用待複驗 |
 | GPS | 僅建置 | |
 | PWM 輸出 | 待複驗 | 有刷馬達 PWM 先前驅動過馬達；電調用的一般 PWM、OneShot、OneShot125 未上板，見〈馬達輸出〉 |
 | AnalogIn | 僅建置 | 只有原始取樣，參考電壓未確認，不換算電壓。需要電壓的功能（類比電池監測、RSSI、空速、測距）呼叫 `set_pin()` 一律得到失敗，會回報不可用，而不是拿到無效的電壓 |
-| 參數存在 Flash | 待複驗 | 重開機與斷電後保留 |
+| 參數存在 Flash | 板上驗證（T2） | 重開機後保留；斷電後保留未驗證 |
 | SD 卡 | 未實作 | |
 | `--upload` 燒錄 | 僅建置 | `COMn`（Windows 版工具）與 `/dev/tty*`（Linux 版工具）都未上板；手動燒錄見〈燒錄〉 |
 | 韌體 OTA 更新 | 不提供 | 本儲存庫不提供 Wi-Fi 韌體更新；更新韌體以燒錄進行，見〈燒錄〉 |
 | 自訂板建置 | 僅建置 | `--extra-hwdef` |
-| Flash 版面 | 預設版面板上驗證 | `FLASH_LAYOUT`，預設 `realtek-ota` 已在板上開機；`sdk-d1b6426`、`arduino-default` 僅建置，見〈Flash 版面〉 |
+| Flash 版面 | 預設版面板上驗證（T1、T2） | `FLASH_LAYOUT`，預設 `realtek-ota` 已在板上開機；`sdk-d1b6426`、`arduino-default` 僅建置，見〈Flash 版面〉 |
 
 ## 授權
 

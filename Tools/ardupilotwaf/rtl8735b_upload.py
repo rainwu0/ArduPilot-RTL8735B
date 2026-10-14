@@ -9,7 +9,7 @@ RTL8735B 的 --upload：以 SDK 附的 uartfwburn，經 UART 下載模式燒錄 
 - --upload-port /dev/ttyXXX：執行 Linux 版 uartfwburn.linux（原生 Linux，或 WSL 以 usbipd 掛上的 USB 序列裝置）。
 - 環境變數 AP_OVERRIDE_UPLOAD_CMD：改執行自訂指令，參數與 ChibiOS 相同。
 
-晶片只能以按鍵進入下載模式（uartfwburn 的 -d 不支援本晶片），所以板子不在下載模式時會重試一段時間。
+晶片只能以按鍵進入下載模式（uartfwburn 的 -d 不支援本晶片），所以開發板不在下載模式時會重試一段時間。
 只下載、不抹除：任何情況都不傳 -e。
 """
 
@@ -30,7 +30,7 @@ IMAGE_NAME = 'flash_ntz.bin'
 BAUD = 2000000
 STAGE_NAME = 'ardupilot-rtl8735b-upload'
 
-# 板子不在下載模式時的輸出：重試，讓使用者有時間按鍵
+# 開發板不在下載模式時的輸出：重試，讓使用者有時間按鍵
 RETRY_MARKERS = ('ping fail', 'uart boot fail', 'ucfg fail')
 SUCCESS_MARKER = 'download success'
 # Windows 的 COM 埠被其他程式佔用時的輸出
@@ -67,7 +67,7 @@ def wsl_interop_available(binfmt_dir='/proc/sys/fs/binfmt_misc'):
 
 
 def check_static(port, override, interop_available=wsl_interop_available):
-    '''建置開始前就能判斷的錯誤；序列裝置是否存在留到燒錄時再查，板子可能建置期間才接上'''
+    '''建置開始前就能判斷的錯誤；序列裝置是否存在留到燒錄時再查，開發板可能建置期間才接上'''
     if override:
         return
     if not port:
@@ -190,20 +190,20 @@ def upload(image, port, sdk, workdir, override=None, *,
 
     cmd = tool_command(kind, port)
     log('RTL8735B 燒錄：%s（工作目錄 %s）' % (' '.join(cmd), tool_dir))
-    log('請讓板子進入燒錄模式（%s）；%d 秒內沒有進入會自動重試' % (DOWNLOAD_MODE_KEYS, RETRY_WINDOW_S))
+    log('請讓開發板進入燒錄模式（%s）；%d 秒內沒有進入會自動重試' % (DOWNLOAD_MODE_KEYS, RETRY_WINDOW_S))
     deadline = clock() + RETRY_WINDOW_S
     while True:
         rc, output = run_tool(cmd, tool_dir, ATTEMPT_TIMEOUT_S)
         result = classify(output)
         if result == 'success':
-            log('RTL8735B 燒錄完成；重置板子後開機')
+            log('RTL8735B 燒錄完成；重置開發板後開機')
             return
         if result == 'busy':
             raise UploadError('%s 被其他程式佔用（例如地面站軟體），關閉後再試' % port)
         if result == 'retry':
             if clock() + RETRY_DELAY_S < deadline:
-                log('板子還沒進入燒錄模式，%d 秒後重試' % RETRY_DELAY_S)
+                log('開發板還沒進入燒錄模式，%d 秒後重試' % RETRY_DELAY_S)
                 sleep(RETRY_DELAY_S)
                 continue
-            raise UploadError('%d 秒內板子沒有進入燒錄模式，沒有寫入' % RETRY_WINDOW_S)
+            raise UploadError('%d 秒內開發板沒有進入燒錄模式，沒有寫入' % RETRY_WINDOW_S)
         raise UploadError('燒錄失敗（結束碼 %d），工具輸出見上方' % rc)

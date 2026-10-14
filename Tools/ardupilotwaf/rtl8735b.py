@@ -57,7 +57,7 @@ def configure(cfg):
         cfg.fatal("Failed to process hwdef.dat")
     hal_common.process_hwdef_results(cfg, hwdef_obj)
 
-    # 板子的應用程式（選用）：hwdef 以 env RTL8735B_APP_DIR <目錄> 指定，相對路徑以原始碼根目錄為基準
+    # 開發板的應用程式（選用）：hwdef 以 env RTL8735B_APP_DIR <目錄> 指定，相對路徑以原始碼根目錄為基準
     if env.RTL8735B_APP_DIR:
         app_dir = os.path.normpath(os.path.join(env.SRCROOT, env.RTL8735B_APP_DIR))
         if not os.path.isdir(app_dir):

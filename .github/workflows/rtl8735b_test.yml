@@ -1,0 +1,80 @@
+# RTL8735B 移植的主機測試與提交慣例檢查：不需要板子，也不需要 Realtek SDK。
+# 交叉建置要下載 SDK，放在手動觸發的 rtl8735b_build.yml。
+name: RTL8735B tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # 手動重跑（例如剛開 Actions、還沒有新的 push 時）
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rtl8735b-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host-tests:
+    name: Host tests
+    runs-on: ubuntu-latest
+    # HAL README 與 tests/README 以 Ubuntu 22.04 為準
+    container: ubuntu:22.04
+    timeout-minutes: 30
+    steps:
+      - name: Install packages
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates git build-essential python3
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run Tools/scripts/rtl8735b_test.sh
+        run: Tools/scripts/rtl8735b_test.sh
+
+  branch-conventions:
+    name: Commit conventions
+    runs-on: ubuntu-latest
+    container: ubuntu:22.04
+    timeout-minutes: 30
+    # 事件的值經 env 傳進 run，不直接寫進指令
+    env:
+      EVENT_NAME: ${{ github.event_name }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PUSH_BEFORE_SHA: ${{ github.event.before }}
+    steps:
+      - name: Install packages
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates git python3
+
+      # PR 檢查分支本身的提交（不是 GitHub 產生的合併提交），所以 checkout PR 的 head
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check branch conventions
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if [ "$EVENT_NAME" = pull_request ]; then
+            base=$PR_BASE_SHA
+          elif [ "$EVENT_NAME" = push ]; then
+            base=$PUSH_BEFORE_SHA
+          else
+            # 手動執行時檢查本移植的全部提交：基線是 ArduPilot master 9f648ccabc
+            base=9f648ccabcf25a421192dc5b57491ce981506872
+          fi
+          echo "base $base"
+          python3 Tools/scripts/check_branch_conventions.py --base-branch "$base"

@@ -1,0 +1,77 @@
+# RTL8735B 的交叉建置：照 HAL README〈取得與建置〉逐行做，每次都從鎖定的來源下載 Realtek SDK 與 ASDK。
+# 只能手動觸發（要有寫入權限）。
+# 建置輸出不公開：SDK 的編譯警告會引用 SDK 的原始碼行，所以完整輸出只寫進 runner 上的檔案，
+# 這裡只印結果、映像大小與 sha256；不上傳 artifact，也不用 cache 存 SDK、工具鏈或產物。
+# README〈取得與建置〉改了，這裡要跟著改。
+name: RTL8735B build
+
+on:
+  workflow_dispatch:
+    inputs:
+      board:
+        description: Board
+        type: choice
+        options: [hub8735ultra, amb82-mini, rtl8735b-empty]
+        default: hub8735ultra
+
+permissions:
+  contents: read
+
+# 同一個板型只留最新一次；不同板型可以同時跑
+concurrency:
+  group: rtl8735b-build-${{ github.ref }}-${{ inputs.board }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build copter
+    runs-on: ubuntu-latest
+    container: ubuntu:22.04
+    timeout-minutes: 120
+    env:
+      BOARD: ${{ inputs.board }}
+    steps:
+      # README 的步驟以有 sudo 的一般 Ubuntu 22.04 為前提；容器裡先補上 sudo 與 git
+      - name: Install sudo and git
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends sudo git ca-certificates
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build (HAL README, Get and build)
+        shell: bash
+        run: |
+          git config --global --add safe.directory '*'
+          log="$RUNNER_TEMP/build.log"
+          # step 的 shell 開了 -e；建置失敗時也要印出摘要，所以暫時關掉 -e 取結束碼。
+          # 不用「( … ) || rc=$?」：接在 || 左邊時，子 shell 裡的 set -e 會失效，失敗的步驟不會停下
+          set +e
+          (
+            set -euxo pipefail
+            export DEBIAN_FRONTEND=noninteractive
+            Tools/environment_install/install-rtl8735b-prereqs-ubuntu.sh
+            source ~/.venv-rtl8735b/bin/activate
+            Tools/scripts/rtl8735b_get_sdk.sh
+            export PATH="$PWD/../ambpro2_sdk/tools/asdk-10.3.0/linux/newlib/bin:$PATH"
+            git submodule update --init --recursive modules/waf modules/mavlink modules/DroneCAN
+            ./waf configure --board "$BOARD"
+            ./waf copter
+          ) > "$log" 2>&1
+          rc=$?
+          set -e
+          echo "board $BOARD, exit code $rc"
+          # 映像關卡的一行（大小與上限），以及 waf 的結果行；都不含 SDK 原始碼
+          grep -E "^firmware_ntz.bin: |^'(configure|copter)' finished successfully" "$log" || true
+          if [ "$rc" -ne 0 ]; then
+            # 失敗在 README 的哪一步：set -x 的最後幾行指令
+            grep '^+ ' "$log" | tail -n 3 || true
+            # 只印本儲存庫檔案的錯誤，不印 SDK 路徑下的
+            grep -E "(error|Error):" "$log" | grep -v "ambpro2_sdk" | tail -n 40 || true
+            exit "$rc"
+          fi
+          sha256sum "build/$BOARD/sdk_build/firmware_ntz.bin" "build/$BOARD/sdk_build/flash_ntz.bin"
+          ls -l "build/$BOARD/sdk_build/firmware_ntz.bin" "build/$BOARD/sdk_build/flash_ntz.bin"

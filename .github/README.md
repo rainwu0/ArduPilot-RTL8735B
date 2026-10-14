@@ -1,5 +1,7 @@
 # ArduPilot RTL8735B 移植
 
+[![RTL8735B tests](https://github.com/rainwu0/ArduPilot-RTL8735B/actions/workflows/rtl8735b_test.yml/badge.svg)](https://github.com/rainwu0/ArduPilot-RTL8735B/actions/workflows/rtl8735b_test.yml)
+
 Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Documentation is in Traditional Chinese.
 
 這是把 [ArduPilot](https://github.com/ArduPilot/ardupilot) 搬到 Realtek RTL8735B 上的非官方移植，個人維護，跟 ArduPilot 開發團隊、Realtek 都沒有關係。**還沒飛過，請勿用於飛行。**
@@ -12,6 +14,7 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Docume
 - 板型：`hub8735ultra`（HUB 8735 ultra，板商 ideasHatch，[板商資料](https://github.com/ideashatch/HUB-8735)），開發都在這塊上做；`amb82-mini` 只建置過。
 - 目前的版本在 HUB 8735 ultra 上能開機、連上 Wi-Fi。SPI、I²C、UART、有刷馬達的 PWM 以前的版本在板上跑過，要用目前的版本重新確認。
 - 板型本身不含感測器，要自己接、自己寫進疊加檔。沒接氣壓計時開機停在 Config Error，Wi-Fi 會連上熱點，但不會有 MAVLink。
+- 不用板子、不用 SDK 就能跑的主機測試：`Tools/scripts/rtl8735b_test.sh`，說明在 [tests/README.md][tests]。主機測試通過不代表在板子上能用。
 
 每一項的狀態見[〈功能狀態〉][status]。
 
@@ -31,9 +34,16 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Docume
 ## 想參與
 
 - 問題、上板結果都歡迎開 issue，回報在這裡，不要回報到 ArduPilot。上面「還缺什麼」的實測結果特別有用，哪怕只是「我的板子開得了機」。
-- 要送 PR 的話先看 [CONTRIBUTING](CONTRIBUTING.md)。
+- 要送 PR 的話先看 [CONTRIBUTING](CONTRIBUTING.md)，送之前跑一次 `Tools/scripts/rtl8735b_test.sh`。PR 也會跑同一套測試；外部貢獻者送的 PR，要等維護者核准才會開始跑。
 
-## 最近的變動（2026-10-14）
+## 最近的變動
+
+### 2026-10-14：公開測試
+
+- 新增 `Tools/scripts/rtl8735b_test.sh`：hwdef、Flash 版面、`--upload` 的工具測試，以及 HAL（序列埠、SPI／I²C、IO、RC 輸入、參數儲存、排程、Wi-Fi）的主機測試。需要 `build-essential` 和 `python3`，不需要板子和 SDK。加 `--build` 會另外交叉建置一次。
+- 推到 `main` 和開 PR 時，GitHub Actions 會跑同一套測試和提交慣例檢查；交叉建置要手動觸發。原本從 ArduPilot 帶過來、在這裡用不到的 CI 設定已經拿掉。
+
+### 2026-10-14：自訂板與修正
 
 用自訂疊加檔或板子應用程式的人，先看前四條。
 
@@ -61,3 +71,4 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Docume
 [custom]: /libraries/AP_HAL_RTL8735B/README.md#自訂板
 [app]: /libraries/AP_HAL_RTL8735B/README.md#板子的應用程式
 [license]: /libraries/AP_HAL_RTL8735B/README.md#授權
+[tests]: /libraries/AP_HAL_RTL8735B/tests/README.md

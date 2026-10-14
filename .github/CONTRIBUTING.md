@@ -20,12 +20,14 @@ Issues and pull requests are welcome here, in Chinese or English. This is not th
 
 - 照 ArduPilot 的慣例：一個提交只動一個子系統（例如 `AP_HAL_RTL8735B:`、`hwdef:`、`waf:`、`Tools:`），提交訊息用英文寫成 `Subsystem: summary`。
 - README 與程式註解用台灣用語的繁體中文。
-- 本儲存庫沒有開 CI，送之前請自己建置一次：
+- 送之前先跑測試；改了 HAL 或建置相關的檔案，加 `--build` 再交叉建置一次（要 SDK，見 HAL README〈取得與建置〉）：
 
   ```bash
-  ./waf configure --board hub8735ultra
-  ./waf copter
+  Tools/scripts/rtl8735b_test.sh
+  Tools/scripts/rtl8735b_test.sh --build
   ```
+
+  PR 會在 GitHub Actions 跑同一套主機測試和提交慣例檢查，外部貢獻者的 PR 要等維護者核准才會開始跑；交叉建置不會自動跑。修錯誤時，先寫一個修正前會失敗的測試，見 `libraries/AP_HAL_RTL8735B/tests/README.md`。
 
 - 在 PR 裡寫清楚在哪塊板子上試過、怎麼試的；只建置過也直接寫「只建置」。
 - 範圍只到 HAL，以及讓這顆晶片接上 ArduPilot 所必要的部分；特定機體的功能請放在自己的專案。

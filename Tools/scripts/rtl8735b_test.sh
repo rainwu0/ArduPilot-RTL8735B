@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# RTL8735B 移植的測試：主機測試不需要板子，也不需要 Realtek SDK。
+# RTL8735B 移植的測試：主機測試不需要開發板，也不需要 Realtek SDK。
 # 用法：Tools/scripts/rtl8735b_test.sh [--build]
 #   --build  另外交叉建置一次 hub8735ultra 的 copter（要 SDK 與 Realtek ASDK，見 HAL README〈取得與建置〉）
 # 任何一項失敗就以非 0 結束；最後印每一項的結果。說明見 libraries/AP_HAL_RTL8735B/tests/README.md。

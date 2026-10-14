@@ -13,7 +13,7 @@ GPIO *irq_owner;
 AP_HAL::GPIO::irq_handler_fn_t irq_handlers[RTL8735B_GPIO_PIN_COUNT];
 AP_HAL::Proc irq_procs[RTL8735B_GPIO_PIN_COUNT];
 
-// 邏輯編號在板子 hwdef 的 RTL8735B_GPIO 表中的位置；不在表中回傳 -1。
+// 邏輯編號在開發板 hwdef 的 RTL8735B_GPIO 表中的位置；不在表中回傳 -1。
 int gpio_slot(uint8_t pin)
 {
     for (uint8_t i = 0; i < RTL8735B_GPIO_PIN_COUNT; i++) {

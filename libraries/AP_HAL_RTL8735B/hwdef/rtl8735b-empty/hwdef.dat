@@ -1,5 +1,5 @@
 # RTL8735B 通用板：只設定晶片周邊的腳位，不含感測器。
-# 腳位依 HUB 8735 ultra 配置：序列埠、SPI、I²C、PWM、類比輸入在排針上；GPIO 7、25、26 沿用板子的 D 編號（25、26 為板上 LED）。
+# 腳位依 HUB 8735 ultra 配置：序列埠、SPI、I²C、PWM、類比輸入在排針上；GPIO 7、25、26 沿用開發板的 D 編號（25、26 為板上 LED）。
 # 感測器、安裝方向與預設參數以 ./waf configure --extra-hwdef 疊加。
 define HAL_RTL8735B_BOARD_NAME "rtl8735b-empty"
 # 匯流排、輸出與腳位（關鍵字見 hwdef/scripts/rtl8735b_hwdef.py；疊加檔以 undef <關鍵字> 清空整組再重寫）

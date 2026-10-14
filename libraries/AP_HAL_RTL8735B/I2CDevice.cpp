@@ -124,7 +124,7 @@ I2CDeviceManager::I2CDeviceManager() :
     _ready(false),
     _bus("APM_I2C1")
 {
-    // 板子 hwdef 的 RTL8735B_I2CBUS 只有一條（rtl8735b_hwdef.py 檢查）
+    // 開發板 hwdef 的 RTL8735B_I2CBUS 只有一條（rtl8735b_hwdef.py 檢查）
     if (RTL8735B_I2C_BUS_CONFIG_COUNT == 1U) {
         const RTL8735BI2CBusConfig &cfg = RTL8735B_I2C_BUS_CONFIGS[0];
         _ready = rtl8735b_i2c_init(cfg.logical_bus, cfg.sdk_index, cfg.sda_pin,

@@ -3,7 +3,7 @@
 #include "hwdef.h"
 #include <PinNames.h>
 
-// 表格來自板子的 hwdef（RTL8735B_I2CBUS、RTL8735B_SPIBUS、RTL8735B_SPIDEV，由 rtl8735b_hwdef.py 產生）。
+// 表格來自開發板的 hwdef（RTL8735B_I2CBUS、RTL8735B_SPIBUS、RTL8735B_SPIDEV，由 rtl8735b_hwdef.py 產生）。
 const RTL8735BI2CBusConfig RTL8735B_I2C_BUS_CONFIGS[] = {HAL_RTL8735B_I2C_BUSES};
 const uint32_t RTL8735B_I2C_BUS_CONFIG_COUNT =
     sizeof(RTL8735B_I2C_BUS_CONFIGS) / sizeof(RTL8735B_I2C_BUS_CONFIGS[0]);

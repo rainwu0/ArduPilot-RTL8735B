@@ -2,7 +2,7 @@
 
 ArduPilot 在 Realtek RTL8735B 上的硬體抽象層（HAL）。**未經飛行驗證，請勿用於飛行。**
 
-開發與驗證用的板子是 HUB 8735 ultra（板商 ideasHatch，主晶片 RTL8735B；板商資料：https://github.com/ideashatch/HUB-8735）。
+開發與驗證用的開發板是 HUB 8735 ultra（板商 ideasHatch，主晶片 RTL8735B；板商資料：https://github.com/ideashatch/HUB-8735）。
 
 各功能目前能用到哪裡，見〈功能狀態〉。
 
@@ -65,7 +65,7 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 
 #### 接上感測器
 
-板型本身不含感測器，沒有氣壓計時開機會停在 Config Error。下面是在 HUB 8735 ultra 上接 IMU、氣壓計、羅盤的一種接法，已在板上驗證：開機後三個感測器都被偵測到（燒錄後第一次開機曾出現一次氣壓計初始化失敗，見〈功能狀態〉的 I²C 列），Wi-Fi 地面站收得到心跳與參數，參數在重開機後保留，抬起板子前、後端時姿態方向正確（[BOARD_TESTS.md](BOARD_TESTS.md) 的 T2）。
+板型本身不含感測器，沒有氣壓計時開機會停在 Config Error。下面是在 HUB 8735 ultra 上接 IMU、氣壓計、羅盤的一種接法，已在板上驗證：開機後三個感測器都被偵測到（燒錄後第一次開機曾出現一次氣壓計初始化失敗，見〈功能狀態〉的 I²C 列），Wi-Fi 地面站收得到心跳與參數，參數在重開機後保留，抬起開發板前、後端時姿態方向正確（[BOARD_TESTS.md](BOARD_TESTS.md) 的 T2）。
 
 | 感測器 | 模組 | 接到 |
 |---|---|---|
@@ -85,9 +85,9 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 
 安裝方向：
 
-- IMU 的 `ROTATION_*` 要實測，不能只看模組的絲印。實測上，元件面朝上的 GY-BMI160 配 `ROTATION_NONE` 時，水平放著的板子會被當成上下顛倒。疊加檔裡的值是範例板實測的結果：元件面朝上，前方是 USB 接頭的另一端。
-- 換了擺法要重測：板子前端抬起時 pitch 要變正，水平放著時 roll、pitch 接近 0。
-- 整片板子在機身上轉了方向時，不改疊加檔，改參數 `AHRS_ORIENTATION`。外接羅盤的方向用參數 `COMPASS_ORIENT`。
+- IMU 的 `ROTATION_*` 要實測，不能只看模組的絲印。實測上，元件面朝上的 GY-BMI160 配 `ROTATION_NONE` 時，水平放著的開發板被當成上下顛倒。疊加檔裡的值是範例開發板實測的結果：元件面朝上，前方是 USB 接頭的另一端。
+- 換了擺法要重測：開發板前端抬起時 pitch 要變正，水平放著時 roll、pitch 接近 0。
+- 整片開發板在機身上轉了方向時，不改疊加檔，改參數 `AHRS_ORIENTATION`。外接羅盤的方向用參數 `COMPASS_ORIENT`。
 
 ### AMB82-mini
 
@@ -98,7 +98,7 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 
 ### 自訂板
 
-其他 RTL8735B 板子以 `--extra-hwdef` 覆寫：序列埠以 `undef` 後重新 `define`；匯流排、輸出與腳位用下列關鍵字，先 `undef <關鍵字>` 清空整組再重寫。
+其他 RTL8735B 開發板以 `--extra-hwdef` 覆寫：序列埠以 `undef` 後重新 `define`；匯流排、輸出與腳位用下列關鍵字，先 `undef <關鍵字>` 清空整組再重寫。
 
 | 關鍵字 | 欄位 | `hub8735ultra` 的值 |
 |---|---|---|
@@ -120,7 +120,7 @@ I²C、SPI 匯流排與類比輸入各一個，SPI 裝置 1–4 個，PWM 1–12
 ./waf configure --board hub8735ultra --extra-hwdef /path/to/myboard.dat
 ```
 
-### 板子的應用程式
+### 開發板的應用程式
 
 自訂板可以把 SDK 端的 C 程式編進同一份韌體。在疊加的 hwdef 加一行：
 
@@ -149,7 +149,7 @@ FLASH_LAYOUT sdk-d1b6426
 | `arduino-default` | 0x060000，4 MiB | 0x520000，64 KiB | 4,194,304 bytes | 同一個 Arduino 套件 OTA Mode=Disable 的 `amebapro2_partitiontable.json` |
 
 - 狀態：預設的 `realtek-ota` 已在 HUB 8735 ultra 上以本版本的映像（`hub8735ultra` 板型）開機；`sdk-d1b6426`、`arduino-default` 僅建置。
-- 預設是 `realtek-ota`：手動燒錄預設建置的 `flash_ntz.bin` 時，板子的分割表也會換成這個版面。HUB 8735 ultra（ideashatch/HUB-8735 870a7e0 發行的板商套件 4.1.1）與 AMB82-mini（Ameba-AIoT/ameba-arduino-pro2 93d6351）的 Arduino 套件在 OTA Mode=Enable 時，以及新版 SDK（Ameba-AIoT/ameba-rtos-pro2 eb5c090），都用這個版面。要沿用 SDK `d1b6426` 原本的分割，選 `sdk-d1b6426`。
+- 預設是 `realtek-ota`：手動燒錄預設建置的 `flash_ntz.bin` 時，開發板的分割表也會換成這個版面。HUB 8735 ultra（ideashatch/HUB-8735 870a7e0 發行的板商套件 4.1.1）與 AMB82-mini（Ameba-AIoT/ameba-arduino-pro2 93d6351）的 Arduino 套件在 OTA Mode=Enable 時，以及新版 SDK（Ameba-AIoT/ameba-rtos-pro2 eb5c090），都用這個版面。要沿用 SDK `d1b6426` 原本的分割，選 `sdk-d1b6426`。
 - 建置時以 SDK 的分割表為底，只改寫各記錄的位址與長度。
 - 映像上限是 fw1 的長度：韌體燒在 fw1。`firmware_ntz.bin` 超過上限，或建出的 `flash_ntz.bin` 的槽記錄與版面不同時，建置失敗。
 - 本儲存庫不提供 Wi-Fi 韌體更新，不會寫入 fw2；fw2 只是分割表中的一筆記錄。
@@ -185,7 +185,7 @@ MAVLink 預設走 UDP：本機埠 14555，還沒有地面站時把 HEARTBEAT 廣
 define HAL_RTL8735B_WIFI_TCP_PORT 5760
 ```
 
-TCP 同時只服務一個地面站，地面站可連到板子的 5760 埠。
+TCP 同時只服務一個地面站，地面站可連到開發板的 5760 埠。
 
 Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通道（`ArduCopter/system.cpp` 的 `init_ardupilot`）。找不到氣壓計時開機停在 Config Error：Wi-Fi 仍會連上熱點，但 UDP 與 TCP 都不會送出或接收 MAVLink。
 
@@ -206,7 +206,7 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 ./waf copter --upload --upload-port /dev/ttyUSB0  # Linux：執行 Linux 版工具
 ```
 
-- 看到「請讓板子進入燒錄模式」時，依開發板的按鍵讓晶片進入燒錄模式（由重置時 PA5 的電位決定；HUB 8735 ultra 是按住 upgrade 鍵、短按 reset，再放開 upgrade）。60 秒內沒有進入會自動重試，逾時則不寫入。看到 `download success` 後重置一次即開機。
+- 看到「請讓開發板進入燒錄模式」時，依開發板的按鍵讓晶片進入燒錄模式（由重置時 PA5 的電位決定；HUB 8735 ultra 是按住 upgrade 鍵、短按 reset，再放開 upgrade）。60 秒內沒有進入會自動重試，逾時則不寫入。看到 `download success` 後重置一次即開機。
 - `COMn` 需要 WSL interop（能在 WSL 執行 Windows 程式），沒有時 `--upload` 會在編譯開始前提示。開了 systemd 的 WSL 在發行版閒置關閉、又在同一個 WSL VM 內重新啟動後，interop 可能不會重新註冊：在 Windows 執行 `wsl --shutdown` 讓 WSL 重新開機，並在建置與燒錄期間保持一個 WSL 終端開著。
 - `/dev/ttyXXX` 需要該裝置的讀寫權限（`dialout` 群組）；在 WSL 要先以 usbipd 把 USB 序列裝置掛進 WSL。
 - 環境變數 `AP_OVERRIDE_UPLOAD_CMD` 可改用自訂指令：執行時後面接上映像路徑，有 `--upload-port` 時再接 `--port <埠>`。
@@ -235,11 +235,11 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 
 - `ArduCopter/takeoff_check.cpp`：本平台沒有 ESC 遙測（`HAL_WITH_ESC_TELEM` 為 0），原本的起飛前檢查整段不編譯，解鎖後馬達會停在地面怠速。改為沒有 ESC 遙測時只略過馬達轉速檢查，CPU 負載檢查照常（本 HAL 尚未提供系統負載，所以目前不會擋）；有 ESC 遙測的建置不受影響。本庫直接採用上游 PR 34070（https://github.com/ArduPilot/ardupilot/pull/34070，作者 yuiseki）的提交；到 2026-10-07 這個 PR 尚未被上游合併。
 - `libraries/AP_HAL/AP_HAL_Boards.h`：`HAL_BOARD_RTL8735B` 為 100，避開上游依序分配的平台編號。
-- `Tools/ardupilotwaf/boards.py`（waf 的板子登記）與 `libraries/AP_Filesystem/AP_Filesystem.h`（本平台的 newlib 沒有 `dirent.h`，在此補上定義）：加入本平台，不改變其他平台的行為。
+- `Tools/ardupilotwaf/boards.py`（waf 的板型登記）與 `libraries/AP_Filesystem/AP_Filesystem.h`（本平台的 newlib 沒有 `dirent.h`，在此補上定義）：加入本平台，不改變其他平台的行為。
 
 ## 功能狀態
 
-「板上驗證」：在 HUB 8735 ultra 上運作過，紀錄在 [BOARD_TESTS.md](BOARD_TESTS.md)，括號裡是紀錄編號。「待複驗」：先前有板上結果，但無法確認來自受測的這塊板子，或沒有和目前版本對應的紀錄，要重新驗證。只用板型 `hub8735ultra`、沒接感測器時，能開機、連上 Wi-Fi，但停在氣壓計的 Config Error，所以沒有 Wi-Fi MAVLink（T1）；照〈接上感測器〉接好時，有 Wi-Fi MAVLink（T2；氣壓計偶發初始化失敗，見 I²C 列）。
+「板上驗證」：在 HUB 8735 ultra 上運作過，紀錄在 [BOARD_TESTS.md](BOARD_TESTS.md)，括號裡是紀錄編號。「待複驗」：先前有板上結果，但無法確認來自受測的這塊開發板，或沒有和目前版本對應的紀錄，要重新驗證。只用板型 `hub8735ultra`、沒接感測器時，能開機、連上 Wi-Fi，但停在氣壓計的 Config Error，所以沒有 Wi-Fi MAVLink（T1）；照〈接上感測器〉接好時，有 Wi-Fi MAVLink（T2；氣壓計偶發初始化失敗，見 I²C 列）。
 
 | 項目 | 狀態 | 說明 |
 |---|---|---|

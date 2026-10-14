@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
 '''
-由 hwdef.dat 產生 RTL8735B 板子的 hwdef.h。
-處理共用的 define、IMU、COMPASS、BARO 列、FLASH_LAYOUT，以及描述板子周邊的關鍵字：
+由 hwdef.dat 產生 RTL8735B 開發板的 hwdef.h。
+處理共用的 define、IMU、COMPASS、BARO 列、FLASH_LAYOUT，以及描述開發板周邊的關鍵字：
 
   RTL8735B_I2CBUS <邏輯匯流排> <SDK 編號 0-3> <SDA> <SCL> <時脈 Hz> <internal|external>
   RTL8735B_SPIBUS <邏輯匯流排> <SDK 編號 0-1> <MOSI> <MISO> <SCLK> <預設時脈 Hz>

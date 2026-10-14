@@ -19,7 +19,7 @@
 #include <FreeRTOS.h>
 #include <task.h>
 
-// 尚未初始化的匯流排編號；初始化後改成呼叫端給的邏輯匯流排編號（來自板子 hwdef 的表）。
+// 尚未初始化的匯流排編號；初始化後改成呼叫端給的邏輯匯流排編號（來自開發板 hwdef 的表）。
 #define BUS_ID_NONE 0xFFU
 // 沒有接腳位：SDK 的 NC（PinNames.h）。0 是合法的 PIN_A0（I2C0 的 SCL），不能拿來表示「沒設定」。
 #define BUS_PIN_NONE ((uint32_t)0xFFFFFFFFU)
@@ -317,7 +317,7 @@ int rtl8735b_spi_init(uint8_t bus, uint8_t sdk_index, uint32_t mosi_pin, uint32_
         spi_free(&spi_object);
         return RTL8735B_BUS_ERROR;
     }
-    // SDK 依 SCLK 腳決定 SSI 編號，要和板子 hwdef 寫的一致
+    // SDK 依 SCLK 腳決定 SSI 編號，要和開發板 hwdef 寫的一致
     if (spi_object.hal_ssi_adaptor.index != sdk_index ||
         hal_ssi_set_sclk(&spi_object.hal_ssi_adaptor, clock_hz) != HAL_OK) {
         spi_free(&spi_object);

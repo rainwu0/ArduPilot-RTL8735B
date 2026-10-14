@@ -163,7 +163,7 @@ int rtl8735b_gpio_irq_attach(uint8_t logical_pin, uint8_t trigger, uint32_t irq_
 
 int rtl8735b_adc_init(uint8_t logical_pin)
 {
-    // ADC 通道來自板子 hwdef 的 RTL8735B_ADC 表（PF0–PF3 是通道 0–3）
+    // ADC 通道來自開發板 hwdef 的 RTL8735B_ADC 表（PF0–PF3 是通道 0–3）
     const uint8_t channel = rtl8735b_adc_channel(logical_pin);
     if (rtl8735b_analog_pin(logical_pin) == RTL8735B_INVALID_PIN || channel > 3U) {
         return -1;

@@ -12,7 +12,7 @@
 #   CMAKE_TOOLCHAIN_FILE  SDK 的 toolchain.cmake（旗標、-wrap 與 -D 都來自它）
 #   RTL8735B_WIFI_CREDENTIALS_SOURCE  waf 在建置目錄產生的 wifi_credentials.c（hwdef/scripts/rtl8735b_wifi_config.py），
 #                      未設定 Wi-Fi 時是 SSID 長度 0 的版本；內容可能含帳密，只在建置目錄
-#   RTL8735B_APP_DIR   板子的應用程式目錄（hwdef 的 env RTL8735B_APP_DIR，絕對路徑）；空字串表示沒有
+#   RTL8735B_APP_DIR   開發板的應用程式目錄（hwdef 的 env RTL8735B_APP_DIR，絕對路徑）；空字串表示沒有
 #   RTL8735B_PARTITION_TABLE  waf 在建置目錄產生的分割表 JSON（hwdef 的 FLASH_LAYOUT，
 #                      hwdef/scripts/rtl8735b_flash_layout.py），取代 SDK 範例專案的那一份
 #
@@ -116,7 +116,7 @@ target_compile_definitions(${app} PRIVATE ${sdk_defines})
 target_compile_options(${app} PRIVATE $<$<COMPILE_LANGUAGE:C>:${WARN_ERR_FLAGS}>)
 target_include_directories(${app} PUBLIC ${sdk_includes})
 
-# 板子的應用程式（選用）：目錄中的 .c 與入口一起編譯，沿用 SDK 的 include 與巨集，
+# 開發板的應用程式（選用）：目錄中的 .c 與入口一起編譯，沿用 SDK 的 include 與巨集，
 # 由 main.c 呼叫其中的 rtl8735b_app_init()
 if(RTL8735B_APP_DIR)
     file(GLOB app_sources CONFIGURE_DEPENDS "${RTL8735B_APP_DIR}/*.c")

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # HAL 的主機測試（Wi-Fi 以外）：序列埠、SPI/I²C、IO 與看門狗、RC 輸入與參數儲存、排程。
-# 正式的 HAL 原始碼配替身 SDK、FreeRTOS 與 AP_HAL 在主機上編譯執行；不開序列埠、不碰板子。
+# 正式的 HAL 原始碼配替身 SDK、FreeRTOS 與 AP_HAL 在主機上編譯執行；不開序列埠、不碰開發板。
 # HAL 原始碼預設是本目錄上兩層的 libraries/AP_HAL_RTL8735B，可用 $1 指定；只跑一組時給第二個參數。
 set -euo pipefail
 ulimit -c 0
@@ -134,7 +134,7 @@ run_scheduler() {
         "$test_dir/scheduler_host_test.cpp" -o "$out/scheduler-test"
     timeout 60 "$out/scheduler-test"
 
-    # 韌體入口 main.c 的 rtl8735b_app_init：沒有板子的應用程式時是空的弱符號；有應用程式
+    # 韌體入口 main.c 的 rtl8735b_app_init：沒有開發板的應用程式時是空的弱符號；有應用程式
     # （CMake 定義 RTL8735B_APP_REQUIRED）時不提供，應用程式漏寫入口就在連結時報錯，不會悄悄變成空函式。
     local main_c="$lib_dir/targets/cmake/main.c" sym
     cc "${CFLAGS[@]}" -I"$test_dir/main_fakes" -c "$main_c" -o "$out/main-noapp.o"

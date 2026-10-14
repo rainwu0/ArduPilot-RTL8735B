@@ -45,7 +45,7 @@ private:
         uint8_t _pin;
     };
 
-    // 依板子 hwdef 的 RTL8735B_GPIO 順序，一支腳一個
+    // 依開發板 hwdef 的 RTL8735B_GPIO 順序，一支腳一個
     Source _sources[RTL8735B_GPIO_PIN_COUNT];
     Semaphore _irq_semaphore;
 };

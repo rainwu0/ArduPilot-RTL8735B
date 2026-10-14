@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tools/ardupilotwaf/rtl8735b_upload.py（--upload）的主機測試；不需要板子。"""
+"""Tools/ardupilotwaf/rtl8735b_upload.py（--upload）的主機測試；不需要開發板。"""
 
 import io
 import os

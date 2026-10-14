@@ -33,7 +33,7 @@ public:
     AP_HAL::Util::safety_state safety_switch_state() const;
 
 private:
-    // 路數來自板子 hwdef 的 RTL8735B_RCOUT
+    // 路數來自開發板 hwdef 的 RTL8735B_RCOUT
     static constexpr uint8_t CHANNELS = RTL8735B_RCOUT_CHANNELS;
     void _stop_channel(uint8_t chan);
     bool _brushed_hold_low(uint8_t chan);

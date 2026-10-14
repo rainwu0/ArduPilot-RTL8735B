@@ -5,7 +5,7 @@
 """
 RTL8735B 的 Flash 版面：分割表各記錄的位址與長度，以及建置時給 SDK 打包用的分割表 JSON。
 
-版面依來源命名。各套件的分割表不是每塊板子一份，只由套件的 OTA Mode 選項決定：
+版面依來源命名。各套件的分割表不是每塊開發板一份，只由套件的 OTA Mode 選項決定：
   realtek-ota（預設）  Realtek 的 Arduino 套件 OTA Mode=Enable 用的 amebapro2_partitiontable_OTA.json
                        （Ameba-AIoT/ameba-arduino-pro2 93d6351），與 Ameba-AIoT/ameba-rtos-pro2 eb5c090 的範例分割相同；
                        HUB 8735 ultra 板商套件 4.1.1（ideashatch/HUB-8735 870a7e0 的發行包）也是這一份。

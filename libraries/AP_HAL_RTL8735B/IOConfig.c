@@ -5,7 +5,7 @@
 #include "hwdef.h"
 #include <PinNames.h>
 
-// 表格來自板子的 hwdef（rtl8735b_hwdef.py 產生的 HAL_RTL8735B_* 巨集）。
+// 表格來自開發板的 hwdef（rtl8735b_hwdef.py 產生的 HAL_RTL8735B_* 巨集）。
 static const uint32_t rcout_pins[] = {HAL_RTL8735B_RCOUT_PINS};
 
 static const struct {

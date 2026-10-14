@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-'''hwdef 產生器（hwdef/scripts/rtl8735b_hwdef.py）的板子描述關鍵字：
+'''hwdef 產生器（hwdef/scripts/rtl8735b_hwdef.py）的開發板描述關鍵字：
 RTL8735B_I2CBUS、RTL8735B_SPIBUS、RTL8735B_SPIDEV、RTL8735B_RCOUT、RTL8735B_GPIO、RTL8735B_ADC。
 
 產生器把它們轉成 hwdef.h 的表格巨集（HAL_RTL8735B_*）與數量；疊加檔以 undef 清空整組再重寫。

@@ -1,9 +1,9 @@
 ---
 name: 上板結果 / Board test report
-about: 某個功能在你的板子上能不能用（成功也歡迎）
+about: 某個功能在你的開發板上能不能用（成功也歡迎）
 ---
 
-- 板子：<!-- HUB 8735 ultra / AMB82-mini / 其他 -->
+- 開發板：<!-- HUB 8735 ultra / AMB82-mini / 其他 -->
 - 板型：<!-- hub8735ultra / amb82-mini / 自訂，附上疊加檔 -->
 - 本儲存庫的提交：<!-- git rev-parse --short HEAD -->
 - 接了哪些感測器或周邊：

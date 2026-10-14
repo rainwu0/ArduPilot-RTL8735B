@@ -9,7 +9,7 @@ about: 建置、燒錄或板上執行出錯
 
 **環境**
 
-- 板子：<!-- HUB 8735 ultra / AMB82-mini / 其他 -->
+- 開發板：<!-- HUB 8735 ultra / AMB82-mini / 其他 -->
 - 板型：<!-- hub8735ultra / amb82-mini / 自訂，附上疊加檔 -->
 - 本儲存庫的提交：<!-- git rev-parse --short HEAD -->
 - `FLASH_LAYOUT`：<!-- 沒改就寫預設 -->

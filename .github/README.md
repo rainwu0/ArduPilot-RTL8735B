@@ -12,16 +12,16 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Docume
 
 - ArduPilot master `9f648ccabc`（2026-09-25）加上 RTL8735B 的 HAL，保留 ArduPilot 的完整歷史。
 - 板型：`hub8735ultra`（HUB 8735 ultra，板商 ideasHatch，[板商資料](https://github.com/ideashatch/HUB-8735)），開發都在這塊上做；`amb82-mini` 只建置過。
-- **HUB 8735 ultra 照範例接上 BMI160、BMP280、GY-271（QMC5883L）就能用：** 開機、經 Wi-Fi（UDP）連上地面站、參數在重開機後保留、抬起板子時姿態方向正確。接法和疊加檔見[〈接上感測器〉][sensors]，上板紀錄見 [BOARD_TESTS.md][tests-board] 的 T2。
+- **HUB 8735 ultra 照範例接上 BMI160、BMP280、GY-271（QMC5883L）就能用：** 開機、經 Wi-Fi（UDP）連上地面站、參數在重開機後保留、抬起開發板時姿態方向正確。接法和疊加檔見[〈接上感測器〉][sensors]，上板紀錄見 [BOARD_TESTS.md][tests-board] 的 T2。
 - 板型本身不含感測器。什麼都沒接時開機停在氣壓計的 Config Error，Wi-Fi 會連上熱點，但不會有 MAVLink。
-- 不用板子、不用 SDK 就能跑的主機測試：`Tools/scripts/rtl8735b_test.sh`，說明在 [tests/README.md][tests]。主機測試通過不代表在板子上能用。
+- 不用開發板、不用 SDK 就能跑的主機測試：`Tools/scripts/rtl8735b_test.sh`，說明在 [tests/README.md][tests]。主機測試通過不代表在開發板上能用。
 
 每一項的狀態見[〈功能狀態〉][status]。
 
 ## 可以拿來做什麼
 
-- 建置 Copter、燒進板子：[〈取得與建置〉][build]、[〈燒錄〉][flash]。第一次上手，照[〈接上感測器〉][sensors]接三顆模組最快。
-- 替自己的 RTL8735B 板子寫 hwdef 疊加檔（腳位、匯流排、感測器）：[〈自訂板〉][custom]。
+- 建置 Copter、燒進開發板：[〈取得與建置〉][build]、[〈燒錄〉][flash]。第一次上手，照[〈接上感測器〉][sensors]接三顆模組最快。
+- 替自己的 RTL8735B 開發板寫 hwdef 疊加檔（腳位、匯流排、感測器）：[〈自訂板〉][custom]。
 - 把自己的 SDK 端 C 程式和韌體編在一起：[〈板子的應用程式〉][app]。
 
 ## 還缺什麼
@@ -39,7 +39,7 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Docume
 
 ## 想參與
 
-- 問題、上板結果都歡迎開 issue，回報在這裡，不要回報到 ArduPilot。上面「還缺什麼」的實測結果特別有用，哪怕只是「我的板子開得了機」。
+- 問題、上板結果都歡迎開 issue，回報在這裡，不要回報到 ArduPilot。上面「還缺什麼」的實測結果特別有用，哪怕只是「我的開發板開得了機」。
 - 要送 PR 的話先看 [CONTRIBUTING](CONTRIBUTING.md)，送之前跑一次 `Tools/scripts/rtl8735b_test.sh`。PR 也會跑同一套測試；外部貢獻者送的 PR，要等維護者核准才會開始跑。
 
 ## 最近的變動
@@ -55,10 +55,10 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Docume
 
 ### 2026-10-14：公開測試
 
-- 新增 `Tools/scripts/rtl8735b_test.sh`：hwdef、Flash 版面、`--upload` 的工具測試，以及 HAL（序列埠、SPI／I²C、IO、RC 輸入、參數儲存、排程、Wi-Fi）的主機測試。需要 `build-essential` 和 `python3`，不需要板子和 SDK。加 `--build` 會另外交叉建置一次。
+- 新增 `Tools/scripts/rtl8735b_test.sh`：hwdef、Flash 版面、`--upload` 的工具測試，以及 HAL（序列埠、SPI／I²C、IO、RC 輸入、參數儲存、排程、Wi-Fi）的主機測試。需要 `build-essential` 和 `python3`，不需要開發板和 SDK。加 `--build` 會另外交叉建置一次。
 - 推到 `main` 和開 PR 時，GitHub Actions 會跑同一套測試和提交慣例檢查；交叉建置要手動觸發。原本從 ArduPilot 帶過來、在這裡用不到的 CI 設定已經拿掉。
 
-更早的變動看 `git log 9f648ccabc..main`。2026-10-14 以前的疊加檔要注意：舊的 `HAL_RTL8735B_*` 腳位設定已改成關鍵字（見[〈自訂板〉][custom]），同一支腳用兩次會在 configure 時失敗，板子應用程式少了 `rtl8735b_app_init()` 會連結失敗。
+更早的變動看 `git log 9f648ccabc..main`。2026-10-14 以前的疊加檔要注意：舊的 `HAL_RTL8735B_*` 腳位設定已改成關鍵字（見[〈自訂板〉][custom]），同一支腳用兩次會在 configure 時失敗，開發板的應用程式少了 `rtl8735b_app_init()` 會連結失敗。
 
 ## 授權
 

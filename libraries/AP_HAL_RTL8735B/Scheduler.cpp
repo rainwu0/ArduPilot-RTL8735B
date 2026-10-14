@@ -39,6 +39,7 @@ Scheduler::Scheduler() :
     _num_io_procs(0),
     _in_io_proc(false),
     _initialized(false),
+    _main_last_block_us(0),
     _main_task_handle(nullptr),
     _timer_task_handle(nullptr),
     _io_task_handle(nullptr),
@@ -77,8 +78,11 @@ void Scheduler::delay(uint16_t ms)
     while ((AP_HAL::micros64() - start) / 1000 < ms) {
         // tick 是 1 ms
         vTaskDelay(1);
-        if (_min_delay_cb_ms <= ms && in_main_thread()) {
-            call_delay_cb();
+        if (in_main_thread()) {
+            _main_last_block_us = AP_HAL::micros64();
+            if (_min_delay_cb_ms <= ms) {
+                call_delay_cb();
+            }
         }
     }
 }
@@ -104,6 +108,13 @@ void Scheduler::delay_microseconds(uint16_t us)
     // boost，由 AP_HAL::Scheduler 的預設轉呼叫這裡）。每次只讓 remaining/1000 個 tick：vTaskDelay(n)
     // 最多等 n 個 tick，醒來時不會超過目標；剩下不足一個 tick 的部分忙等補足。超出要求的只有醒來時
     // 被較高優先權 task 延後的時間。
+    //
+    // 例外：主執行緒已經連續 MAIN_MAX_SPIN_US 沒有讓出 CPU 時，這次改成讓出一個 tick，可能超過要求。
+    // IMU 斷線時，wait_for_sample 等不到樣本，會一直以 delay_microseconds_boost(100) 輪詢；每次都忙等的話，
+    // 優先權較低的 Wi-Fi、UART、IO task 永遠拿不到 CPU。上游 AP_HAL_ESP32、AP_HAL_ChibiOS 在這裡都會讓出。
+    // 主迴圈每圈有 1 ms 以上的餘裕時，等取樣那一段會走上面的 vTaskDelay，碰不到這個上限；負載更高時
+    // （400 Hz 下迴圈本體超過約 1.5 ms），每 20 ms 會有一圈多等最多一個 tick。主執行緒經號誌等待讓出時不更新
+    // _main_last_block_us，所以這個上限是保守的：偶爾在沒有餓死別人時也多讓一個 tick。
     const uint64_t end = AP_HAL::micros64() + us;
     for (;;) {
         const uint64_t now = AP_HAL::micros64();
@@ -113,6 +124,10 @@ void Scheduler::delay_microseconds(uint16_t us)
         const uint64_t remaining = end - now;
         if (remaining >= 1000) {
             vTaskDelay(pdMS_TO_TICKS((uint32_t)(remaining / 1000U)));
+            _main_last_block_us = AP_HAL::micros64();
+        } else if (int64_t(now - _main_last_block_us) >= int64_t(MAIN_MAX_SPIN_US)) {
+            vTaskDelay(1);
+            _main_last_block_us = AP_HAL::micros64();
         } else {
             rtl8735b_delay_us((uint32_t)remaining);
         }

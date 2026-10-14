@@ -73,6 +73,9 @@ public:
     static const uint32_t RCIN_STACK_WORDS    = 4096 / sizeof(StackType_t);
     static const uint32_t STORAGE_STACK_WORDS = 4096 / sizeof(StackType_t);
 
+    // 主執行緒在 delay_microseconds 裡連續忙等最多這麼久，就讓出一個 tick（見 Scheduler.cpp）
+    static const uint32_t MAIN_MAX_SPIN_US = 20000;
+
 private:
     static void _timer_thread(void *arg);
     static void _io_thread(void *arg);
@@ -98,6 +101,9 @@ private:
     Semaphore _io_sem;
 
     volatile bool _initialized;
+
+    // 主執行緒上一次以 vTaskDelay 讓出 CPU 後醒來的時間（micros64）
+    uint64_t _main_last_block_us;
 
     TaskHandle_t _main_task_handle;
     TaskHandle_t _timer_task_handle;

@@ -231,6 +231,9 @@ void test_sweep()
     static const uint16_t ms_list[] = {1, 2, 3, 10};
     static const uint64_t latencies[] = {0, 37};
 
+    // 實機的主執行緒一直在跑：先讓它在掃描開始前讓出過一次，否則上一個測試之後替身時鐘跳了幾秒，
+    // 會被當成主執行緒連續忙等太久（見 test_main_thread_spin_yields）。
+    (void)measure(main_task, 5000000 - 2000, [] { sched.delay_microseconds(1000); });
     for (uint64_t latency : latencies) {
         wake_latency_us = latency;
         for (uint64_t phase = 0; phase < 1000; phase++) {
@@ -275,6 +278,40 @@ void test_sweep()
     wake_latency_us = 0;
 }
 
+// IMU 斷線時（例如杜邦線鬆了），AP_InertialSensor::wait_for_sample 等不到樣本，會一直以
+// delay_microseconds_boost(100) 輪詢（AP_InertialSensor.cpp:2099–2151 的 while (true)）。
+// 主執行緒（優先權 4）若每次都忙等，優先權較低的 Wi-Fi、UART、IO task 就永遠拿不到 CPU。
+// 上游 AP_HAL_ESP32（us >= 100 時 vTaskDelay）與 AP_HAL_ChibiOS（chThdSleep）在這裡都會讓出。
+// 要求：主執行緒連續忙等時，至少每 21 ms（20 ms 加一個 tick）讓出一次。
+void test_main_thread_spin_yields()
+{
+    wake_latency_us = 0;
+    current_task = main_task;
+    AP_HAL::Scheduler &base = sched;
+    const uint64_t start = 9000000;
+    now_us = start;
+    busy_us = 0;
+    block_calls = 0;
+    unsigned seen_blocks = 0;
+    uint64_t last_block_end = start;
+    uint64_t longest_gap = 0;
+    while (now_us < start + 200000) {
+        base.delay_microseconds_boost(100);
+        if (block_calls != seen_blocks) {
+            seen_blocks = block_calls;
+            if (now_us - last_block_end > longest_gap) {
+                longest_gap = now_us - last_block_end;
+            }
+            last_block_end = now_us;
+        }
+    }
+    if (now_us - last_block_end > longest_gap) {
+        longest_gap = now_us - last_block_end;
+    }
+    expect(block_calls > 0, "主執行緒連續 200 ms 以 delay_microseconds_boost(100) 輪詢，一次都沒有讓出 CPU");
+    expect(longest_gap <= 21000, "主執行緒連續輪詢時，最長 %" PRIu64 " us 沒有讓出 CPU（要求 <= 21000）", longest_gap);
+}
+
 } // namespace
 
 int main()
@@ -287,6 +324,7 @@ int main()
 
     test_call_just_before_tick_edge();
     test_sweep();
+    test_main_thread_spin_yields();
 
     printf("現況：其他執行緒 delay_microseconds 掃描中短於要求 %u/%u 次（未要求，待追蹤）\n",
            other_short_waits, other_waits);

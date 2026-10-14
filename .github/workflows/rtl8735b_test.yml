@@ -1,4 +1,4 @@
-# RTL8735B 移植的主機測試與提交慣例檢查：不需要板子，也不需要 Realtek SDK。
+# RTL8735B 移植的主機測試與提交慣例檢查：不需要開發板，也不需要 Realtek SDK。
 # 交叉建置要下載 SDK，放在手動觸發的 rtl8735b_build.yml。
 name: RTL8735B tests
 

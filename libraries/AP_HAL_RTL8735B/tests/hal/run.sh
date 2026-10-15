@@ -46,8 +46,8 @@ run_bus() {
     timeout 30 "$out/bus-shim-test"
     timeout 30 "$out/bus-shim-test" reinit-failure
     timeout 30 "$out/bus-shim-test" alt-index
-    timeout 30 "$out/bus-shim-test" pin-zero
     timeout 30 "$out/bus-shim-test" init-clear
+    timeout 30 "$out/bus-shim-test" pin-zero
 
     c++ "${CXXFLAGS[@]}" -pthread -I"$test_dir/fakes/device_bus" -I"$lib_dir" \
         "$lib_dir/DeviceBus.cpp" "$test_dir/bus_device_host_test.cpp" -o "$out/bus-device-test"

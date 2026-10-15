@@ -442,22 +442,6 @@ static int alt_index_scenario()
     return 0;
 }
 
-// 腳位值 0 是 SDK 的 PIN_A0，是合法的腳位（PA0 可以當 I2C0 的 SCL，SDK i2c_api.c 的腳位表）；
-// 「沒接腳位」用 SDK 的 NC 表示，不是 0。
-static int pin_zero_scenario()
-{
-    assert(rtl8735b_i2c_init(2U, 0U, PIN_A1, PIN_A0, 100000U) == RTL8735B_BUS_OK);
-    assert(mock_i2c_bus_num == 0U && mock_i2c_scl == PIN_A0 && mock_i2c_sda == PIN_A1);
-    assert(mock_i2c_clock_hz == 100000U);
-
-    // SPI 的 CS 是一般 GPIO：PA0 可以，NC 不行
-    assert(rtl8735b_spi_init(3U, 1U, PIN_F7, PIN_F5, PIN_F6, PIN_F8, 2000000U, 0U) == RTL8735B_BUS_OK);
-    assert(rtl8735b_spi_set_cs(3U, PIN_A0, 1U) == RTL8735B_BUS_OK);
-    assert(rtl8735b_spi_set_cs(3U, PIN_A0, 0U) == RTL8735B_BUS_OK);
-    assert(rtl8735b_spi_set_cs(3U, static_cast<uint32_t>(NC), 1U) == RTL8735B_BUS_INVALID);
-    return 0;
-}
-
 // 開機時 SDA 已被拉住：重置沒有讓感測器斷電時，裝置可能停在送資料位元的中途。初始化控制器之前
 // 先以 GPIO 清除匯流排，GPIO 釋放腳位後才交給 I2C；這時控制器還沒初始化，不需要 deinit。
 static int init_clear_scenario()
@@ -475,19 +459,72 @@ static int init_clear_scenario()
     return 0;
 }
 
+// 腳位值 0 是合法的腳位：SDK 的 PIN_A0 就是 0，是 I2C0 的 SCL（SDA 是 PIN_A1）。
+// 「沒接」要用 SDK 的 NC，不能拿 0 當作沒設定。SPI 的片選可以是任何 GPIO，同樣要接受 0、拒絕 NC。
+// shim 只允許初始化一次 I2C，所以獨立成一個情境。
+static int pin_zero_scenario()
+{
+    // NC 當 SDA 或 SCL 都是沒接，拒絕；被拒絕不能占用這唯一一次的初始化。
+    assert(rtl8735b_i2c_init(1U, 0U, static_cast<uint32_t>(NC), PIN_A0, 400000U) == RTL8735B_BUS_INVALID);
+    assert(rtl8735b_i2c_init(1U, 0U, PIN_A1, static_cast<uint32_t>(NC), 400000U) == RTL8735B_BUS_INVALID);
+    assert(mock_i2c_init_calls == 0U);
+
+    // I2C0：SDA = PA1、SCL = PA0。SDK 收到的匯流排編號與兩支腳位都要正確。
+    assert(rtl8735b_i2c_init(1U, 0U, PIN_A1, PIN_A0, 400000U) == RTL8735B_BUS_OK);
+    assert(mock_i2c_init_calls == 1U);
+    assert(mock_i2c_bus_num == 0U);
+    assert(mock_i2c_sda == PIN_A1 && mock_i2c_scl == PIN_A0);
+    assert(mock_i2c_clock_hz == 400000U);
+    // SDA 沒被拉住，清除匯流排不送脈衝，腳位也不留在 GPIO 手上。
+    assert(mock_scl_pulses == 0U);
+    assert(!mock_gpio_owned[PIN_A0] && !mock_gpio_owned[PIN_A1]);
+    const uint8_t reg = 0xD0U;
+    uint8_t value = 0U;
+    assert(rtl8735b_i2c_transfer(1U, 0x76U, &reg, 1U, &value, 1U, 0U, 4U) == RTL8735B_BUS_OK);
+    assert(value == 0xA5U);
+    assert(mock_i2c_write_addr == 0x76U && mock_i2c_read_addr == 0x76U);
+
+    // SPI：SSI 用的腳位照常（SPI1），片選另外以 GPIO 軟體控制。
+    assert(rtl8735b_spi_init(1U, 1U, PIN_F7, PIN_F5, PIN_F6, PIN_F8, 1000000U, 0U) == RTL8735B_BUS_OK);
+    // 片選是 PIN_A0：拉低與放開都成功，而且真的操作到那一腳。
+    assert(rtl8735b_spi_set_cs(1U, PIN_A0, 0U) == RTL8735B_BUS_OK);
+    mock_cs_count = 0U;
+    assert(rtl8735b_spi_set_cs(1U, PIN_A0, 1U) == RTL8735B_BUS_OK);
+    assert(mock_cs_count == 1U && mock_cs_levels[0] == 0);
+    assert(rtl8735b_spi_set_cs(1U, PIN_A0, 0U) == RTL8735B_BUS_OK);
+    assert(mock_cs_count == 2U && mock_cs_levels[1] == 1);
+    // 一般傳輸也能以 PIN_A0 當片選：傳輸期間拉低、結束放開。
+    mock_cs_count = 0U;
+    const uint8_t tx[] = {0x12U, 0x34U};
+    uint8_t rx[2] = {};
+    assert(rtl8735b_spi_transfer(1U, PIN_A0, tx, 2U, rx, 2U, 20U, 0U) == RTL8735B_BUS_OK);
+    assert(mock_cs_count == 2U && mock_cs_levels[0] == 0 && mock_cs_levels[1] == 1);
+    uint8_t duplex[2] = {0x01U, 0xFEU};
+    mock_cs_count = 0U;
+    assert(rtl8735b_spi_transfer_fullduplex(1U, PIN_A0, duplex, duplex, 2U, 20U, 0U) == RTL8735B_BUS_OK);
+    assert(mock_cs_count == 2U && mock_cs_levels[0] == 0 && mock_cs_levels[1] == 1);
+    assert(duplex[0] == 0xFEU && duplex[1] == 0x01U);
+
+    // 片選是 NC（沒接）：拒絕，而且不碰任何腳位。
+    mock_cs_count = 0U;
+    assert(rtl8735b_spi_set_cs(1U, static_cast<uint32_t>(NC), 1U) == RTL8735B_BUS_INVALID);
+    assert(mock_cs_count == 0U);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc > 1 && strcmp(argv[1], "alt-index") == 0) {
         return alt_index_scenario();
-    }
-    if (argc > 1 && strcmp(argv[1], "pin-zero") == 0) {
-        return pin_zero_scenario();
     }
     if (argc > 1 && strcmp(argv[1], "reinit-failure") == 0) {
         return reinit_failure_scenario();
     }
     if (argc > 1 && strcmp(argv[1], "init-clear") == 0) {
         return init_clear_scenario();
+    }
+    if (argc > 1 && strcmp(argv[1], "pin-zero") == 0) {
+        return pin_zero_scenario();
     }
     assert(rtl8735b_i2c_init(1U, 1U, PIN_F2, PIN_F1, 400000U) == RTL8735B_BUS_OK);
     // SDA 沒被拉住時，初始化不在 SCL 送脈衝，也不留著 GPIO。

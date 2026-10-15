@@ -154,9 +154,57 @@ extern const RTL8735BSPIBusConfig RTL8735B_SPI_BUS_CONFIGS[] = {
 extern const uint32_t RTL8735B_SPI_BUS_CONFIG_COUNT = 1U;
 extern const RTL8735BSPIDeviceConfig RTL8735B_SPI_DEVICE_CONFIGS[] = {
     {"bmi160", 1U, 88U, 1000000U, 10000000U, 20U, 17U, 0U},
-    {"baro_spi", 1U, 90U, 500000U, 4000000U, 20U, 19U, 1U},
+    // 同一條匯流排上的第二個裝置：mode、片選與裝置識別碼都和第一個不同
+    {"icm20689", 1U, 89U, 1000000U, 8000000U, 20U, 18U, 3U},
 };
 extern const uint32_t RTL8735B_SPI_DEVICE_CONFIG_COUNT = 2U;
+}
+
+// 同一條匯流排上有 mode 不同的裝置：每次傳輸當下、手動拉片選當下，SPI 的 mode 與片選
+// 都要是這個裝置自己的，不能沿用上一個用過匯流排的裝置，也不能一直是初始化時的 mode。
+static void test_each_device_uses_its_own_mode_and_chip_select(RTL8735B::SPIDeviceManager &manager)
+{
+    auto *dev0 = static_cast<RTL8735B::SPIDevice *>(manager.get_device_ptr("bmi160"));
+    auto *dev1 = static_cast<RTL8735B::SPIDevice *>(manager.get_device_ptr("icm20689"));
+    assert(dev0 != nullptr && dev1 != nullptr);
+
+    // 兩個裝置在同一條匯流排上，但裝置識別碼不同
+    assert(dev0->bus_num() == dev1->bus_num());
+    assert(dev0->get_bus_address() == 17U && dev1->get_bus_address() == 18U);
+    assert(dev0->get_bus_address() != dev1->get_bus_address());
+
+    // 兩個裝置交錯傳輸：一般傳輸與全雙工都涵蓋，每次都換回該裝置自己的 mode 與片選。
+    const uint8_t command = 0x80U;
+    uint8_t duplex[2] = {0x5AU, 0xA5U};
+    assert(dev1->transfer(&command, 1U, nullptr, 0U));
+    assert(transfer_mode == 3U && transfer_cs == 89U);
+    assert(dev0->transfer(&command, 1U, nullptr, 0U));
+    assert(transfer_mode == 0U && transfer_cs == 88U);
+    assert(dev1->transfer_fullduplex(duplex, 2U));
+    assert(transfer_mode == 3U && transfer_cs == 89U);
+    assert(dev0->transfer_fullduplex(duplex, 2U));
+    assert(transfer_mode == 0U && transfer_cs == 88U);
+    assert(dev1->transfer(&command, 1U, nullptr, 0U));
+    assert(transfer_mode == 3U && transfer_cs == 89U);
+
+    // 手動拉片選：匯流排上一個用的是另一個裝置，拉片選當下也要已經換成自己的 mode。
+    assert(dev0->set_chip_select(true));
+    assert(cs_assert_mode == 0U && selected_cs == 88U && selected_cs_asserted == 1U);
+    // 片選持有期間的傳輸沿用自己的 mode，並且不放開片選。
+    assert(dev0->transfer(&command, 1U, nullptr, 0U));
+    assert(transfer_mode == 0U && transfer_cs == 88U && transfer_kept_cs == 1U);
+    assert(dev0->set_chip_select(false));
+    assert(selected_cs == 88U && selected_cs_asserted == 0U);
+
+    assert(dev1->set_chip_select(true));
+    assert(cs_assert_mode == 3U && selected_cs == 89U && selected_cs_asserted == 1U);
+    assert(dev1->transfer_fullduplex(duplex, 2U));
+    assert(transfer_mode == 3U && transfer_cs == 89U && transfer_kept_cs == 1U);
+    assert(dev1->set_chip_select(false));
+    assert(selected_cs == 89U && selected_cs_asserted == 0U);
+
+    delete dev0;
+    delete dev1;
 }
 
 int main()
@@ -171,7 +219,7 @@ int main()
     assert(init_clock == 1000000U && init_mode == 0U);
     assert(manager.get_count() == 2U);
     assert(std::strcmp(manager.get_device_name(0U), "bmi160") == 0);
-    assert(std::strcmp(manager.get_device_name(1U), "baro_spi") == 0);
+    assert(std::strcmp(manager.get_device_name(1U), "icm20689") == 0);
     assert(manager.get_device_name(2U) == nullptr);
     assert(manager.get_device_ptr("unknown") == nullptr);
 
@@ -196,22 +244,7 @@ int main()
     assert(transfer_calls == 2U && transfer_kept_cs == 1U);
     assert(device->set_chip_select(false));
     assert(selected_cs == 88U && selected_cs_asserted == 0U);
-
-    // 同一條匯流排上的另一個裝置用 mode 1：不論兩個裝置怎麼交錯，每次傳輸前都要換成該裝置自己的 mode；
-    // 手動拉 CS 前也一樣。兩個裝置的位址（device_id）不同。
-    auto *other = static_cast<RTL8735B::SPIDevice *>(manager.get_device_ptr("baro_spi"));
-    assert(other != nullptr);
-    assert(other->get_bus_address() != device->get_bus_address());
-    uint8_t buf[3] = {0x01U, 0x02U, 0x03U};
-    RTL8735B::SPIDevice *const order[] = {other, device, other, other, device, device, other};
-    for (RTL8735B::SPIDevice *dev : order) {
-        assert(dev->transfer_fullduplex(buf, sizeof(buf)));
-        assert(transfer_mode == (dev == other ? 1U : 0U));
-        assert(transfer_cs == (dev == other ? 90U : 88U));
-    }
-    assert(other->set_chip_select(true));
-    assert(cs_assert_mode == 1U);
-    assert(other->set_chip_select(false));
-    delete other;
     delete device;
+
+    test_each_device_uses_its_own_mode_and_chip_select(manager);
 }

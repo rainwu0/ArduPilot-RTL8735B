@@ -395,38 +395,46 @@ void test_send_failure_drops_frame_and_stalled_frame_is_resynced()
     assert(!fake.sent.empty() && fake.sent.back().data == next);
 }
 
-// end()／begin() 清空 TX 緩衝區後，開頭不完整訊框的等待要重新起算：重啟前的訊框已經快等到 TX_STALL_MS，
-// 重啟後寫入的新訊框開頭不能沿用舊的起點，在新訊框還沒等滿之前就被丟掉位元組。
-void test_restart_resets_incomplete_frame_timer()
+// 開頭的不完整訊框快等到逾時時用 end()、begin() 重啟埠：緩衝區已清空，之後寫入的新訊框前段
+// 要從頭起算等待，不能沿用舊訊框的起始時間而被誤丟第一個位元組；訊框補齊後原樣送出。
+void test_restart_restarts_incomplete_frame_wait()
 {
     FakeNet fake;
     reset(fake);
     WiFiDriver d(WiFiDriver::Protocol::UDP, kLocalPort, kGcsPort);
     bring_up(d);
-    const uint32_t t0 = 50000;
-    fake.inbound.push_back({kGcs, 14550, {1}});
-    d._link_step(t0);
-    const auto before = mav2(30, 28);
-    assert(d.write(before.data(), 3) == 3);          // 只寫進訊框開頭
-    d._link_step(t0 + 1);                             // 從這裡開始等
-    fake.inbound.push_back({kGcs, 14550, {1}});
-    d._link_step(t0 + WiFiDriver::TX_STALL_MS);       // 還在期限內
+    fake.inbound.push_back({kGcs, kGcsPort, {1}});
+    d._link_step(100);
+    assert(d.status().gcs_known);
 
+    // 舊訊框只寫了前幾個位元組：時間走到快逾時但還沒超過，沒有送出也沒有丟棄。
+    const auto old_frame = mav2(24, 30);
+    assert(d.write(old_frame.data(), 5) == 5);
+    const uint32_t wait_started = 110;
+    d._link_step(wait_started);
+    d._link_step(wait_started + WiFiDriver::TX_STALL_MS - 100);
+    assert(fake.sent.empty() && d.tx_pending() && d.status().tx_dropped_bytes == 0);
+
+    // 重啟埠之後馬上寫入另一個新訊框的前段（中間沒有任何一步看過空的緩衝區）。
     d.end();
     d.begin(57600);
-    const auto after = mav2(0, 9);
-    assert(d.write(after.data(), 4) == 4);
-    const uint32_t dropped = d.status().tx_dropped_bytes;
-    // 照舊起點早已超過期限；照新起點還沒
-    for (uint32_t dt = 2; dt <= 4; dt++) {
-        fake.inbound.push_back({kGcs, 14550, {1}});
-        d._link_step(t0 + WiFiDriver::TX_STALL_MS + dt);
-    }
-    assert(d.status().tx_dropped_bytes == dropped);
-    assert(d.write(after.data() + 4, after.size() - 4) == after.size() - 4);
-    fake.inbound.push_back({kGcs, 14550, {1}});
-    d._link_step(t0 + WiFiDriver::TX_STALL_MS + 5);
-    assert(!fake.sent.empty() && fake.sent.back().data == after);
+    assert(d.is_initialized() && !d.tx_pending());
+    const auto fresh = mav2(0, 9);
+    assert(d.write(fresh.data(), 4) == 4);
+
+    // 這時間點如果沿用舊計時就已經超過 TX_STALL_MS；新訊框的前段不能因此被丟。
+    const uint32_t restarted = wait_started + WiFiDriver::TX_STALL_MS + 1;
+    d._link_step(restarted);
+    assert(d.status().tx_dropped_bytes == 0);
+    assert(fake.sent.empty() && d.tx_pending());
+
+    // 補齊其餘部分後，送出的就是完整的新訊框。
+    assert(d.write(fresh.data() + 4, fresh.size() - 4) == fresh.size() - 4);
+    d._link_step(restarted + 50);
+    assert(fake.sent.size() == 1);
+    assert(fake.sent[0].address == kGcs && fake.sent[0].port == kGcsPort && fake.sent[0].data == fresh);
+    assert(d.status().tx_dropped_bytes == 0 && d.status().tx_errors == 0);
+    assert(!d.tx_pending());
 }
 
 void test_link_loss_reconnects()
@@ -929,7 +937,7 @@ int main()
     test_foreign_sources_and_gcs_timeout();
     test_rx_overflow_drops_whole_datagram();
     test_send_failure_drops_frame_and_stalled_frame_is_resynced();
-    test_restart_resets_incomplete_frame_timer();
+    test_restart_restarts_incomplete_frame_wait();
     test_link_loss_reconnects();
     test_end_keeps_task_and_rebegin();
     test_uart_api_does_not_block_while_sdk_join_blocks();

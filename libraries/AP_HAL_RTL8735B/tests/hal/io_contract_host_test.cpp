@@ -737,33 +737,6 @@ static void test_brushed_clock_conflict_is_reported_once()
     assert(text == "RTL8735B: brushed PWM ch1 unavailable (PWM clock in use by OneShot125 output); output stopped\n");
 }
 
-// 改輸出模式時，要先照舊模式停止輸出再換模式：新模式可能因為 PWM 時脈被另一種模式占用而驅動不了腳位，
-// 這時舊的輸出不能留著。safety 也要讓通道真的停止，而不是只把軟體的值歸零。
-// （同一次開機在 HAL 層直接換模式才會遇到；Copter 的 MOT_PWM_TYPE 要重開機才生效。）
-static void test_mode_change_stops_old_output_when_new_mode_cannot_drive()
-{
-    reset_fake_outputs();
-    RTL8735B::RCOutput output;
-    output.init();
-    const uint8_t ch = 2;
-    output.set_output_mode(1U << ch, AP_HAL::RCOutput::MODE_PWM_ONESHOT125);
-    output.enable_ch(ch);
-    output.write(ch, 1250);
-    assert(output_active[ch] && output_is_oneshot125[ch]);
-
-    apply_ticks_result = RTL8735B_PWM_ERR_CLOCK;   // 有刷的寫入一律因時脈衝突被拒
-    StdoutCapture capture;
-    stop_events.clear();
-    output.set_output_mode(1U << ch, AP_HAL::RCOutput::MODE_PWM_BRUSHED);
-    assert(stop_events.find('S') != std::string::npos && !output_active[ch]);
-    output.write(ch, 1700);
-    assert(!output_active[ch]);
-    output_active[ch] = true;   // 假設通道又被別的路徑啟動
-    assert(output.force_safety_on());
-    (void)capture.finish();
-    assert(!output_active[ch] && output.read(ch) == 0);
-}
-
 // 從有刷切到一般 PWM：切換當下照舊模式停止，先以 duty 0 驅動（有刷的停止狀態），不直接停用通道；
 // SDK 沒寫停用後腳位的電位，低側開關的閘極不能處於不確定的電位。
 static void test_brushed_to_normal_switch_holds_low_first()
@@ -779,6 +752,48 @@ static void test_brushed_to_normal_switch_holds_low_first()
     output.set_output_mode(1U << 0, AP_HAL::RCOutput::MODE_PWM_NORMAL);
     assert(!stop_events.empty() && stop_events[0] == 'H');
     assert(!output_active[0]);
+}
+
+// 通道正在輸出 OneShot125 時，同一次開機直接切成有刷：PWM 時脈還被 OneShot125 占用，
+// 有刷的 duty 0 寫不進去（替身一律回時脈衝突）。換模式本身就要把舊的 OneShot125 輸出停掉，
+// 之後不能讓輸出重新開始；有刷停止時 duty 0 寫不進去，也要退回直接停用通道。
+static void test_oneshot125_to_brushed_switch_stops_old_output()
+{
+    reset_fake_outputs();
+    RTL8735B::RCOutput output;
+    output.init();
+    // 先要求有刷可用的頻率，再切成 OneShot125 並開始輸出
+    // （與 AP_Motors 的順序相同：set_freq 之後才 set_output_mode）。
+    output.set_freq(1U << 0, 16000);
+    output.set_output_mode(1U << 0, AP_HAL::RCOutput::MODE_PWM_ONESHOT125);
+    output.enable_ch(0);
+    output.write(0, 1500);
+    assert(output_active[0] && output_is_oneshot125[0] && output_oneshot125_ticks[0] == 750);
+    assert(output.read(0) == 1500);
+
+    // 有刷的寫入一律因時脈衝突失敗；診斷訊息的內容由 test_brushed_clock_conflict_is_reported_once 檢查。
+    apply_ticks_result = RTL8735B_PWM_ERR_CLOCK;
+    StdoutCapture capture;
+    output.set_output_mode(1U << 0, AP_HAL::RCOutput::MODE_PWM_BRUSHED);
+    // 切換本身就讓舊輸出停止，不能留到下一次寫入。
+    assert(!output_active[0]);
+    assert(output.read(0) == 0);
+    uint32_t mode_mask = 0;
+    assert(output.get_output_mode(mode_mask) == AP_HAL::RCOutput::MODE_PWM_BRUSHED && mode_mask == 1U);
+
+    // 之後的寫入：有刷寫不進去，輸出不能重新開始，也不能回到 OneShot125。
+    const unsigned oneshot125_before = oneshot125_count;
+    output.write(0, 1500);
+    assert(!output_active[0] && output.read(0) == 0);
+    assert(oneshot125_count == oneshot125_before);
+
+    // 即使通道又被別的路徑設成輸出中（停止時 duty 0 寫不進去，不能只相信自己記的狀態），
+    // 安全開關仍要讓它真的停止，且讀回 0。
+    output_active[0] = true;
+    assert(output.force_safety_on());
+    assert(!output_active[0]);
+    assert(output.read(0) == 0);
+    (void)capture.finish();
 }
 
 // OneShot：與一般 PWM 相同的微秒路徑，以 set_freq 的頻率連續輸出（50–490 Hz）。
@@ -827,8 +842,8 @@ int main()
     test_oneshot125_mode_outputs_scaled_pulse();
     test_oneshot125_clock_conflict_is_reported_once();
     test_brushed_clock_conflict_is_reported_once();
-    test_mode_change_stops_old_output_when_new_mode_cannot_drive();
     test_brushed_to_normal_switch_holds_low_first();
+    test_oneshot125_to_brushed_switch_stops_old_output();
     test_oneshot_mode_uses_normal_pwm_path();
     puts("IO contract host tests passed");
     return 0;

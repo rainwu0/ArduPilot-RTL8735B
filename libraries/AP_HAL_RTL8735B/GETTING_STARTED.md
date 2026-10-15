@@ -10,7 +10,7 @@
 - **感測器模組**：最少兩顆，GY-BMI160（IMU）和 BMP280（氣壓計）。羅盤 GY-271（QMC5883L）可以之後再接。另外準備杜邦線或焊接工具。
 - **電腦**：一台 Windows，裝好 WSL 的 Ubuntu 22.04。建置在 WSL 裡做，燒錄和地面站在 Windows 那邊。
 - **Wi-Fi 熱點**：電腦和開發板都連同一個，建議用 2.4 GHz。5 GHz 能不能用還沒驗過。要用自己控制的熱點，因為 Wi-Fi 上的 MAVLink 沒有任何驗證。
-- **磁碟和時間**：至少 5 GB 磁碟。下載原始碼約 640 MB，第一次建置約 3 分鐘（依電腦而定）。
+- **磁碟和時間**：至少 7 GB 磁碟。從 clone 到建好映像約 13 分鐘：clone 約 3.5 分鐘、裝工具與 SDK 約 5 分鐘、建置約 3.3 分鐘（依網路與電腦而定）。
 
 **為什麼一定要接感測器：**
 - 什麼都不接的話，開機會停在 `Config Error: Baro: unable to initialise driver`。Wi-Fi 會連上熱點，但地面站收不到任何東西。這不是 Wi-Fi 壞了，而是 ArduPilot 找不到氣壓計就不往下走。
@@ -51,7 +51,7 @@ git submodule update --init --recursive modules/waf modules/mavlink modules/Dron
 - SDK 和工具鏈會放在旁邊的 `../ambpro2_sdk`，約 675 MB。
 - **每次開新的終端機，都要重做 `source` 和 `export PATH` 這兩行。**
 
-成功時：`arm-none-eabi-gcc --version` 的第一行有 `Realtek ASDK`。沒有的話，就是 PATH 沒設好，或用到了系統套件的編譯器，那個不能用。
+成功時：`arm-none-eabi-gcc --version` 的第一行有 `Realtek ASDK`。沒有的話，就是 PATH 沒設好，或用到了系統套件的編譯器，那個不能用。PATH 沒設時，下一步的 configure 會印出 `Could not find the program ['arm-none-eabi-ar']`。
 
 ## 4. Wi-Fi 設定檔
 

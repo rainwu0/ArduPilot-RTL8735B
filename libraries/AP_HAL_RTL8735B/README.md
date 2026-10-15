@@ -73,7 +73,7 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 | 氣壓計 | BMP280 | I²C 匯流排 1：D0（SDA）、D1（SCL）；SDO 接 GND（位址 0x76），CSB 接 3.3 V（選 I²C 模式） |
 | 羅盤 | GY-271（QMC5883L） | I²C 匯流排 1：和 BMP280 共用 D0、D1 |
 
-- 三個模組都接 3.3 V 與 GND：RTL8735B 的 I/O 是 3.3 V，訊號電位要一致。排針上 3.3 V 與 GND 的位置，請對照板商公開的原理圖（ideashatch/HUB-8735 `870a7e08de7a` 的 `HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf`）。
+- 三個模組都接 3.3 V 與 GND：RTL8735B 的 I/O 是 3.3 V，訊號電位要一致。3.3 V 與 GND 照開發板排針旁絲印標的接；不確定的話，對照板商公開的原理圖（ideashatch/HUB-8735 `870a7e08de7a` 的 `HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf`）。
 - 模組上的腳名依廠商不同，以手上模組的絲印為準。
 
 ```bash

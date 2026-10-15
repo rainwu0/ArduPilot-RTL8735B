@@ -36,20 +36,23 @@ cd ArduPilot-RTL8735B
 ```
 
 - 不要 clone 到 `/mnt/c` 底下，也不要用 Windows 的 Git：前者建置會很慢，後者會把換行改掉，腳本會壞。
-- 不要加 `--recurse-submodules`：ArduPilot 的子模組很多，這裡只用到三個，下一步會裝。
+- 不要加 `--recurse-submodules`：ArduPilot 的子模組很多，用不到。下一步只裝三個，建置時會再自己下載 `gtest`、`littlefs` 兩個，所以建置時也要連網。
 
 ## 3. 安裝工具與 SDK
+
+在 `~/ArduPilot-RTL8735B` 裡執行：
 
 ```bash
 Tools/environment_install/install-rtl8735b-prereqs-ubuntu.sh
 source ~/.venv-rtl8735b/bin/activate
 Tools/scripts/rtl8735b_get_sdk.sh
-export PATH="$PWD/../ambpro2_sdk/tools/asdk-10.3.0/linux/newlib/bin:$PATH"
+export PATH="$HOME/ambpro2_sdk/tools/asdk-10.3.0/linux/newlib/bin:$PATH"
 git submodule update --init --recursive modules/waf modules/mavlink modules/DroneCAN
 ```
 
-- SDK 和工具鏈會放在旁邊的 `../ambpro2_sdk`，約 675 MB。
-- **每次開新的終端機，都要重做 `source` 和 `export PATH` 這兩行。**
+- 第一行會用 `sudo` 裝套件，要輸入 WSL 的密碼。
+- SDK 和工具鏈會放在旁邊的 `~/ambpro2_sdk`，解開後約 1.8 GB。
+- 開新的終端機時要重做幾行設定，見第 4 步的最後。
 
 成功時：`arm-none-eabi-gcc --version` 的第一行有 `Realtek ASDK`。沒有的話，就是 PATH 沒設好，或用到了系統套件的編譯器，那個不能用。PATH 沒設時，下一步的 configure 會印出 `Could not find the program ['arm-none-eabi-ar']`。
 
@@ -62,7 +65,8 @@ ssid=你的熱點名稱
 password=你的熱點密碼
 ```
 
-- 等號後面的內容會原樣使用。**不要加引號，等號前後也不要多打空白**，不然引號和空白會變成名稱或密碼的一部分。名稱中間的空白沒關係。
+- 等號後面的內容會原樣使用。**不要加引號，等號前後和行尾也不要多打空白**，不然引號和空白會變成名稱或密碼的一部分。名稱中間的空白沒關係。
+- 打錯引號或空白時，建置**不會**有任何警告。要到第 7 步看開機訊息的 `SSID length N` 才發現得了：N 是熱點名稱的位元組數，英數字一個算 1，中文一個字算 3。
 - 密碼要 8–63 個字元，或 64 個十六進位字元；開放網路就把 `password=` 後面留空。長度不對時建置會失敗並說明原因。
 - 這個檔案不要放進任何 git 儲存庫，可以 `chmod 600 ~/wifi.txt`。
 
@@ -76,6 +80,17 @@ export RTL8735B_WIFI_CONFIG=~/wifi.txt
 
 帳密會編進韌體：建出來的映像不要分享，回報問題時也不要附上。
 
+**之後每次開新的終端機，先做這四行再建置：**
+
+```bash
+cd ~/ArduPilot-RTL8735B
+source ~/.venv-rtl8735b/bin/activate
+export PATH="$HOME/ambpro2_sdk/tools/asdk-10.3.0/linux/newlib/bin:$PATH"
+export RTL8735B_WIFI_CONFIG=~/wifi.txt
+```
+
+漏了最後一行，建出來的映像會沒有 Wi-Fi。
+
 ## 5. 建置
 
 ```bash
@@ -85,12 +100,14 @@ export RTL8735B_WIFI_CONFIG=~/wifi.txt
 
 成功時：
 
-- 建置輸出裡有 `Wi-Fi STA: 帳密取自 <你的設定檔路徑>`；
-- 最後沒有錯誤，映像在 `build/hub8735ultra/sdk_build/flash_ntz.bin`。
+- 開頭附近有 `Wi-Fi STA: 帳密取自 <你的設定檔路徑>`；
+- 最後一行是 `'copter' finished successfully`，映像在 `build/hub8735ultra/sdk_build/flash_ntz.bin`。
+
+中途會捲過很多 `warning:`，還有 `sed: can't read ...`、`JSON header - entry : fail` 這幾行。這些都來自 SDK，不影響結果，以最後一行為準。
 
 **如果看到的是 `Wi-Fi STA: 未設定`**：建置雖然成功了，但映像裡沒有 Wi-Fi。通常是設定檔路徑寫錯，或這個終端機沒有 `export`。修好之後再跑一次 `./waf copter`。
 
-把映像和燒錄工具複製到 Windows（`<你>` 換成你的 Windows 帳號名稱）：
+把映像和燒錄工具複製到 Windows。`<你>` 換成你的 Windows 帳號名稱，不知道的話在 WSL 執行 `ls /mnt/c/Users` 就看得到：
 
 ```bash
 cp build/hub8735ultra/sdk_build/flash_ntz.bin /mnt/c/Users/<你>/Downloads/
@@ -113,7 +130,7 @@ cp "../ambpro2_sdk/tools/Pro2_PG_tool _v1.3.0.zip" /mnt/c/Users/<你>/Downloads/
    .\uartfwburn.exe -p COMx -f C:\Users\<你>\Downloads\flash_ntz.bin -b 2000000 -U
    ```
 
-成功時：先看到 `programing done.`，最後一行是 `download success`。燒完之後按一下 reset 開機。
+成功時：先看到 `programing done.`（工具自己的拼法），最後一行是 `download success`。燒完之後按一下 reset 開機。
 
 失敗時：
 - `uart COMx open fail`：剛進燒錄模式時常見，過幾秒再執行同一個指令就好，不用重按鍵。
@@ -136,6 +153,7 @@ WiFi: joining (SSID length N)
 WiFi: up, local 192.168.x.x:14555
 ```
 
+- `SSID length N` 的 N 要等於你的熱點名稱的位元組數（英數字一個算 1，中文一個字算 3）。對不上，就是設定檔裡多了引號或空白。
 - `WiFi: up` 大約在開機後 5 秒出現。它後面的 IP 就是開發板的位址，記下來。
 - 有接羅盤的話，約 17 秒時會多一行 `QMC5883L found on bus 1 ...`；沒接羅盤就不會出現。
 - **回報問題要貼開機訊息時，先遮掉 `set ssid [...]` 那一行**：SDK 會在那裡印出你的熱點名稱。

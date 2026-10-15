@@ -20,7 +20,8 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Docume
 
 ## 可以拿來做什麼
 
-- 建置 Copter、燒進開發板：[〈取得與建置〉][build]、[〈燒錄〉][flash]。第一次上手，照[〈接上感測器〉][sensors]接三顆模組最快。
+- **第一次上手**：照[〈從零開始〉][start]一步一步做，從接線、建置、燒錄到地面站連上。
+- 建置 Copter、燒進開發板的細節：[〈取得與建置〉][build]、[〈燒錄〉][flash]。
 - 替自己的 RTL8735B 開發板寫 hwdef 疊加檔（腳位、匯流排、感測器）：[〈自訂板〉][custom]。
 - 把自己的 SDK 端 C 程式和韌體編在一起：[〈開發板的應用程式〉][app]。
 
@@ -48,6 +49,7 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Docume
 
 第一個里程碑：照範例接線，就能在 HUB 8735 ultra 上開機、連上地面站。這個版本標了標籤 `v0.1.0`（`git checkout v0.1.0`）。標籤只標提交，不附韌體。
 
+- 新增[〈從零開始〉][start]：沒有基礎的人照著做，從接線到地面站連上，每一步都寫了成功時會看到什麼。
 - 新增範例疊加檔 `hwdef/hub8735ultra/sensors-example.dat`，以及 HAL README 的〈接上感測器〉：BMI160 走 SPI，BMP280、GY-271 走 I²C，附接線表。
 - 新增 [BOARD_TESTS.md][tests-board]，記錄每一次上板驗證：版本、映像、接線、步驟、結果和沒測到的部分。功能狀態表的「板上驗證」都附紀錄編號。
 - SPI、I²C、排程、Wi-Fi MAVLink（UDP）、參數保存，從「待複驗」改成「板上驗證（T2）」。參數保存只驗了重開機。
@@ -73,4 +75,5 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Docume
 [license]: /libraries/AP_HAL_RTL8735B/README.md#授權
 [tests]: /libraries/AP_HAL_RTL8735B/tests/README.md
 [tests-board]: /libraries/AP_HAL_RTL8735B/BOARD_TESTS.md
+[start]: /libraries/AP_HAL_RTL8735B/GETTING_STARTED.md
 [sensors]: /libraries/AP_HAL_RTL8735B/README.md#接上感測器

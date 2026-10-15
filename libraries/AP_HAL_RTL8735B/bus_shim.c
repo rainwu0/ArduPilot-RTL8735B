@@ -44,6 +44,7 @@ static uint32_t i2c_sda_pin;
 static uint32_t i2c_scl_pin;
 static uint32_t i2c_clock_hz;
 static int _i2c_hw_init(void);
+static void _i2c_clear_bus(void);
 static uint8_t i2c_tx_scratch[BUS_I2C_MAX_TRANSFER];
 static uint8_t i2c_rx_scratch[BUS_I2C_MAX_TRANSFER];
 
@@ -113,6 +114,11 @@ int rtl8735b_i2c_init(uint8_t bus, uint8_t sdk_index, uint32_t sda_pin, uint32_t
     i2c_sda_pin = sda_pin;
     i2c_scl_pin = scl_pin;
     i2c_clock_hz = clock_hz;
+    // 重置沒有讓感測器斷電時（按 reset、軟體重開、看門狗重置），裝置可能停在送資料位元的中途、
+    // 一直拉住 SDA，開機探測的第一筆交易就會失敗。所以初始化控制器之前先清除匯流排；SDA 沒被拉住時
+    // 只讀一次就放開腳位。上游 AP_HAL_ChibiOS 在定義 HAL_I2C_CLEAR_BUS 時，開機也會先清所有 I2C 匯流排
+    // （ArduPilot 9f648ccabc 的 libraries/AP_HAL_ChibiOS/HAL_ChibiOS_Class.cpp:248-252，I2CBus::clear_all()）。
+    _i2c_clear_bus();
     const int result = _i2c_hw_init();
     if (result == RTL8735B_BUS_OK) {
         i2c_bus_id = bus;
@@ -161,8 +167,9 @@ static void _i2c_delay_us(uint32_t us)
 }
 
 // 裝置在傳輸中途被打斷時可能一直拉住 SDA；在 SCL 送脈衝讓它把這個位元組送完、放開 SDA。
+// 開機時在控制器初始化之前、逾時恢復時在 hal_i2c_deinit 之後呼叫。
 // 推論：hal_i2c_deinit 會解除這兩腳的 I2C 註冊（Realtek ameba-rtos-pro2@eb5c0907c40d 的
-// hal_i2c.c 如此，本 SDK 的 ROM 未查證）；若沒有解除，這裡的 GPIO 設定不會生效。
+// hal_i2c.c 如此，本 SDK 的 ROM 未查證）；若沒有解除，逾時恢復時這裡的 GPIO 設定不會生效。
 // 以「輸出 0／改回輸入」模擬開汲極，高電位靠匯流排上的上拉電阻，需上板確認。
 static void _i2c_clear_bus(void)
 {

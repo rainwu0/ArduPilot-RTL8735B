@@ -334,9 +334,13 @@ extern "C" void gpio_write(gpio_t *gpio, int value)
         mock_cs_levels[mock_cs_count++] = value;
     }
 }
+// 只讀 SDA：PF2 可以模擬被拉住，其他情境的 SDA（PE6、PA1）一律放開。
 extern "C" int gpio_read(gpio_t *gpio)
 {
-    assert(gpio->pin == PIN_F2);
+    assert(gpio->pin == PIN_F2 || gpio->pin == PIN_E6 || gpio->pin == PIN_A1);
+    if (gpio->pin != PIN_F2) {
+        return 1;
+    }
     return mock_sda_low_pulses == 0U ? 1 : 0;
 }
 
@@ -454,6 +458,23 @@ static int pin_zero_scenario()
     return 0;
 }
 
+// 開機時 SDA 已被拉住：重置沒有讓感測器斷電時，裝置可能停在送資料位元的中途。初始化控制器之前
+// 先以 GPIO 清除匯流排，GPIO 釋放腳位後才交給 I2C；這時控制器還沒初始化，不需要 deinit。
+static int init_clear_scenario()
+{
+    mock_sda_low_pulses = 3U;
+    assert(rtl8735b_i2c_init(1U, 1U, PIN_F2, PIN_F1, 400000U) == RTL8735B_BUS_OK);
+    assert(mock_scl_pulses == 3U);
+    assert(!mock_gpio_owned[PIN_F1] && !mock_gpio_owned[PIN_F2]);
+    assert(mock_gpio_deinit_order != 0U && mock_gpio_deinit_order < mock_i2c_init_order);
+    assert(mock_i2c_deinit_calls == 0U);
+    const uint8_t reg = 0xD0U;
+    uint8_t value = 0U;
+    assert(rtl8735b_i2c_transfer(1U, 0x76U, &reg, 1U, &value, 1U, 0U, 4U) == RTL8735B_BUS_OK);
+    assert(value == 0xA5U);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc > 1 && strcmp(argv[1], "alt-index") == 0) {
@@ -465,7 +486,13 @@ int main(int argc, char **argv)
     if (argc > 1 && strcmp(argv[1], "reinit-failure") == 0) {
         return reinit_failure_scenario();
     }
+    if (argc > 1 && strcmp(argv[1], "init-clear") == 0) {
+        return init_clear_scenario();
+    }
     assert(rtl8735b_i2c_init(1U, 1U, PIN_F2, PIN_F1, 400000U) == RTL8735B_BUS_OK);
+    // SDA 沒被拉住時，初始化不在 SCL 送脈衝，也不留著 GPIO。
+    assert(mock_scl_pulses == 0U);
+    assert(!mock_gpio_owned[PIN_F1] && !mock_gpio_owned[PIN_F2]);
     // SDK 在位址 NACK 時於 LOG UART 同步列印約 128 字元（115200 baud 約 10 ms）；
     // HAL 以回傳碼報告失敗，因此只關閉 SDK 的 I2C 錯誤列印，其他模組不變。
     assert((ConfigDebugErr & _DBG_I2C_) == 0U);

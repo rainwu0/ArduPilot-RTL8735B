@@ -4,7 +4,7 @@ ArduPilot 在 Realtek RTL8735B 上的硬體抽象層（HAL）。**未經飛行�
 
 開發與驗證用的開發板是 HUB 8735 ultra（板商 ideasHatch，主晶片 RTL8735B；板商資料：https://github.com/ideashatch/HUB-8735）。
 
-各功能目前能用到哪裡，見〈功能狀態〉。
+第一次上手：照[從零開始](GETTING_STARTED.md)做一次。各功能目前能用到哪裡，見〈功能狀態〉。
 
 本儲存庫是個人維護的非官方移植，與 ArduPilot 開發團隊無關。本平台的問題請在本儲存庫回報，不要回報到 ArduPilot 的論壇或 issue。
 

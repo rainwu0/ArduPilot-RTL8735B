@@ -2,6 +2,7 @@
 #include "bus_shim.h"
 #include <diag.h>
 #include <hal_i2c.h>
+#include <hal_irq.h>
 #include <hal_pinmux.h>
 #include <hal_ssi.h>
 #include <gpio_api.h>
@@ -49,6 +50,10 @@ hal_i2c_adapter_t *mock_i2c_adapter;
 uint8_t mock_abort_stuck;
 uint32_t mock_i2c_init_calls;
 uint32_t mock_i2c_deinit_calls;
+// NVIC 的 I2C 中斷（這條匯流排的那一路）。替身的 hal_i2c_init 模擬 ROM 初始化時註冊並開啟中斷。
+uint8_t mock_i2c_irq_enabled;
+// adapter 剛被清零、hal_i2c_load_default 還沒填回時，中斷仍開著的次數：晚到的中斷會拿到清零的 adapter
+uint32_t mock_i2c_zeroed_with_irq_enabled;
 PinName mock_spi_ssel;
 uint8_t mock_ssi_init_fail;
 // SPI mode：SSI 啟用狀態，以及每次改 CPOL/CPHA 時 SSI 是否已停用
@@ -125,8 +130,29 @@ extern "C" void vTaskDelay(TickType_t ticks)
 
 extern "C" TaskHandle_t xTaskGetCurrentTaskHandle(void) { return nullptr; }
 
+extern "C" void hal_irq_enable(int32_t irqn)
+{
+    assert(irqn == I2C0_IRQn + mock_i2c_bus_num);
+    mock_i2c_irq_enabled = 1U;
+}
+
+extern "C" void hal_irq_disable(int32_t irqn)
+{
+    assert(irqn == I2C0_IRQn + mock_i2c_bus_num);
+    mock_i2c_irq_enabled = 0U;
+}
+
+extern "C" void hal_irq_clear_pending(int32_t irqn)
+{
+    assert(irqn == I2C0_IRQn + mock_i2c_bus_num);
+}
+
 extern "C" hal_status_t hal_i2c_load_default(hal_i2c_adapter_t *adapter, uint8_t index)
 {
+    // _i2c_hw_init 在呼叫這裡之前把 adapter 清零
+    if (mock_i2c_irq_enabled) {
+        mock_i2c_zeroed_with_irq_enabled++;
+    }
     mock_i2c_bus_num = index;
     adapter->status = I2CStatusInitialized;
     adapter->err_type = I2CErrorNone;
@@ -146,6 +172,7 @@ extern "C" hal_status_t hal_i2c_init(hal_i2c_adapter_t *adapter,
     mock_i2c_scl = scl;
     mock_i2c_sda = sda;
     mock_i2c_init_calls++;
+    mock_i2c_irq_enabled = 1U;
     // 重新初始化控制器後，前一次中止留下的狀態消失。
     mock_abort_stuck = 0U;
     adapter->status = I2CStatusIdle;
@@ -582,6 +609,9 @@ int main(int argc, char **argv)
            RTL8735B_BUS_ERROR);
     assert(mock_i2c_deinit_calls == deinits_before_abort + 1U);
     assert(mock_i2c_init_calls == inits_before_abort + 1U);
+    // 重新初始化期間 I2C 中斷是關的，晚到的中斷不會拿到清零的 adapter；完成後重新開啟
+    assert(mock_i2c_zeroed_with_irq_enabled == 0U);
+    assert(mock_i2c_irq_enabled);
     assert(mock_i2c_sda == PIN_F2 && mock_i2c_scl == PIN_F1);
     assert(mock_i2c_clock_hz == 400000U && mock_i2c_restart_enabled == 1U);
     value = 0U;
@@ -610,6 +640,8 @@ int main(int argc, char **argv)
     assert(rtl8735b_i2c_transfer(1U, 0x76U, &reg, 1U, nullptr, 0U, 0U, 1U) ==
            RTL8735B_BUS_TIMEOUT);
     assert(mock_i2c_init_calls == inits_before_timeout + 1U);
+    assert(mock_i2c_zeroed_with_irq_enabled == 0U);
+    assert(mock_i2c_irq_enabled);
     assert(mock_i2c_disable_order != 0U && mock_i2c_disable_order < mock_i2c_deinit_order);
     assert(mock_i2c_deinit_order < mock_i2c_init_order);
     assert(mock_scl_pulses == 0U);

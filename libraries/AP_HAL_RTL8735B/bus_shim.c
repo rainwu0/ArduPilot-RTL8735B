@@ -5,6 +5,7 @@
 
 #include <diag.h>
 #include <hal_i2c.h>
+#include <hal_irq.h>
 #include <hal_pinmux.h>
 #include <hal_ssi.h>
 #include <gpio_api.h>
@@ -184,16 +185,32 @@ static void _i2c_clear_bus(void)
     gpio_deinit(&sda);
 }
 
-// 逾時後恢復：停用控制器讓還在進行的中斷模式傳輸停下，deinit，SDA 被拉住時清除匯流排，
-// 再以原設定初始化。緩衝區是靜態的，晚到的中斷不會寫到失效的記憶體。不呼叫 hal_i2c_unreg_irq：
-// 沒有其他 I2C 中斷時它會停用整組 I2C 中斷，而 hal_i2c_init 是否重新啟用沒有查證。
-static int _i2c_recover(void)
+// 重新初始化控制器。_i2c_hw_init 一開始就清零 adapter，而 I2C 中斷仍以這個 adapter 註冊著：
+// 共用的中斷處理經 i2c_gp_adpt->adapter[index] 找到它（Realtek ameba-rtos-pro2@eb5c0907c40d 的
+// component/soc/8735b/fwlib/rtl8735b/source/ram/hal_i2c.c:676）。期間關掉這一路的 NVIC 中斷，
+// 晚到的中斷才不會拿到清零的 adapter（base_addr 為 0）；成功後清掉期間累積的 pending 再開啟。
+// 失敗時維持關閉：呼叫端會封鎖這條匯流排，不再使用。
+// 不呼叫 hal_i2c_unreg_irq：沒有其他 I2C 中斷時它會停用整組 I2C 中斷，而 hal_i2c_init 是否重新啟用沒有查證。
+// timeout 為真時（逾時恢復）先停用控制器讓還在進行的中斷模式傳輸停下，deinit 後若 SDA 被拉住就清除匯流排。
+// 緩衝區是靜態的，晚到的中斷不會寫到失效的記憶體。
+static int _i2c_reinit(uint8_t timeout)
 {
     hal_i2c_adapter_t *adapter = &i2c_object.i2c_adp;
-    (void)hal_i2c_en_ctrl(adapter, I2CDisable);
+    const int32_t irq = I2C0_IRQn + (int32_t)i2c_bus_index;
+    hal_irq_disable(irq);
+    if (timeout) {
+        (void)hal_i2c_en_ctrl(adapter, I2CDisable);
+    }
     (void)hal_i2c_deinit(adapter);
-    _i2c_clear_bus();
-    return _i2c_hw_init();
+    if (timeout) {
+        _i2c_clear_bus();
+    }
+    const int result = _i2c_hw_init();
+    if (result == RTL8735B_BUS_OK) {
+        hal_irq_clear_pending(irq);
+        hal_irq_enable(irq);
+    }
+    return result;
 }
 
 int rtl8735b_i2c_transfer(uint8_t bus, uint8_t address,
@@ -276,8 +293,7 @@ transfer_done:
         // 板上實測：位址中止後 SDK 把狀態設回 Idle，但下一筆
         // 中斷模式傳送會停在 TxReady 直到逾時。以 SDK API 重新初始化控制器；
         // 失敗則封鎖，讓上層看到真實狀態。
-        (void)hal_i2c_deinit(adapter);
-        if (_i2c_hw_init() != RTL8735B_BUS_OK) {
+        if (_i2c_reinit(0U) != RTL8735B_BUS_OK) {
             i2c_faulted = 1U;
         }
     }
@@ -286,7 +302,7 @@ transfer_done:
     } else if (result == RTL8735B_BUS_TIMEOUT) {
         // 恢復不了，或連續逾時達上限，就封鎖後續交易，讓上層看到匯流排失效。
         i2c_consecutive_timeouts++;
-        if (i2c_consecutive_timeouts >= BUS_I2C_MAX_TIMEOUTS || _i2c_recover() != RTL8735B_BUS_OK) {
+        if (i2c_consecutive_timeouts >= BUS_I2C_MAX_TIMEOUTS || _i2c_reinit(1U) != RTL8735B_BUS_OK) {
             i2c_faulted = 1U;
         }
     }

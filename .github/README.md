@@ -2,7 +2,7 @@
 
 [![RTL8735B tests](https://github.com/rainwu0/ArduPilot-RTL8735B/actions/workflows/rtl8735b_test.yml/badge.svg)](https://github.com/rainwu0/ArduPilot-RTL8735B/actions/workflows/rtl8735b_test.yml)
 
-Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Documentation is in Traditional Chinese.
+Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. English: [README.en.md](README.en.md)
 
 這是把 [ArduPilot](https://github.com/ArduPilot/ardupilot) 搬到 Realtek RTL8735B 上的非官方移植，個人維護，跟 ArduPilot 開發團隊、Realtek 都沒有關係。**還沒飛過，請勿用於飛行。**
 
@@ -52,6 +52,7 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Docume
 - 新增[〈從零開始〉][start]：沒有基礎的人照著做，從接線到地面站連上，每一步都寫了成功時會看到什麼。
 - 新增範例疊加檔 `hwdef/hub8735ultra/sensors-example.dat`，以及 HAL README 的〈接上感測器〉：BMI160 走 SPI，BMP280、GY-271 走 I²C，附接線表。
 - 新增 [BOARD_TESTS.md][tests-board]，記錄每一次上板驗證：版本、映像、接線、步驟、結果和沒測到的部分。功能狀態表的「板上驗證」都附紀錄編號。
+- 首頁、CONTRIBUTING、HAL README 和〈從零開始〉都有英文版，每份開頭都連到另一個語言的版本。
 - SPI、I²C、排程、Wi-Fi MAVLink（UDP）、參數保存，從「待複驗」改成「板上驗證（T2）」。參數保存只驗了重開機。
 - 限制照實寫在上面〈還缺什麼〉：還沒飛過，羅盤方向與校正還沒驗，roll 方向是推得的。
 

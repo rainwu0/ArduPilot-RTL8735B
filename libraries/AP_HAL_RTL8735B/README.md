@@ -1,5 +1,7 @@
 # ArduPilot RTL8735B 移植
 
+English: [README.en.md](README.en.md)
+
 ArduPilot 在 Realtek RTL8735B 上的硬體抽象層（HAL）。**未經飛行驗證，請勿用於飛行。**
 
 開發與驗證用的開發板是 HUB 8735 ultra（板商 ideasHatch，主晶片 RTL8735B；板商資料：https://github.com/ideashatch/HUB-8735）。

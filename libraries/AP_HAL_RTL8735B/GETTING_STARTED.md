@@ -1,5 +1,7 @@
 # 從零開始：在 HUB 8735 ultra 上跑 ArduPilot
 
+English: [GETTING_STARTED.en.md](GETTING_STARTED.en.md)
+
 照這一頁從頭做一次，最後會在地面站上看到開發板的姿態。每一步最後都寫了「成功時會看到」。對不上就先停下來，開 issue 說卡在哪一步。
 
 **還沒飛過，請勿用於飛行。** 這一頁只做到地面站連得上，全程不要接馬達、電調和電池。

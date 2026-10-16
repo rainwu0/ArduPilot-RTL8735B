@@ -33,20 +33,36 @@
 #define BUS_I2C_CLEAR_PULSES 9U
 #define BUS_I2C_CLEAR_HALF_PERIOD_US 5U
 
-static i2c_t i2c_object;
-static uint8_t i2c_initialized;
-static uint8_t i2c_faulted;
-static uint8_t i2c_consecutive_timeouts;
-// 位址中止後重新初始化控制器時沿用的設定。
-static uint8_t i2c_bus_id = BUS_ID_NONE;
-static uint8_t i2c_bus_index;
-static uint32_t i2c_sda_pin;
-static uint32_t i2c_scl_pin;
-static uint32_t i2c_clock_hz;
-static int _i2c_hw_init(void);
-static void _i2c_clear_bus(void);
-static uint8_t i2c_tx_scratch[BUS_I2C_MAX_TRANSFER];
-static uint8_t i2c_rx_scratch[BUS_I2C_MAX_TRANSFER];
+// 每條 I²C 匯流排一組狀態，最多 4 條（SDK 的 I2C0–I2C3）：控制器、逾時次數與封鎖各算各的，
+// 一條被封鎖時其他條照常。每條由自己的 bus task 使用，緩衝區也各一份，兩條同時傳輸互不干擾。
+#define BUS_I2C_MAX_BUSES 4U
+typedef struct {
+    i2c_t object;
+    uint8_t initialized;
+    uint8_t faulted;
+    uint8_t consecutive_timeouts;
+    uint8_t bus_id;  // 呼叫端給的邏輯匯流排編號（來自開發板 hwdef 的表）
+    // 位址中止或逾時後重新初始化控制器時沿用的設定。
+    uint8_t sdk_index;
+    uint32_t sda_pin;
+    uint32_t scl_pin;
+    uint32_t clock_hz;
+    uint8_t tx_scratch[BUS_I2C_MAX_TRANSFER];
+    uint8_t rx_scratch[BUS_I2C_MAX_TRANSFER];
+} i2c_bus_t;
+static i2c_bus_t i2c_buses[BUS_I2C_MAX_BUSES];
+static int _i2c_hw_init(i2c_bus_t *b);
+static void _i2c_clear_bus(const i2c_bus_t *b);
+
+static i2c_bus_t *_i2c_find(uint8_t bus)
+{
+    for (uint8_t i = 0; i < BUS_I2C_MAX_BUSES; i++) {
+        if (i2c_buses[i].initialized && i2c_buses[i].bus_id == bus) {
+            return &i2c_buses[i];
+        }
+    }
+    return NULL;
+}
 
 static spi_t spi_object;
 static uint8_t spi_bus_id = BUS_ID_NONE;
@@ -72,9 +88,9 @@ static int _valid_transfer(const uint8_t *send, uint32_t send_len,
 // timeout 從這個 leg 開始時計算。bus task 以 tick 輪詢、可能被高優先 task 延後喚醒；
 // 共用整筆交易的期限時，前一個 leg 晚醒會讓後一個 leg 一開始就超過期限，
 // 剛啟動的接收被誤判為逾時。每次喚醒先看狀態，晚醒本身不會造成逾時。
-static int _wait_i2c(uint8_t receive, uint32_t timeout_ms)
+static int _wait_i2c(i2c_bus_t *b, uint8_t receive, uint32_t timeout_ms)
 {
-    hal_i2c_adapter_t *adapter = &i2c_object.i2c_adp;
+    hal_i2c_adapter_t *adapter = &b->object.i2c_adp;
     const uint64_t deadline_us = rtl8735b_systime_us() +
         (uint64_t)timeout_ms * 1000ULL;
     for (;;) {
@@ -93,7 +109,7 @@ static int _wait_i2c(uint8_t receive, uint32_t timeout_ms)
         if (rtl8735b_systime_us() >= deadline_us) {
             return RTL8735B_BUS_TIMEOUT;
         }
-        // I2C1 使用中斷模式；讓出一個 tick，避免高優先 bus task 忙等餓死 main。
+        // 控制器使用中斷模式；讓出一個 tick，避免高優先 bus task 忙等餓死 main。
         vTaskDelay(pdMS_TO_TICKS(1U));
     }
 }
@@ -102,7 +118,21 @@ int rtl8735b_i2c_init(uint8_t bus, uint8_t sdk_index, uint32_t sda_pin, uint32_t
                        uint32_t clock_hz)
 {
     if (bus == BUS_ID_NONE || sdk_index > 3U || sda_pin == BUS_PIN_NONE || scl_pin == BUS_PIN_NONE ||
-        clock_hz < 1000U || clock_hz % 1000U != 0U || i2c_initialized) {
+        clock_hz < 1000U || clock_hz % 1000U != 0U) {
+        return RTL8735B_BUS_INVALID;
+    }
+    // 同一個邏輯編號或同一個控制器只能初始化一次；被拒絕的不占用位置。
+    i2c_bus_t *b = NULL;
+    for (uint8_t i = 0; i < BUS_I2C_MAX_BUSES; i++) {
+        if (i2c_buses[i].initialized) {
+            if (i2c_buses[i].bus_id == bus || i2c_buses[i].sdk_index == sdk_index) {
+                return RTL8735B_BUS_INVALID;
+            }
+        } else if (b == NULL) {
+            b = &i2c_buses[i];
+        }
+    }
+    if (b == NULL) {
         return RTL8735B_BUS_INVALID;
     }
     // SDK 在位址 NACK 等中止時經 DBG_I2C_ERR 同步列印約 128 字元到 115200 baud 的 LOG UART，
@@ -110,41 +140,43 @@ int rtl8735b_i2c_init(uint8_t bus, uint8_t sdk_index, uint32_t sda_pin, uint32_t
     // 失敗已由本 shim 的回傳碼報告，所以只關閉 SDK 的 I2C 錯誤列印，其他模組的列印不變。
     DBG_ERR_MSG_OFF(_DBG_I2C_);
 
-    i2c_bus_index = sdk_index;
-    i2c_sda_pin = sda_pin;
-    i2c_scl_pin = scl_pin;
-    i2c_clock_hz = clock_hz;
+    b->sdk_index = sdk_index;
+    b->sda_pin = sda_pin;
+    b->scl_pin = scl_pin;
+    b->clock_hz = clock_hz;
+    b->faulted = 0U;
+    b->consecutive_timeouts = 0U;
     // 重置沒有讓感測器斷電時（按 reset、軟體重開、看門狗重置），裝置可能停在送資料位元的中途、
     // 一直拉住 SDA，開機探測的第一筆交易就會失敗。所以初始化控制器之前先清除匯流排；SDA 沒被拉住時
     // 只讀一次就放開腳位。上游 AP_HAL_ChibiOS 在定義 HAL_I2C_CLEAR_BUS 時，開機也會先清所有 I2C 匯流排
     // （ArduPilot 9f648ccabc 的 libraries/AP_HAL_ChibiOS/HAL_ChibiOS_Class.cpp:248-252，I2CBus::clear_all()）。
-    _i2c_clear_bus();
-    const int result = _i2c_hw_init();
+    _i2c_clear_bus(b);
+    const int result = _i2c_hw_init(b);
     if (result == RTL8735B_BUS_OK) {
-        i2c_bus_id = bus;
-        i2c_initialized = 1U;
+        b->bus_id = bus;
+        b->initialized = 1U;
     }
     return result;
 }
 
-static int _i2c_hw_init(void)
+static int _i2c_hw_init(i2c_bus_t *b)
 {
-    memset(&i2c_object, 0, sizeof(i2c_object));
-    hal_i2c_adapter_t *adapter = &i2c_object.i2c_adp;
-    hal_status_t status = hal_i2c_load_default(adapter, i2c_bus_index);
+    memset(&b->object, 0, sizeof(b->object));
+    hal_i2c_adapter_t *adapter = &b->object.i2c_adp;
+    hal_status_t status = hal_i2c_load_default(adapter, b->sdk_index);
     if (status != HAL_OK) {
         return RTL8735B_BUS_ERROR;
     }
     adapter->op_mode = I2CModeInterrupt;
-    status = hal_i2c_init(adapter, i2c_scl_pin, i2c_sda_pin);
+    status = hal_i2c_init(adapter, b->scl_pin, b->sda_pin);
     if (status != HAL_OK) {
         return RTL8735B_BUS_ERROR;
     }
-    if (i2c_object.i2c_adp.status != I2CStatusIdle &&
-        i2c_object.i2c_adp.status != I2CStatusInitialized) {
+    if (adapter->status != I2CStatusIdle &&
+        adapter->status != I2CStatusInitialized) {
         return RTL8735B_BUS_ERROR;
     }
-    adapter->init_dat.clock = i2c_clock_hz / 1000U;
+    adapter->init_dat.clock = b->clock_hz / 1000U;
     status = hal_i2c_set_clk(adapter);
     if (status != HAL_OK) {
         (void)hal_i2c_deinit(adapter);
@@ -171,14 +203,14 @@ static void _i2c_delay_us(uint32_t us)
 // 推論：hal_i2c_deinit 會解除這兩腳的 I2C 註冊（Realtek ameba-rtos-pro2@eb5c0907c40d 的
 // hal_i2c.c 如此，本 SDK 的 ROM 未查證）；若沒有解除，逾時恢復時這裡的 GPIO 設定不會生效。
 // 以「輸出 0／改回輸入」模擬開汲極，高電位靠匯流排上的上拉電阻，需上板確認。
-static void _i2c_clear_bus(void)
+static void _i2c_clear_bus(const i2c_bus_t *b)
 {
     gpio_t sda;
     gpio_t scl;
-    gpio_init(&sda, (PinName)i2c_sda_pin);
+    gpio_init(&sda, (PinName)b->sda_pin);
     gpio_dir(&sda, PIN_INPUT);
     if (gpio_read(&sda) == 0) {
-        gpio_init(&scl, (PinName)i2c_scl_pin);
+        gpio_init(&scl, (PinName)b->scl_pin);
         gpio_dir(&scl, PIN_INPUT);
         gpio_write(&scl, 0);
         for (unsigned i = 0; i < BUS_I2C_CLEAR_PULSES && gpio_read(&sda) == 0; i++) {
@@ -199,20 +231,20 @@ static void _i2c_clear_bus(void)
 // 失敗時維持關閉：呼叫端會封鎖這條匯流排，不再使用。
 // 不呼叫 hal_i2c_unreg_irq：沒有其他 I2C 中斷時它會停用整組 I2C 中斷，而 hal_i2c_init 是否重新啟用沒有查證。
 // timeout 為真時（逾時恢復）先停用控制器讓還在進行的中斷模式傳輸停下，deinit 後若 SDA 被拉住就清除匯流排。
-// 緩衝區是靜態的，晚到的中斷不會寫到失效的記憶體。
-static int _i2c_reinit(uint8_t timeout)
+// 緩衝區是靜態的，晚到的中斷不會寫到失效的記憶體。只動這一條的控制器與中斷，其他條照常。
+static int _i2c_reinit(i2c_bus_t *b, uint8_t timeout)
 {
-    hal_i2c_adapter_t *adapter = &i2c_object.i2c_adp;
-    const int32_t irq = I2C0_IRQn + (int32_t)i2c_bus_index;
+    hal_i2c_adapter_t *adapter = &b->object.i2c_adp;
+    const int32_t irq = I2C0_IRQn + (int32_t)b->sdk_index;
     hal_irq_disable(irq);
     if (timeout) {
         (void)hal_i2c_en_ctrl(adapter, I2CDisable);
     }
     (void)hal_i2c_deinit(adapter);
     if (timeout) {
-        _i2c_clear_bus();
+        _i2c_clear_bus(b);
     }
-    const int result = _i2c_hw_init();
+    const int result = _i2c_hw_init(b);
     if (result == RTL8735B_BUS_OK) {
         hal_irq_clear_pending(irq);
         hal_irq_enable(irq);
@@ -225,21 +257,19 @@ int rtl8735b_i2c_transfer(uint8_t bus, uint8_t address,
                            uint8_t *recv, uint32_t recv_len,
                            uint8_t split_transfers, uint32_t timeout_ms)
 {
-    if (bus != i2c_bus_id || address > 0x7FU ||
+    i2c_bus_t *b = _i2c_find(bus);
+    if (b == NULL || address > 0x7FU ||
         !_valid_transfer(send, send_len, recv, recv_len) ||
         send_len > BUS_I2C_MAX_TRANSFER || recv_len > BUS_I2C_MAX_TRANSFER ||
         timeout_ms == 0U || timeout_ms > BUS_MAX_TIMEOUT_MS) {
         return RTL8735B_BUS_INVALID;
     }
-    if (i2c_faulted) {
+    if (b->faulted) {
         // 保留 timeout 原因，讓上層不把已封鎖的控制器當成可重試 NACK。
         return RTL8735B_BUS_TIMEOUT;
     }
-    if (!i2c_initialized) {
-        return RTL8735B_BUS_ERROR;
-    }
 
-    hal_i2c_adapter_t *adapter = &i2c_object.i2c_adp;
+    hal_i2c_adapter_t *adapter = &b->object.i2c_adp;
     int result = RTL8735B_BUS_OK;
     const uint8_t use_repeated_start =
         send_len > 0U && recv_len > 0U && !split_transfers;
@@ -249,10 +279,10 @@ int rtl8735b_i2c_transfer(uint8_t bus, uint8_t address,
         use_repeated_start ? I2CEnable : I2CDisable);
     if (send_len > 0U) {
         adapter->err_type = I2CErrorNone;
-        memcpy(i2c_tx_scratch, send, send_len);
+        memcpy(b->tx_scratch, send, send_len);
         // AP 與 Mbed HAL 的 adapter 欄位使用 7-bit address；方向另由 send/receive 選擇。
         adapter->tx_dat.addr = address;
-        adapter->tx_dat.buf = i2c_tx_scratch;
+        adapter->tx_dat.buf = b->tx_scratch;
         adapter->tx_dat.len = send_len;
         adapter->tx_dat.mst_stop = (recv_len == 0U || split_transfers) ? I2CEnable : I2CDisable;
         const hal_status_t status = hal_i2c_send(adapter);
@@ -264,7 +294,7 @@ int rtl8735b_i2c_transfer(uint8_t bus, uint8_t address,
             result = RTL8735B_BUS_ERROR;
             goto transfer_done;
         }
-        result = _wait_i2c(0U, timeout_ms);
+        result = _wait_i2c(b, 0U, timeout_ms);
         if (result != RTL8735B_BUS_OK) {
             goto transfer_done;
         }
@@ -275,7 +305,7 @@ int rtl8735b_i2c_transfer(uint8_t bus, uint8_t address,
     if (result == RTL8735B_BUS_OK && recv_len > 0U) {
         adapter->err_type = I2CErrorNone;
         adapter->rx_dat.addr = address;
-        adapter->rx_dat.buf = i2c_rx_scratch;
+        adapter->rx_dat.buf = b->rx_scratch;
         adapter->rx_dat.len = recv_len;
         adapter->rx_dat.mst_stop = I2CEnable;
         const hal_status_t status = hal_i2c_receive(adapter);
@@ -286,10 +316,10 @@ int rtl8735b_i2c_transfer(uint8_t bus, uint8_t address,
         if (status != HAL_OK) {
             result = RTL8735B_BUS_ERROR;
         } else {
-            result = _wait_i2c(1U, timeout_ms);
+            result = _wait_i2c(b, 1U, timeout_ms);
         }
         if (result == RTL8735B_BUS_OK) {
-            memcpy(recv, i2c_rx_scratch, recv_len);
+            memcpy(recv, b->rx_scratch, recv_len);
         }
     }
 
@@ -300,17 +330,17 @@ transfer_done:
         // 板上實測：位址中止後 SDK 把狀態設回 Idle，但下一筆
         // 中斷模式傳送會停在 TxReady 直到逾時。以 SDK API 重新初始化控制器；
         // 失敗則封鎖，讓上層看到真實狀態。
-        if (_i2c_reinit(0U) != RTL8735B_BUS_OK) {
-            i2c_faulted = 1U;
+        if (_i2c_reinit(b, 0U) != RTL8735B_BUS_OK) {
+            b->faulted = 1U;
         }
     }
     if (result == RTL8735B_BUS_OK) {
-        i2c_consecutive_timeouts = 0U;
+        b->consecutive_timeouts = 0U;
     } else if (result == RTL8735B_BUS_TIMEOUT) {
         // 恢復不了，或連續逾時達上限，就封鎖後續交易，讓上層看到匯流排失效。
-        i2c_consecutive_timeouts++;
-        if (i2c_consecutive_timeouts >= BUS_I2C_MAX_TIMEOUTS || _i2c_reinit(1U) != RTL8735B_BUS_OK) {
-            i2c_faulted = 1U;
+        b->consecutive_timeouts++;
+        if (b->consecutive_timeouts >= BUS_I2C_MAX_TIMEOUTS || _i2c_reinit(b, 1U) != RTL8735B_BUS_OK) {
+            b->faulted = 1U;
         }
     }
     return result;

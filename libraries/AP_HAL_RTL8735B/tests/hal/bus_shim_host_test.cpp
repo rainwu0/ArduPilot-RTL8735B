@@ -51,7 +51,10 @@ uint8_t mock_abort_stuck;
 uint32_t mock_i2c_init_calls;
 uint32_t mock_i2c_deinit_calls;
 // NVIC 的 I2C 中斷（這條匯流排的那一路）。替身的 hal_i2c_init 模擬 ROM 初始化時註冊並開啟中斷。
-uint8_t mock_i2c_irq_enabled;
+uint8_t mock_i2c_irq_enabled[4];
+// 各控制器（SDK 編號）的 adapter，以及最後一次傳送用的是哪一個控制器
+hal_i2c_adapter_t *mock_i2c_adapters[4];
+uint8_t mock_i2c_send_index = 0xFFU;
 // adapter 剛被清零、hal_i2c_load_default 還沒填回時，中斷仍開著的次數：晚到的中斷會拿到清零的 adapter
 uint32_t mock_i2c_zeroed_with_irq_enabled;
 PinName mock_spi_ssel;
@@ -130,29 +133,36 @@ extern "C" void vTaskDelay(TickType_t ticks)
 
 extern "C" TaskHandle_t xTaskGetCurrentTaskHandle(void) { return nullptr; }
 
+// I2C0–I2C3 的中斷編號連續（替身 hal_irq.h）；回傳是第幾個控制器
+static uint32_t i2c_irq_index(int32_t irqn)
+{
+    assert(irqn >= I2C0_IRQn && irqn < I2C0_IRQn + 4);
+    return static_cast<uint32_t>(irqn - I2C0_IRQn);
+}
+
 extern "C" void hal_irq_enable(int32_t irqn)
 {
-    assert(irqn == I2C0_IRQn + mock_i2c_bus_num);
-    mock_i2c_irq_enabled = 1U;
+    mock_i2c_irq_enabled[i2c_irq_index(irqn)] = 1U;
 }
 
 extern "C" void hal_irq_disable(int32_t irqn)
 {
-    assert(irqn == I2C0_IRQn + mock_i2c_bus_num);
-    mock_i2c_irq_enabled = 0U;
+    mock_i2c_irq_enabled[i2c_irq_index(irqn)] = 0U;
 }
 
 extern "C" void hal_irq_clear_pending(int32_t irqn)
 {
-    assert(irqn == I2C0_IRQn + mock_i2c_bus_num);
+    (void)i2c_irq_index(irqn);
 }
 
 extern "C" hal_status_t hal_i2c_load_default(hal_i2c_adapter_t *adapter, uint8_t index)
 {
+    assert(index < 4U);
     // _i2c_hw_init 在呼叫這裡之前把 adapter 清零
-    if (mock_i2c_irq_enabled) {
+    if (mock_i2c_irq_enabled[index]) {
         mock_i2c_zeroed_with_irq_enabled++;
     }
+    mock_i2c_adapters[index] = adapter;
     mock_i2c_bus_num = index;
     adapter->status = I2CStatusInitialized;
     adapter->err_type = I2CErrorNone;
@@ -172,7 +182,7 @@ extern "C" hal_status_t hal_i2c_init(hal_i2c_adapter_t *adapter,
     mock_i2c_scl = scl;
     mock_i2c_sda = sda;
     mock_i2c_init_calls++;
-    mock_i2c_irq_enabled = 1U;
+    mock_i2c_irq_enabled[mock_i2c_bus_num] = 1U;
     // 重新初始化控制器後，前一次中止留下的狀態消失。
     mock_abort_stuck = 0U;
     adapter->status = I2CStatusIdle;
@@ -215,6 +225,12 @@ extern "C" void hal_i2c_mst_restr_sw_ctrl(hal_i2c_adapter_t *, uint8_t enabled)
 extern "C" hal_status_t hal_i2c_send(hal_i2c_adapter_t *adapter)
 {
     mock_i2c_send_calls++;
+    mock_i2c_send_index = 0xFFU;
+    for (uint8_t i = 0; i < 4U; i++) {
+        if (mock_i2c_adapters[i] == adapter) {
+            mock_i2c_send_index = i;
+        }
+    }
     mock_i2c_write_addr = adapter->tx_dat.addr;
     // SDK 契約：software restart 會覆蓋 mst_stop，不能只檢查欄位。
     mock_i2c_write_stop = mock_i2c_software_restart ? static_cast<uint8_t>(I2CDisable) : adapter->tx_dat.mst_stop;
@@ -334,10 +350,10 @@ extern "C" void gpio_write(gpio_t *gpio, int value)
         mock_cs_levels[mock_cs_count++] = value;
     }
 }
-// 只讀 SDA：PF2 可以模擬被拉住，其他情境的 SDA（PE6、PA1）一律放開。
+// 只讀 SDA：PF2 可以模擬被拉住，其他情境的 SDA（PE4、PE6、PA1）一律放開。
 extern "C" int gpio_read(gpio_t *gpio)
 {
-    assert(gpio->pin == PIN_F2 || gpio->pin == PIN_E6 || gpio->pin == PIN_A1);
+    assert(gpio->pin == PIN_F2 || gpio->pin == PIN_E4 || gpio->pin == PIN_E6 || gpio->pin == PIN_A1);
     if (gpio->pin != PIN_F2) {
         return 1;
     }
@@ -512,8 +528,60 @@ static int pin_zero_scenario()
     return 0;
 }
 
+// 兩條匯流排同時用（板上感測器在 I2C1、外接的在 I2C2）：各自用自己的控制器，逾時次數、
+// 重新初始化與封鎖各算各的；一條被封鎖時另一條照常，恢復時也只動那一條的中斷。
+static int two_buses_scenario()
+{
+    assert(rtl8735b_i2c_init(1U, 1U, PIN_F2, PIN_F1, 400000U) == RTL8735B_BUS_OK);
+    assert(rtl8735b_i2c_init(2U, 2U, PIN_E4, PIN_E3, 100000U) == RTL8735B_BUS_OK);
+    assert(mock_i2c_init_calls == 2U);
+    assert(mock_i2c_irq_enabled[1] && mock_i2c_irq_enabled[2]);
+    // 同一個邏輯編號、同一個控制器都不能再初始化一次
+    assert(rtl8735b_i2c_init(2U, 3U, PIN_E6, PIN_E5, 100000U) == RTL8735B_BUS_INVALID);
+    assert(rtl8735b_i2c_init(3U, 2U, PIN_E6, PIN_E5, 100000U) == RTL8735B_BUS_INVALID);
+    assert(mock_i2c_init_calls == 2U);
+
+    const uint8_t reg = 0xD0U;
+    uint8_t value = 0U;
+    assert(rtl8735b_i2c_transfer(2U, 0x1EU, &reg, 1U, &value, 1U, 0U, 4U) == RTL8735B_BUS_OK);
+    assert(mock_i2c_send_index == 2U && mock_i2c_write_addr == 0x1EU && value == 0xA5U);
+    assert(rtl8735b_i2c_transfer(1U, 0x76U, &reg, 1U, &value, 1U, 0U, 4U) == RTL8735B_BUS_OK);
+    assert(mock_i2c_send_index == 1U && mock_i2c_write_addr == 0x76U);
+    assert(rtl8735b_i2c_transfer(4U, 0x76U, &reg, 1U, &value, 1U, 0U, 4U) == RTL8735B_BUS_INVALID);
+
+    // 逾時次數各算各的：I2C1 逾時兩次之間，I2C2 的成功交易不會把 I2C1 的次數歸零
+    for (unsigned i = 0; i < 2U; i++) {
+        mock_i2c_timeout_next_write = 1U;
+        assert(rtl8735b_i2c_transfer(1U, 0x76U, &reg, 1U, nullptr, 0U, 0U, 1U) == RTL8735B_BUS_TIMEOUT);
+        assert(mock_i2c_irq_enabled[1] && mock_i2c_irq_enabled[2]);
+        assert(rtl8735b_i2c_transfer(2U, 0x1EU, &reg, 1U, &value, 1U, 0U, 4U) == RTL8735B_BUS_OK);
+    }
+    // I2C2 自己逾時一次再成功，只歸零自己的次數
+    mock_i2c_timeout_next_write = 1U;
+    assert(rtl8735b_i2c_transfer(2U, 0x1EU, &reg, 1U, nullptr, 0U, 0U, 1U) == RTL8735B_BUS_TIMEOUT);
+    assert(rtl8735b_i2c_transfer(2U, 0x1EU, &reg, 1U, &value, 1U, 0U, 4U) == RTL8735B_BUS_OK);
+
+    // I2C1 第三次連續逾時：封鎖 I2C1，之後不再碰它的控制器；I2C2 照常
+    const uint32_t inits = mock_i2c_init_calls;
+    mock_i2c_timeout_next_write = 1U;
+    assert(rtl8735b_i2c_transfer(1U, 0x76U, &reg, 1U, nullptr, 0U, 0U, 1U) == RTL8735B_BUS_TIMEOUT);
+    assert(mock_i2c_init_calls == inits);
+    const uint32_t sends = mock_i2c_send_calls;
+    assert(rtl8735b_i2c_transfer(1U, 0x0DU, &reg, 1U, &value, 1U, 0U, 4U) == RTL8735B_BUS_TIMEOUT);
+    assert(mock_i2c_send_calls == sends);
+    value = 0U;
+    assert(rtl8735b_i2c_transfer(2U, 0x1EU, &reg, 1U, &value, 1U, 0U, 4U) == RTL8735B_BUS_OK);
+    assert(mock_i2c_send_index == 2U && value == 0xA5U);
+    assert(mock_i2c_irq_enabled[2]);
+    assert(mock_i2c_zeroed_with_irq_enabled == 0U);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
+    if (argc > 1 && strcmp(argv[1], "two-buses") == 0) {
+        return two_buses_scenario();
+    }
     if (argc > 1 && strcmp(argv[1], "alt-index") == 0) {
         return alt_index_scenario();
     }
@@ -675,7 +743,7 @@ int main(int argc, char **argv)
     assert(mock_i2c_init_calls == inits_before_abort + 1U);
     // 重新初始化期間 I2C 中斷是關的，晚到的中斷不會拿到清零的 adapter；完成後重新開啟
     assert(mock_i2c_zeroed_with_irq_enabled == 0U);
-    assert(mock_i2c_irq_enabled);
+    assert(mock_i2c_irq_enabled[1]);
     assert(mock_i2c_sda == PIN_F2 && mock_i2c_scl == PIN_F1);
     assert(mock_i2c_clock_hz == 400000U && mock_i2c_restart_enabled == 1U);
     value = 0U;
@@ -705,7 +773,7 @@ int main(int argc, char **argv)
            RTL8735B_BUS_TIMEOUT);
     assert(mock_i2c_init_calls == inits_before_timeout + 1U);
     assert(mock_i2c_zeroed_with_irq_enabled == 0U);
-    assert(mock_i2c_irq_enabled);
+    assert(mock_i2c_irq_enabled[1]);
     assert(mock_i2c_disable_order != 0U && mock_i2c_disable_order < mock_i2c_deinit_order);
     assert(mock_i2c_deinit_order < mock_i2c_init_order);
     assert(mock_scl_pulses == 0U);

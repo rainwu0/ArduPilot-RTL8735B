@@ -252,6 +252,69 @@ void test_end_and_reinitialize()
     assert(ports[kActiveUart].init_count == 2);
 }
 
+// 序列 RC：ArduPilot 在 RC 輸入的埠上輪流試幾種設定（AP_RCProtocol::SerialConfig::apply_to_uart：
+// 先設同位與停止位元、開或關 RX 反相，再 begin(baud, 128, 128)）。本 HAL 只支援 8N1、不反相：
+// 要求反相時回報不支援、照 8N1 開著；8E2（SBUS）時埠關閉；輪到 8N1 的設定（例如 CRSF 的 416666）時
+// 埠重新開啟，收得到資料。接收機用 8N1 不反相的協定（CRSF、ELRS 等）就能接上就用。
+void test_serial_rc_probe_cycle()
+{
+    constexpr uint16_t kOptionRxInv = 1U << 0;  // AP_HAL::UARTDriver::OPTION_RXINV
+    reset_ports();
+    RTL8735B::UARTDriver driver(4, kActiveUart, 41, 42, true);
+    auto apply = [&](uint32_t baud, uint8_t parity, int stop_bits, bool invert) {
+        driver.configure_parity(parity);
+        driver.set_stop_bits(stop_bits);
+        const uint16_t options = invert ? uint16_t(driver.get_options() | kOptionRxInv) :
+                                          uint16_t(driver.get_options() & ~kOptionRxInv);
+        const bool accepted = driver.set_options(options);
+        driver.begin(baud, 128, 128);
+        return accepted;
+    };
+
+    assert(apply(115200, 0, 1, false));
+    assert(driver.is_initialized() && driver.get_baud_rate() == 115200);
+    // 反相不支援：回報失敗，埠照 8N1 不反相開著
+    assert(!apply(115200, 0, 1, true));
+    assert(driver.is_initialized());
+    // SBUS（100000、8E2、反相）：埠關閉，不會用錯的格式收資料
+    (void)apply(100000, 2, 2, true);
+    assert(!driver.is_initialized());
+    // CRSF（416666、8N1）：重新開啟
+    assert(apply(416666, 0, 1, false));
+    assert(driver.is_initialized() && driver.get_baud_rate() == 416666);
+    assert(ports[kActiveUart].baud == 416666);
+
+    ports[kActiveUart].rx_fifo = {0xC8, 0x18, 0x16};
+    irq(kActiveUart, kRxIrq);
+    uint8_t frame[3]{};
+    assert(driver.read(frame, sizeof(frame)) == 3);
+    assert(frame[0] == 0xC8 && frame[1] == 0x18 && frame[2] == 0x16);
+
+    // CRSFv3 協商的高速率
+    assert(apply(2000000, 0, 1, false));
+    assert(driver.is_initialized() && ports[kActiveUart].baud == 2000000);
+}
+
+// GPS：AP_GPS 自動找鮑率時輪流以各種速率 begin（AP_GPS::_baudrates）；埠開著時只換鮑率、不重新初始化，
+// 每一種速率都收得到資料。
+void test_gps_autobaud_cycle()
+{
+    reset_ports();
+    RTL8735B::UARTDriver driver(1, kActiveUart, 41, 42, true);
+    const uint32_t bauds[] = {9600U, 115200U, 4800U, 19200U, 38400U, 57600U, 230400U, 460800U};
+    for (uint32_t baud : bauds) {
+        driver.begin(baud);
+        assert(driver.is_initialized() && driver.get_baud_rate() == baud);
+        assert(ports[kActiveUart].baud == baud);
+        ports[kActiveUart].rx_fifo = {0xB5, 0x62};
+        irq(kActiveUart, kRxIrq);
+        uint8_t sync[2]{};
+        assert(driver.read(sync, sizeof(sync)) == 2);
+        assert(sync[0] == 0xB5 && sync[1] == 0x62);
+    }
+    assert(ports[kActiveUart].init_count == 1);
+}
+
 void test_write_refusal_preserves_queued_data()
 {
     reset_ports();
@@ -552,6 +615,8 @@ int main()
     test_discard_input_rx_irq_before_mask_is_serviced();
     test_end_rx_irq_before_mask_is_serviced();
     test_rx_irq_while_not_accepting_masks_rx();
+    test_serial_rc_probe_cycle();
+    test_gps_autobaud_cycle();
     puts("UART host tests passed");
     return 0;
 }

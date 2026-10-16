@@ -45,7 +45,7 @@ The toolchain must be the Realtek ASDK that comes with the SDK (`arm-none-eabi-g
 | SPI bus 1 (SDK SPI1) | D18 (PF5, MISO), D19 (PF6, SCLK), D20 (PF7, MOSI), D21 (PF8, CS of the SPI device `bmi160`) |
 | PWM outputs 1–4 | D11 (PF14), D22 (PF11), D23 (PF12), D24 (PF13) |
 | SERIAL1 (UART2, MAVLink2) | D8 (PD15, TX), D15 (PD16, RX) |
-| SERIAL3 (UART0) | D9 (PA2, TX), D10 (PA3, RX) |
+| SERIAL3 (UART0, GPS) | D9 (PA2, TX), D10 (PA3, RX) |
 | SERIAL4 (UART3, RC input) | D6 (PE1, TX), D5 (PE2, RX) |
 | Analog input, logical number 2 | D2 (PF0, ADC channel 0) |
 | GPIO | 7 (D7, PD17, input), 25 (D25, PE6, green LED, output), 26 (D26, PF9, blue LED, output) |
@@ -58,6 +58,14 @@ Reserved pins:
 - D13 (PF10): not set by this board type. In our tests it drives the white fill light on the board; for details see the schematic the vendor published (`HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf` in ideashatch/HUB-8735 `870a7e08de7a`).
 - D14 (PA5): marked Sensor power on in `variant.h`; its level at reset also decides whether the chip enters download mode (see *Flashing*).
 - D16 (PF3), D17 (PF4): LOG UART (SERIAL0, disabled).
+
+RC receiver and GPS (build and host tests only; never tried with real devices):
+
+- Connect an RC receiver to SERIAL4: the receiver's TX to D5 (RX), its RX to D6 (TX). `SERIAL4_PROTOCOL` already defaults to 23 (RC input); no parameter change is needed.
+- Serial RC protocols that use 8N1 without inversion work, for example CRSF/ELRS (416666 baud) and the protocols at 115200 baud. SBUS needs 8E2 and inversion, and this HAL's serial ports do only 8N1 without inversion, so SBUS is not supported; while ArduPilot tries the formats in turn, the port is closed for a format it does not support and opened again for the next one.
+- Connect a GPS to SERIAL3: the GPS's TX to D10 (RX), its RX to D9 (TX). `SERIAL3_PROTOCOL` already defaults to 5 (GPS), and ArduPilot finds the baud rate by itself. To use SERIAL1 (D8 TX, D15 RX) instead, set `SERIAL1_PROTOCOL` to 5; its default is MAVLink2.
+- Levels: the RTL8735B's I/O is 3.3 V, and whether its pins tolerate 5 V is unknown. A receiver or GPS with 5 V signals needs a level shifter.
+- Host tests cover how the serial port behaves while ArduPilot tries RC formats in turn and while the GPS driver changes baud rates (`tests/hal/uart_driver_host_test.cpp`).
 
 Other notes:
 
@@ -256,8 +264,8 @@ Do not unplug USB while flashing. Close other programs that open serial ports by
 | Wi-Fi MAVLink (UDP) | Verified on a board (T2) | STA mode |
 | Wi-Fi MAVLink (TCP) | Build only | Chosen at build time, either this or UDP |
 | Console / USB MAVLink | Not implemented | |
-| RC input | Build only | Serial RC (AP_RCProtocol). RC override from a ground station goes over MAVLink, not through RC input; its use on a board is to be rechecked |
-| GPS | Build only | |
+| RC input | Build only | Serial RC (AP_RCProtocol), on SERIAL4 by default; protocols with 8N1 and no inversion (CRSF, ELRS and others) work, SBUS does not (wiring in *Board types*). Host tests cover trying the formats in turn; never tried with a receiver. RC override from a ground station goes over MAVLink, not through RC input; its use on a board is to be rechecked |
+| GPS | Build only | On SERIAL3 by default; on SERIAL1, change `SERIAL1_PROTOCOL` (wiring in *Board types*). Host tests cover the automatic baud rate changes; never tried with a GPS |
 | PWM output | To be rechecked | Brushed motor PWM has driven motors before; normal PWM for ESCs, OneShot and OneShot125 not tried on a board, see *Motor outputs* |
 | AnalogIn | Build only | Raw samples only; the reference voltage is not confirmed, so there is no conversion to volts. Features that need a voltage (analog battery monitoring, RSSI, airspeed, rangefinders) always get a failure from `set_pin()` and report themselves unavailable, instead of getting an invalid voltage |
 | Parameters in Flash | Verified on a board (T2) | Kept across reboots; kept across power loss not verified |

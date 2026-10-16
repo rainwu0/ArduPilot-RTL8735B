@@ -45,7 +45,7 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 | SPI 匯流排 1（SDK 的 SPI1） | D18（PF5，MISO）、D19（PF6，SCLK）、D20（PF7，MOSI）、D21（PF8，SPI 裝置 `bmi160` 的 CS） |
 | PWM 輸出 1–4 | D11（PF14）、D22（PF11）、D23（PF12）、D24（PF13） |
 | SERIAL1（UART2，MAVLink2） | D8（PD15，TX）、D15（PD16，RX） |
-| SERIAL3（UART0） | D9（PA2，TX）、D10（PA3，RX） |
+| SERIAL3（UART0，GPS） | D9（PA2，TX）、D10（PA3，RX） |
 | SERIAL4（UART3，RC 輸入） | D6（PE1，TX）、D5（PE2，RX） |
 | 類比輸入，邏輯編號 2 | D2（PF0，ADC 通道 0） |
 | GPIO | 7（D7，PD17，輸入）、25（D25，PE6，綠色 LED，輸出）、26（D26，PF9，藍色 LED，輸出） |
@@ -58,6 +58,14 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 - D13（PF10）：本板型不設定。實測上它控制板上的白色補光燈；詳見板商公開的原理圖（ideashatch/HUB-8735 `870a7e08de7a` 的 `HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf`）。
 - D14（PA5）：`variant.h` 標為 Sensor power on；重置時的電位也決定是否進入燒錄模式（見〈燒錄〉）。
 - D16（PF3）、D17（PF4）：LOG UART（SERIAL0，停用）。
+
+RC 接收機與 GPS（只有建置與主機測試，沒有接過實物）：
+
+- RC 接收機接 SERIAL4：接收機的 TX 接 D5（RX），RX 接 D6（TX）。`SERIAL4_PROTOCOL` 預設就是 23（RC 輸入），不用改參數。
+- 支援 8N1、不反相的序列 RC 協定，例如 CRSF／ELRS（416666 baud）與 115200 baud 的協定。SBUS 要 8E2 與反相，本 HAL 的序列埠只做 8N1、不反相，所以不支援；ArduPilot 輪流試各種格式時，試到不支援的格式就先關閉序列埠，再試下一種。
+- GPS 接 SERIAL3：GPS 的 TX 接 D10（RX），RX 接 D9（TX）。`SERIAL3_PROTOCOL` 預設就是 5（GPS），鮑率由 ArduPilot 自動找。接在 SERIAL1（D8 TX、D15 RX）時，要把 `SERIAL1_PROTOCOL` 改成 5，它的預設是 MAVLink2。
+- 準位：RTL8735B 的 I/O 是 3.3 V，腳能不能承受 5 V 不知道。5 V 準位的接收機或 GPS 要加準位轉換。
+- 主機測試涵蓋 ArduPilot 輪流試 RC 格式、GPS 自動換鮑率時序列埠的行為（`tests/hal/uart_driver_host_test.cpp`）。
 
 其他說明：
 
@@ -256,8 +264,8 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 | Wi-Fi MAVLink（UDP） | 板上驗證（T2） | STA 模式 |
 | Wi-Fi MAVLink（TCP） | 僅建置 | 建置時選擇，與 UDP 二選一 |
 | 主控台／USB MAVLink | 未實作 | |
-| RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol）。地面站的 RC override 走 MAVLink，不經過 RC 輸入；它在板上的使用待複驗 |
-| GPS | 僅建置 | |
+| RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol），預設在 SERIAL4；支援 8N1、不反相的協定（CRSF、ELRS 等），不支援 SBUS（接法見〈板型〉）。主機測試涵蓋輪流試格式，沒有接過接收機實測。地面站的 RC override 走 MAVLink，不經過 RC 輸入；它在板上的使用待複驗 |
+| GPS | 僅建置 | 預設在 SERIAL3；接 SERIAL1 要改 `SERIAL1_PROTOCOL`（接法見〈板型〉）。主機測試涵蓋自動換鮑率，沒有接過 GPS 實測 |
 | PWM 輸出 | 待複驗 | 有刷馬達 PWM 先前驅動過馬達；電調用的一般 PWM、OneShot、OneShot125 未上板，見〈馬達輸出〉 |
 | AnalogIn | 僅建置 | 只有原始取樣，參考電壓未確認，不換算電壓。需要電壓的功能（類比電池監測、RSSI、空速、測距）呼叫 `set_pin()` 一律得到失敗，會回報不可用，而不是拿到無效的電壓 |
 | 參數存在 Flash | 板上驗證（T2） | 重開機後保留；斷電後保留未驗證 |

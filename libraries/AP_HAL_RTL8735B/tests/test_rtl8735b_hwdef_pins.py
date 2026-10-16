@@ -267,9 +267,23 @@ class RulesTest(unittest.TestCase):
         header = generate(['RTL8735B_GPIO 255 PIN_E4 out'])
         self.assertIn('{255,PIN_E4,1}', table(header, 'HAL_RTL8735B_GPIO_PINS'))
 
+    def test_two_i2c_buses(self):
+        # 板上感測器留在 I2C1，外接的另走 I2C2（D3 SDA＝PE4、D4 SCL＝PE3），一條封鎖時另一條照常
+        header = generate(['RTL8735B_I2CBUS 2 2 PIN_E4 PIN_E3 100000 external'])
+        self.assertEqual(table(header, 'HAL_RTL8735B_I2C_BUSES'),
+                         ['{1,1,PIN_F2,PIN_F1,400000U,0}', '{2,2,PIN_E4,PIN_E3,100000U,0}'])
+        self.assertEqual(count(header, 'HAL_RTL8735B_I2C_BUS_COUNT'), 2)
+
+    def test_i2c_buses_are_distinct(self):
+        # 同一個邏輯編號、同一個 SDK 控制器都只能用一次；報錯要指出是哪一個
+        self.assertRejectedNaming(['RTL8735B_I2CBUS 1 2 PIN_E4 PIN_E3 400000 external'], 'RTL8735B_I2CBUS', '邏輯匯流排 1')
+        self.assertRejectedNaming(['RTL8735B_I2CBUS 2 1 PIN_E4 PIN_E3 400000 external'], 'RTL8735B_I2CBUS', 'I2C1')
+
     def test_group_sizes(self):
-        # 這一步只搬資料：I²C、SPI 匯流排與類比輸入各一個，SPI 裝置 1–4 個（CS 表 4 格），PWM 1–12 路
-        self.assertRejected(['RTL8735B_I2CBUS 2 2 PIN_E4 PIN_E3 400000 external'])
+        # I²C 匯流排 1–4 條（SDK 的 I2C0–I2C3）；SPI 匯流排與類比輸入各一個，SPI 裝置 1–4 個（CS 表 4 格），PWM 1–12 路
+        self.assertRejected(['undef RTL8735B_I2CBUS'] +
+                            ['RTL8735B_I2CBUS %u %u PIN_S%u PIN_T%u 400000 external' % (i, i % 4, i, i)
+                             for i in range(5)])
         self.assertRejected(['undef RTL8735B_I2CBUS'])
         self.assertRejected(['RTL8735B_SPIBUS 2 0 PIN_E3 PIN_E2 PIN_E1 1000000'])
         self.assertRejected(['RTL8735B_ADC 3 PIN_F3'])

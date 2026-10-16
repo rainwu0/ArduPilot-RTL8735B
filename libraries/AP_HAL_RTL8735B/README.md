@@ -111,9 +111,12 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 | `RTL8735B_GPIO` | 邏輯編號、腳位、`in` 或 `out` | `7 PIN_D17 in`、`25 PIN_E6 out`、`26 PIN_F9 out` |
 | `RTL8735B_ADC` | 邏輯編號、腳位（PF0–PF3） | `2 PIN_F0` |
 
-I²C、SPI 匯流排與類比輸入各一個，SPI 裝置 1–4 個，PWM 1–12 路；寫錯會在建置時報錯。邏輯編號的範圍：匯流排 0–31、GPIO 0–255、類比輸入 0–253；SPI 裝置名稱不能重複。腳位能不能當該周邊用，由 SDK 初始化時判斷，不行就不輸出。
+I²C 匯流排 1–4 條（SDK 的 I2C0–I2C3 各一條），SPI 匯流排與類比輸入各一個，SPI 裝置 1–4 個，PWM 1–12 路；寫錯會在建置時報錯。邏輯編號的範圍：匯流排 0–31、GPIO 0–255、類比輸入 0–253；I²C 的邏輯編號與 SDK 編號不能重複，SPI 裝置名稱不能重複。腳位能不能當該周邊用，由 SDK 初始化時判斷，不行就不輸出。
 
 - `RTL8735B_I2CBUS` 的時脈：驅動向匯流排要求的時脈必須等於這一欄，否則取不到裝置（`I2CDevice.cpp` 的 `get_device_ptr` 回傳 `nullptr`）。驅動沒有指定時，ArduPilot 要求的是 400000。
+- 多條 I²C：每條有自己的 bus task（名稱是 `APM_I2C` 加 SDK 編號）、逾時次數與封鎖，一條連續逾時被停用時，其他條照常。例如板上感測器留在匯流排 1，外接的另走 D3、D4：疊加檔加一行 `RTL8735B_I2CBUS 2 2 PIN_E4 PIN_E3 400000 external`。
+- `internal` 與 `external`：ArduPilot 只在 `external` 的匯流排上探測外接的感測器（例如外接羅盤），接頭拉到板外的匯流排要標 `external`。
+- 位址衝突：同一條匯流排上的兩個裝置不能同位址（板上的匯流排 1 已用 0x76 的 BMP280、0x0D 的 QMC5883L）；不同匯流排上可以同位址。衝突時改裝置的位址腳，或把其中一個移到另一條匯流排。
 - 舊的寫法已經移除：`HAL_RTL8735B_I2C1_*`、`HAL_RTL8735B_SPI1_*`、`HAL_RTL8735B_BMI160_CS_PIN`、`HAL_RTL8735B_RCOUT_CHANNELS`、`HAL_RTL8735B_RCOUT_PIN0`–`PIN3`、`HAL_RTL8735B_GPIO_PIN7`／`PIN25`／`PIN26`、`HAL_RTL8735B_ADC_CHANNELS`、`HAL_RTL8735B_ADC_PIN0`、`HAL_RTL8735B_ADC_LOGICAL0` 這些 `define` 不再有作用。疊加檔若還在用，建置不會報錯，設定只會悄悄失效，要改成上表的關鍵字。
 
 板型都不含感測器；沒有氣壓計時開機會停在 `Config Error: Baro: unable to initialise driver`，這時 Wi-Fi 也不會有 MAVLink（見〈Wi-Fi〉）。感測器、安裝方向與預設參數寫成另一個 hwdef 檔，以 `--extra-hwdef` 疊加：
@@ -248,7 +251,7 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 | 建置系統 | 板上驗證（T1、T2） | |
 | 排程與號誌 | 板上驗證（T2） | Copter 主迴圈在板上執行（心跳、參數、姿態更新）；400 Hz 的實際頻率未量測 |
 | SPI | 板上驗證（T2） | BMI160 |
-| I²C | 板上驗證（T2） | BMP280、QMC5883L 共用匯流排 1。開機時氣壓計偶發初始化失敗，原因未明（T2 也出現一次）。逾時處理未上板：傳輸逾時後重新初始化控制器、必要時清除匯流排，連續 3 次逾時才停用該匯流排 |
+| I²C | 板上驗證（T2） | BMP280、QMC5883L 共用匯流排 1。開機時氣壓計偶發初始化失敗，原因未明（T2 也出現一次）。逾時處理未上板：傳輸逾時後重新初始化控制器、必要時清除匯流排，連續 3 次逾時才停用該匯流排。多條匯流排同時用（各自逾時、停用）只在主機測試驗過，未上板 |
 | UART | 待複驗 | 只支援 8N1 |
 | Wi-Fi MAVLink（UDP） | 板上驗證（T2） | STA 模式 |
 | Wi-Fi MAVLink（TCP） | 僅建置 | 建置時選擇，與 UDP 二選一 |

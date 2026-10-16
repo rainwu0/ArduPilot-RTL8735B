@@ -41,10 +41,10 @@ KEYWORDS = {
     'RTL8735B_ADC': 2,
 }
 
-# 這一步只把資料搬到 hwdef，表的形狀與 HAL 現在的寫法相同：
-# I²C、SPI 匯流排與類比輸入各一個；SPI 裝置最多 4 個（bus_shim.c 的軟體 CS 表）；PWM 最多 12 路（PWM0–11）。
+# 表的大小與 HAL 的寫法相同：I²C 匯流排最多 4 條（SDK 的 I2C0–I2C3，bus_shim.c 每條一組狀態）；
+# SPI 匯流排與類比輸入各一個；SPI 裝置最多 4 個（bus_shim.c 的軟體 CS 表）；PWM 最多 12 路（PWM0–11）。
 LIMITS = {
-    'RTL8735B_I2CBUS': (1, 1),
+    'RTL8735B_I2CBUS': (1, 4),
     'RTL8735B_SPIBUS': (1, 1),
     'RTL8735B_SPIDEV': (1, 4),
     'RTL8735B_RCOUT': (1, 12),
@@ -140,7 +140,16 @@ class RTL8735BHWDef(hwdef.HWDef):
 
         k = 'RTL8735B_I2CBUS'
         rows = []
+        i2c_buses = set()
+        i2c_indexes = set()
         for (bus, index, sda, scl, clock, kind) in self.board[k]:
+            # 每條匯流排在 ArduPilot 有自己的編號，在 SDK 有自己的控制器，兩者都不能重複
+            if self.number(k, bus, 0, 31) in i2c_buses:
+                self.error('%s 的邏輯匯流排 %s 重複' % (k, bus))
+            i2c_buses.add(int(bus))
+            if self.number(k, index, 0, 3) in i2c_indexes:
+                self.error('%s 的 SDK 控制器 I2C%s 重複' % (k, index))
+            i2c_indexes.add(int(index))
             uses += [(sda, '%s %s SDA' % (k, bus)), (scl, '%s %s SCL' % (k, bus))]
             rows.append('{%u, %u, %s, %s, %uU, %u}' % (
                 self.number(k, bus, 0, 31), self.number(k, index, 0, 3), self.pin(k, sda), self.pin(k, scl),

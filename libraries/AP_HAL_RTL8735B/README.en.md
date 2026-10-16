@@ -111,9 +111,12 @@ Other RTL8735B boards are described with `--extra-hwdef`: serial ports with `und
 | `RTL8735B_GPIO` | logical number, pin, `in` or `out` | `7 PIN_D17 in`, `25 PIN_E6 out`, `26 PIN_F9 out` |
 | `RTL8735B_ADC` | logical number, pin (PF0–PF3) | `2 PIN_F0` |
 
-One I²C bus, one SPI bus and one analog input; 1–4 SPI devices; 1–12 PWM outputs. Mistakes are reported at build time. Ranges of logical numbers: buses 0–31, GPIO 0–255, analog inputs 0–253; SPI device names must be unique. Whether a pin can serve that peripheral is decided by the SDK at initialization; if it cannot, there is no output.
+1–4 I²C buses (one for each of SDK I2C0–I2C3), one SPI bus and one analog input; 1–4 SPI devices; 1–12 PWM outputs. Mistakes are reported at build time. Ranges of logical numbers: buses 0–31, GPIO 0–255, analog inputs 0–253; I²C logical numbers and SDK numbers must not repeat, and SPI device names must be unique. Whether a pin can serve that peripheral is decided by the SDK at initialization; if it cannot, there is no output.
 
 - The clock in `RTL8735B_I2CBUS`: the clock a driver asks the bus for must equal this field, or the device cannot be obtained (`get_device_ptr` in `I2CDevice.cpp` returns `nullptr`). When the driver does not ask for one, ArduPilot asks for 400000.
+- Several I²C buses: each has its own bus task (named `APM_I2C` plus the SDK number), its own timeout count and its own blocking, so when one bus is disabled after repeated timeouts, the others carry on. For example, to keep the on-board sensors on bus 1 and put external ones on D3 and D4, add `RTL8735B_I2CBUS 2 2 PIN_E4 PIN_E3 400000 external` to the overlay.
+- `internal` and `external`: ArduPilot probes for external sensors (an external compass, for example) only on `external` buses, so mark a bus that goes to a connector off the board as `external`.
+- Address conflicts: two devices on the same bus cannot share an address (bus 1 on the board already has the BMP280 at 0x76 and the QMC5883L at 0x0D); devices on different buses can. On a conflict, change the device's address pin or move one of them to another bus.
 - The old syntax has been removed: the `define`s `HAL_RTL8735B_I2C1_*`, `HAL_RTL8735B_SPI1_*`, `HAL_RTL8735B_BMI160_CS_PIN`, `HAL_RTL8735B_RCOUT_CHANNELS`, `HAL_RTL8735B_RCOUT_PIN0`–`PIN3`, `HAL_RTL8735B_GPIO_PIN7`/`PIN25`/`PIN26`, `HAL_RTL8735B_ADC_CHANNELS`, `HAL_RTL8735B_ADC_PIN0` and `HAL_RTL8735B_ADC_LOGICAL0` no longer have any effect. If an overlay still uses them, the build does not fail; the settings just stop working without a word. Change them to the keywords in the table above.
 
 Board types have no sensors. Without a barometer, boot stops at `Config Error: Baro: unable to initialise driver`, and Wi-Fi then carries no MAVLink either (see *Wi-Fi*). Write the sensors, mounting orientation and default parameters in another hwdef file and add it with `--extra-hwdef`:
@@ -248,7 +251,7 @@ Do not unplug USB while flashing. Close other programs that open serial ports by
 | Build system | Verified on a board (T1, T2) | |
 | Scheduling and semaphores | Verified on a board (T2) | The Copter main loop runs on the board (heartbeat, parameters, attitude updates); whether it actually reaches 400 Hz is not measured |
 | SPI | Verified on a board (T2) | BMI160 |
-| I²C | Verified on a board (T2) | BMP280 and QMC5883L share bus 1. The barometer occasionally fails to initialize at boot, cause unknown (also seen once in T2). Timeout handling not tried on a board: after a transfer times out, the controller is reinitialized and the bus cleared if needed; the bus is disabled only after 3 timeouts in a row |
+| I²C | Verified on a board (T2) | BMP280 and QMC5883L share bus 1. The barometer occasionally fails to initialize at boot, cause unknown (also seen once in T2). Timeout handling not tried on a board: after a transfer times out, the controller is reinitialized and the bus cleared if needed; the bus is disabled only after 3 timeouts in a row. Several buses at once (each with its own timeouts and disabling) has been checked only in host tests, not on a board |
 | UART | To be rechecked | 8N1 only |
 | Wi-Fi MAVLink (UDP) | Verified on a board (T2) | STA mode |
 | Wi-Fi MAVLink (TCP) | Build only | Chosen at build time, either this or UDP |

@@ -35,7 +35,6 @@
 
 // 每條 I²C 匯流排一組狀態，最多 4 條（SDK 的 I2C0–I2C3）：控制器、逾時次數與封鎖各算各的，
 // 一條被封鎖時其他條照常。每條由自己的 bus task 使用，緩衝區也各一份，兩條同時傳輸互不干擾。
-#define BUS_I2C_MAX_BUSES 4U
 typedef struct {
     i2c_t object;
     uint8_t initialized;
@@ -50,13 +49,13 @@ typedef struct {
     uint8_t tx_scratch[BUS_I2C_MAX_TRANSFER];
     uint8_t rx_scratch[BUS_I2C_MAX_TRANSFER];
 } i2c_bus_t;
-static i2c_bus_t i2c_buses[BUS_I2C_MAX_BUSES];
+static i2c_bus_t i2c_buses[RTL8735B_I2C_MAX_BUSES];
 static int _i2c_hw_init(i2c_bus_t *b);
 static void _i2c_clear_bus(const i2c_bus_t *b);
 
 static i2c_bus_t *_i2c_find(uint8_t bus)
 {
-    for (uint8_t i = 0; i < BUS_I2C_MAX_BUSES; i++) {
+    for (uint8_t i = 0; i < RTL8735B_I2C_MAX_BUSES; i++) {
         if (i2c_buses[i].initialized && i2c_buses[i].bus_id == bus) {
             return &i2c_buses[i];
         }
@@ -123,7 +122,7 @@ int rtl8735b_i2c_init(uint8_t bus, uint8_t sdk_index, uint32_t sda_pin, uint32_t
     }
     // 同一個邏輯編號或同一個控制器只能初始化一次；被拒絕的不占用位置。
     i2c_bus_t *b = NULL;
-    for (uint8_t i = 0; i < BUS_I2C_MAX_BUSES; i++) {
+    for (uint8_t i = 0; i < RTL8735B_I2C_MAX_BUSES; i++) {
         if (i2c_buses[i].initialized) {
             if (i2c_buses[i].bus_id == bus || i2c_buses[i].sdk_index == sdk_index) {
                 return RTL8735B_BUS_INVALID;

@@ -16,7 +16,11 @@ enum rtl8735b_bus_result {
     RTL8735B_BUS_BUSY = -5,
 };
 
+// I²C 匯流排最多幾條：SDK 的 I2C0–I2C3 各一條（hwdef 產生器的上限相同）
+#define RTL8735B_I2C_MAX_BUSES 4U
+
 // bus 是 ArduPilot 的邏輯匯流排編號，sdk_index 是 SDK 的 I2C 控制器編號（0–3）；之後的交易以 bus 指定。
+// 每條匯流排各自初始化一次；同一個 bus 或 sdk_index 已初始化時回傳 RTL8735B_BUS_INVALID。
 int rtl8735b_i2c_init(uint8_t bus, uint8_t sdk_index, uint32_t sda_pin, uint32_t scl_pin,
                        uint32_t clock_hz);
 int rtl8735b_i2c_transfer(uint8_t bus, uint8_t address,

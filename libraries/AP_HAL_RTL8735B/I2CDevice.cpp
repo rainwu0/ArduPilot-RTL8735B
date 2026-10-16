@@ -8,18 +8,6 @@
 
 using namespace RTL8735B;
 
-namespace {
-const RTL8735BI2CBusConfig *find_i2c_bus(uint8_t bus)
-{
-    for (uint32_t i = 0; i < RTL8735B_I2C_BUS_CONFIG_COUNT; i++) {
-        if (RTL8735B_I2C_BUS_CONFIGS[i].logical_bus == bus) {
-            return &RTL8735B_I2C_BUS_CONFIGS[i];
-        }
-    }
-    return nullptr;
-}
-}
-
 I2CDevice::I2CDevice(DeviceBus &bus, uint8_t bus_num, uint8_t address,
                      uint32_t timeout_ms) :
     AP_HAL::I2CDevice(),
@@ -120,42 +108,91 @@ void I2CDevice::set_split_transfers(bool split)
     _split_transfers = split;
 }
 
-I2CDeviceManager::I2CDeviceManager() :
-    _ready(false),
-    _bus("APM_I2C1")
+namespace {
+// hwdef 表中實際用到的匯流排數（產生器保證 1–RTL8735B_I2C_MAX_BUSES 條）
+uint32_t i2c_bus_count()
 {
-    // 開發板 hwdef 的 RTL8735B_I2CBUS 只有一條（rtl8735b_hwdef.py 檢查）
-    if (RTL8735B_I2C_BUS_CONFIG_COUNT == 1U) {
-        const RTL8735BI2CBusConfig &cfg = RTL8735B_I2C_BUS_CONFIGS[0];
-        _ready = rtl8735b_i2c_init(cfg.logical_bus, cfg.sdk_index, cfg.sda_pin,
-                                    cfg.scl_pin, cfg.clock_hz) == RTL8735B_BUS_OK;
+    return RTL8735B_I2C_BUS_CONFIG_COUNT < RTL8735B_I2C_MAX_BUSES ?
+        RTL8735B_I2C_BUS_CONFIG_COUNT : RTL8735B_I2C_MAX_BUSES;
+}
+
+// bus task 的名稱依 SDK 的控制器編號，例如 I2C1 是 APM_I2C1；產生器保證控制器編號不重複。
+const char *bus_task_name(uint32_t slot)
+{
+    static const char *const names[] = {"APM_I2C0", "APM_I2C1", "APM_I2C2", "APM_I2C3"};
+    if (slot < i2c_bus_count() && RTL8735B_I2C_BUS_CONFIGS[slot].sdk_index < 4U) {
+        return names[RTL8735B_I2C_BUS_CONFIGS[slot].sdk_index];
     }
+    return "APM_I2C";
+}
+}
+
+static_assert(RTL8735B_I2C_MAX_BUSES == 4U, "I2CDeviceManager has one DeviceBus member per bus");
+
+I2CDeviceManager::I2CDeviceManager() :
+    _bus0(bus_task_name(0)),
+    _bus1(bus_task_name(1)),
+    _bus2(bus_task_name(2)),
+    _bus3(bus_task_name(3)),
+    _buses{&_bus0, &_bus1, &_bus2, &_bus3},
+    _ready{false, false, false, false}
+{
+    // 每條各自初始化；一條失敗時其他條照常可用。
+    for (uint32_t i = 0; i < i2c_bus_count(); i++) {
+        const RTL8735BI2CBusConfig &cfg = RTL8735B_I2C_BUS_CONFIGS[i];
+        _ready[i] = rtl8735b_i2c_init(cfg.logical_bus, cfg.sdk_index, cfg.sda_pin,
+                                       cfg.scl_pin, cfg.clock_hz) == RTL8735B_BUS_OK;
+    }
+}
+
+int I2CDeviceManager::find_slot(uint8_t bus) const
+{
+    for (uint32_t i = 0; i < i2c_bus_count(); i++) {
+        if (RTL8735B_I2C_BUS_CONFIGS[i].logical_bus == bus) {
+            return _ready[i] ? (int)i : -1;
+        }
+    }
+    return -1;
 }
 
 AP_HAL::I2CDevice *I2CDeviceManager::get_device_ptr(
     uint8_t bus, uint8_t address, uint32_t bus_clock, bool use_smbus,
     uint32_t timeout_ms)
 {
-    const RTL8735BI2CBusConfig *cfg = find_i2c_bus(bus);
-    if (!_ready || cfg == nullptr || address > 0x7FU ||
-        bus_clock != cfg->clock_hz || use_smbus ||
+    const int slot = find_slot(bus);
+    if (slot < 0 || address > 0x7FU ||
+        bus_clock != RTL8735B_I2C_BUS_CONFIGS[slot].clock_hz || use_smbus ||
         timeout_ms == 0U || timeout_ms > 100U) {
         return nullptr;
     }
-    return new (std::nothrow) I2CDevice(_bus, bus, address, timeout_ms);
+    return new (std::nothrow) I2CDevice(*_buses[slot], bus, address, timeout_ms);
+}
+
+// 已初始化的匯流排的遮罩；依表的 internal 欄只取內部或外部的
+uint32_t I2CDeviceManager::mask_of(bool internal_only, bool external_only) const
+{
+    uint32_t mask = 0U;
+    for (uint32_t i = 0; i < i2c_bus_count(); i++) {
+        const RTL8735BI2CBusConfig &cfg = RTL8735B_I2C_BUS_CONFIGS[i];
+        if (!_ready[i] || (internal_only && !cfg.internal) || (external_only && cfg.internal)) {
+            continue;
+        }
+        mask |= 1UL << cfg.logical_bus;
+    }
+    return mask;
 }
 
 uint32_t I2CDeviceManager::get_bus_mask(void) const
 {
-    return _ready ? (1UL << RTL8735B_I2C_BUS_CONFIGS[0].logical_bus) : 0U;
+    return mask_of(false, false);
 }
 
 uint32_t I2CDeviceManager::get_bus_mask_external(void) const
 {
-    return RTL8735B_I2C_BUS_CONFIGS[0].internal ? 0U : get_bus_mask();
+    return mask_of(false, true);
 }
 
 uint32_t I2CDeviceManager::get_bus_mask_internal(void) const
 {
-    return RTL8735B_I2C_BUS_CONFIGS[0].internal ? get_bus_mask() : 0U;
+    return mask_of(true, false);
 }

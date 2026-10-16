@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstdint>
 #include <deque>
+#include <string>
 
 // 表裡唯一的 I2C 匯流排；run.sh 另以 -DTEST_I2C_BUS=3 -DTEST_I2C_INDEX=2 -DTEST_I2C_INTERNAL=1 再編一次，
 // 證明邏輯編號、SDK 編號與內外部都跟著表走。
@@ -19,6 +20,10 @@
 namespace {
 uint64_t now_us;
 uint32_t init_calls;
+uint8_t fail_init_bus = 0xFFU;
+uint8_t last_bus;
+const char *created_tasks[4];
+uint32_t created_task_count;
 uint8_t initialized_bus;
 uint8_t initialized_sdk_index;
 uint32_t initialized_sda;
@@ -33,9 +38,12 @@ std::deque<int> responses;
 thread_local TaskHandle_t current_task = reinterpret_cast<TaskHandle_t>(2U);
 }
 
-extern "C" BaseType_t xTaskCreate(TaskFunction_t, const char *, uint32_t,
+extern "C" BaseType_t xTaskCreate(TaskFunction_t, const char *name, uint32_t,
                                     void *, UBaseType_t, TaskHandle_t *)
 {
+    if (created_task_count < 4U) {
+        created_tasks[created_task_count++] = name;
+    }
     return pdPASS;
 }
 extern "C" void vTaskDelay(TickType_t ticks)
@@ -57,15 +65,16 @@ extern "C" int rtl8735b_i2c_init(uint8_t bus, uint8_t sdk_index, uint32_t sda, u
     initialized_sda = sda;
     initialized_scl = scl;
     initialized_clock = clock_hz;
-    return RTL8735B_BUS_OK;
+    return bus == fail_init_bus ? RTL8735B_BUS_ERROR : RTL8735B_BUS_OK;
 }
 
-extern "C" int rtl8735b_i2c_transfer(uint8_t, uint8_t address,
+extern "C" int rtl8735b_i2c_transfer(uint8_t bus, uint8_t address,
                                        const uint8_t *, uint32_t,
                                        uint8_t *, uint32_t,
                                        uint8_t, uint32_t timeout_ms)
 {
     transfer_calls++;
+    last_bus = bus;
     last_address = address;
     last_timeout_ms = timeout_ms;
     if (poisoned) {
@@ -98,10 +107,19 @@ extern "C" int rtl8735b_spi_clock_pulse(uint8_t, uint32_t, uint32_t)
 { return RTL8735B_BUS_ERROR; }
 
 extern "C" {
+#ifdef TEST_TWO_I2C_BUSES
+// 板上感測器在 I2C1（內部），外接的在 I2C2（外部，D3、D4）
+extern const RTL8735BI2CBusConfig RTL8735B_I2C_BUS_CONFIGS[] = {
+    {1U, 1U, 42U, 41U, 400000U, 1U},
+    {2U, 2U, 36U, 35U, 100000U, 0U},
+};
+extern const uint32_t RTL8735B_I2C_BUS_CONFIG_COUNT = 2U;
+#else
 extern const RTL8735BI2CBusConfig RTL8735B_I2C_BUS_CONFIGS[] = {
     {TEST_I2C_BUS, TEST_I2C_INDEX, 42U, 41U, 400000U, TEST_I2C_INTERNAL},
 };
 extern const uint32_t RTL8735B_I2C_BUS_CONFIG_COUNT = 1U;
+#endif
 extern const RTL8735BSPIBusConfig RTL8735B_SPI_BUS_CONFIGS[] = {
     {0U, 0U, 0U, 0U, 0U, 0U},
 };
@@ -124,8 +142,59 @@ static void clear_transport()
     responses.clear();
 }
 
+#ifdef TEST_TWO_I2C_BUSES
+// 兩條匯流排：各自初始化、各有自己的 bus task 與號誌；遮罩依各條的內外部；
+// 一條初始化失敗時，另一條照常可用。
+static void test_two_buses()
+{
+    clear_transport();
+    RTL8735B::I2CDeviceManager manager;
+    assert(init_calls == 2U);
+    assert(manager.get_bus_mask() == ((1U << 1) | (1U << 2)));
+    assert(manager.get_bus_mask_internal() == (1U << 1));
+    assert(manager.get_bus_mask_external() == (1U << 2));
+
+    // 時脈依各條的表；外接那條是 100 kHz
+    assert(manager.get_device_ptr(2U, 0x1EU, 400000U) == nullptr);
+    auto *baro = static_cast<RTL8735B::I2CDevice *>(manager.get_device_ptr(1U, 0x76U, 400000U));
+    auto *ext = static_cast<RTL8735B::I2CDevice *>(manager.get_device_ptr(2U, 0x1EU, 100000U));
+    assert(baro != nullptr && ext != nullptr);
+    assert(baro->bus_num() == 1U && ext->bus_num() == 2U);
+    // 兩條各有自己的號誌與 task：一條卡住不會擋住另一條
+    assert(baro->get_semaphore() != ext->get_semaphore());
+
+    const uint8_t command = 0xD0U;
+    assert(ext->transfer(&command, 1U, nullptr, 0U) && last_bus == 2U && last_address == 0x1EU);
+    assert(baro->transfer(&command, 1U, nullptr, 0U) && last_bus == 1U && last_address == 0x76U);
+
+    created_task_count = 0U;
+    assert(baro->register_periodic_callback(1000U, []() {}) != nullptr);
+    assert(ext->register_periodic_callback(1000U, []() {}) != nullptr);
+    assert(created_task_count == 2U);
+    assert(std::string(created_tasks[0]) == "APM_I2C1" && std::string(created_tasks[1]) == "APM_I2C2");
+    delete baro;
+    delete ext;
+
+    // I2C1 初始化失敗：只剩 I2C2
+    clear_transport();
+    fail_init_bus = 1U;
+    RTL8735B::I2CDeviceManager partial;
+    fail_init_bus = 0xFFU;
+    assert(init_calls == 2U);
+    assert(partial.get_bus_mask() == (1U << 2) && partial.get_bus_mask_internal() == 0U);
+    assert(partial.get_device_ptr(1U, 0x76U, 400000U) == nullptr);
+    AP_HAL::I2CDevice *still = partial.get_device_ptr(2U, 0x1EU, 100000U);
+    assert(still != nullptr);
+    delete still;
+}
+#endif
+
 int main()
 {
+#ifdef TEST_TWO_I2C_BUSES
+    test_two_buses();
+    return 0;
+#endif
     clear_transport();
     RTL8735B::I2CDeviceManager manager;
     assert(init_calls == 1U);

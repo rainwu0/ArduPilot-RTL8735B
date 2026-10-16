@@ -66,6 +66,12 @@ run_bus() {
         "$lib_dir/DeviceBus.cpp" "$lib_dir/I2CDevice.cpp" \
         "$test_dir/i2c_device_host_test.cpp" -o "$out/i2c-device-alt-test"
     timeout 30 "$out/i2c-device-alt-test"
+    # 兩條 I2C 匯流排：I2C1 內部、I2C2 外部，各自的 bus task 與遮罩
+    c++ "${CXXFLAGS[@]}" -pthread -DTEST_TWO_I2C_BUSES=1 \
+        -I"$test_dir/fakes/device_bus" -I"$lib_dir" \
+        "$lib_dir/DeviceBus.cpp" "$lib_dir/I2CDevice.cpp" \
+        "$test_dir/i2c_device_host_test.cpp" -o "$out/i2c-device-two-test"
+    timeout 30 "$out/i2c-device-two-test"
 }
 
 run_io() {

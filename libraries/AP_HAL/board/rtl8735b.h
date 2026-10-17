@@ -25,12 +25,23 @@
 #endif
 #define HAL_STORAGE_SIZE_AVAILABLE HAL_STORAGE_SIZE
 
-// 檔案系統後端（AP_Filesystem_config.h 以這兩個決定 FATFS 與 LittleFS）：SD 卡尚未支援
+// 檔案系統後端。AP_Filesystem_config.h 以 HAL_OS_FATFS_IO、HAL_OS_LITTLEFS_IO 決定 ChibiOS 的 FatFs 後端
+// 與 LittleFS，本平台都不用；板上的 microSD 走 AP_Filesystem_RTL8735B，hwdef 定義
+// HAL_RTL8735B_SDCARD_ENABLED 1 時打開
 #ifndef HAL_OS_FATFS_IO
 #define HAL_OS_FATFS_IO 0
 #endif
 #ifndef HAL_OS_LITTLEFS_IO
 #define HAL_OS_LITTLEFS_IO 0
+#endif
+#ifndef HAL_RTL8735B_SDCARD_ENABLED
+#define HAL_RTL8735B_SDCARD_ENABLED 0
+#endif
+#define AP_FILESYSTEM_RTL8735B_ENABLED HAL_RTL8735B_SDCARD_ENABLED
+
+// 記錄檔目錄，同 AP_HAL_ChibiOS 的 hwdef/scripts/defaults_normal.h；只有檔案系統記錄用到
+#ifndef HAL_BOARD_LOG_DIRECTORY
+#define HAL_BOARD_LOG_DIRECTORY "/APM/LOGS"
 #endif
 
 // SDK 分割表的 fw1 區長 0x380000 bytes；映像格式本身另佔空間。

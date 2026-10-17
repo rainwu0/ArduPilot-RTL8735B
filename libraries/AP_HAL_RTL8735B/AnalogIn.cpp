@@ -42,8 +42,16 @@ static float raw_to_volts(float raw)
 
 // 上層（電池、RSSI、空速、測距等類比 backend）以 set_pin() 的結果判斷可用與否，
 // 例如 AP_BattMonitor_Analog 直接當作 healthy。只接受板型 hwdef 列出的類比腳。
+// 上層每次讀電壓前都會再呼叫一次（AP_BattMonitor_Analog::read()）：腳位沒變時直接回傳成功、
+// 保留累計的取樣，比照 AP_HAL_ChibiOS 的 AnalogSource::set_pin()（ArduPilot 9f648ccabc）。
 bool AnalogIn::Source::set_pin(uint8_t pin)
 {
+    _semaphore.take_blocking();
+    const bool unchanged = _valid && _pin == pin;
+    _semaphore.give();
+    if (unchanged) {
+        return true;
+    }
     return _bind(pin);
 }
 

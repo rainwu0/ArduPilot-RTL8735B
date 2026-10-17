@@ -184,9 +184,16 @@ static void test_adc_init_failure_raw_sample_and_voltage()
     assert(near(source->voltage_latest(), 0.0f));
     assert(near(source->voltage_average(), (4095.0f + 0.0f) / 2.0f * 3.3f / 4095.0f));
 
-    // set_pin 成功後重新開始累計：新取樣進來前平均是 NaN
+    // AP_BattMonitor_Analog::read() 每次讀電壓前都呼叫 set_pin(同一支腳)（ArduPilot 9f648ccabc
+    // AP_BattMonitor_Analog.cpp:157-160）；腳位沒變時保留累計，比照 AP_HAL_ChibiOS AnalogIn.cpp:228
+    io_fake_adc_value = 2048;
+    scheduler.service_io();
     assert(source->set_pin(2));
-    assert(isnan(source->voltage_average()) && isnan(source->voltage_latest()));
+    assert(near(source->voltage_average(), 2048.0f * 3.3f / 4095.0f));
+    scheduler.service_io();
+    assert(source->set_pin(2));
+    assert(near(source->voltage_latest(), 2048.0f * 3.3f / 4095.0f));
+    assert(near(source->voltage_average(), 2048.0f * 3.3f / 4095.0f));
 
     // 預設的表：PF0 是 ADC 通道 0
     assert(io_fake_adc_pin_en == 1U && io_fake_adc_cvlist_channel == 0 && io_fake_adc_read_channel == 0);

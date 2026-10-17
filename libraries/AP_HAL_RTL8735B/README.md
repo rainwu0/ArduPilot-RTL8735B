@@ -57,7 +57,16 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 - D12（PF15）：板上按鍵（`variant.h` 的 `PUSH_BTN`）。
 - D13（PF10）：本板型不設定。實測上它控制板上的白色補光燈；詳見板商公開的原理圖（ideashatch/HUB-8735 `870a7e08de7a` 的 `HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf`）。
 - D14（PA5）：`variant.h` 標為 Sensor power on；重置時的電位也決定是否進入燒錄模式（見〈燒錄〉）。
-- D16（PF3）、D17（PF4）：LOG UART（SERIAL0，停用）。
+- D16（PF3）、D17（PF4）：LOG UART，即 SERIAL0，見下方〈主控台 MAVLink〉。
+
+主控台 MAVLink（只有建置與主機測試，沒有上板）：
+
+- SERIAL0 是 LOG UART，經板上的 USB 轉 UART 接到開發板的 USB 序列埠，也就是燒錄用的那個埠。`SERIAL0_PROTOCOL` 預設 2（MAVLink2），`SERIAL0_BAUD` 預設 115，地面站接這個 COM 埠、115200 baud 就能連線，不需要 Wi-Fi。
+- SDK 的開機訊息與 HAL 的文字訊息也從這個埠印出，會夾在 MAVLink 封包之間；地面站會重新同步，但可能掉幾個封包。保持 115200 時，這些文字用一般的序列埠終端機仍讀得到。
+- ArduPilot 開始用 SERIAL0 之後，這個埠收到的位元組只交給 MAVLink，SDK 主控台不再收到指令。
+- 燒錄也用這個埠：燒錄前先讓地面站斷開它。
+- 不要 SERIAL0 時，在疊加檔寫 `undef HAL_RTL8735B_SERIAL0_ENABLED`，再 `define HAL_RTL8735B_SERIAL0_ENABLED 0`。
+- 晶片自己的 USB（開發板另一個 USB-C）不做 MAVLink：SDK 公開的原始碼裡，USB 裝置端只有標頭，沒有實作。
 
 RC 接收機與 GPS（只有建置與主機測試，沒有接過實物）：
 
@@ -108,7 +117,7 @@ RC 接收機與 GPS（只有建置與主機測試，沒有接過實物）：
 
 ### 自訂板
 
-其他 RTL8735B 開發板以 `--extra-hwdef` 覆寫：序列埠以 `undef` 後重新 `define`；匯流排、輸出與腳位用下列關鍵字，先 `undef <關鍵字>` 清空整組再重寫。
+其他 RTL8735B 開發板以 `--extra-hwdef` 覆寫：序列埠以 `undef` 後重新 `define`；匯流排、輸出與腳位用下列關鍵字：每一行加一筆；要換掉整組時，先 `undef <關鍵字>` 清空再重寫。
 
 | 關鍵字 | 欄位 | `hub8735ultra` 的值 |
 |---|---|---|
@@ -264,7 +273,7 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 | UART | 待複驗 | 只支援 8N1 |
 | Wi-Fi MAVLink（UDP） | 板上驗證（T2） | STA 模式 |
 | Wi-Fi MAVLink（TCP） | 僅建置 | 建置時選擇，與 UDP 二選一 |
-| 主控台／USB MAVLink | 未實作 | |
+| 主控台 MAVLink（SERIAL0） | 僅建置 | LOG UART，經開發板的 USB 序列埠，115200 baud；SDK 與 HAL 的文字訊息夾在封包之間。晶片自己的 USB 不做。見〈板型〉的〈主控台 MAVLink〉 |
 | RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol），預設在 SERIAL4；支援 8N1、不反相的協定（CRSF、ELRS 等），不支援 SBUS（接法見〈板型〉）。主機測試涵蓋輪流試格式，沒有接過接收機實測。地面站的 RC override 走 MAVLink，不經過 RC 輸入；它在板上的使用待複驗 |
 | GPS | 僅建置 | 預設在 SERIAL3；接 SERIAL1 要改 `SERIAL1_PROTOCOL`（接法見〈板型〉）。主機測試涵蓋自動換鮑率，沒有接過 GPS 實測 |
 | PWM 輸出 | 待複驗 | 有刷馬達 PWM 先前驅動過馬達；電調用的一般 PWM、OneShot、OneShot125 未上板，見〈馬達輸出〉 |

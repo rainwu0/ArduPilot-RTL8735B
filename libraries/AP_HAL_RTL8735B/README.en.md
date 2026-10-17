@@ -57,7 +57,16 @@ Reserved pins:
 - D12 (PF15): the button on the board (`PUSH_BTN` in `variant.h`).
 - D13 (PF10): not set by this board type. In our tests it drives the white fill light on the board; for details see the schematic the vendor published (`HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf` in ideashatch/HUB-8735 `870a7e08de7a`).
 - D14 (PA5): marked Sensor power on in `variant.h`; its level at reset also decides whether the chip enters download mode (see *Flashing*).
-- D16 (PF3), D17 (PF4): LOG UART (SERIAL0, disabled).
+- D16 (PF3), D17 (PF4): LOG UART, which is SERIAL0; see *Console MAVLink* below.
+
+Console MAVLink (build and host tests only; not tried on a board):
+
+- SERIAL0 is the LOG UART, connected through the on-board USB-to-UART bridge to the board's USB serial port, the same port used for flashing. `SERIAL0_PROTOCOL` defaults to 2 (MAVLink2) and `SERIAL0_BAUD` to 115, so a ground station on that COM port at 115200 baud connects without Wi-Fi.
+- SDK boot messages and HAL text messages are printed on the same port and land between MAVLink packets; ground stations resynchronize, but a few packets may be lost. At 115200 the text can still be read with an ordinary serial terminal.
+- Once ArduPilot starts using SERIAL0, bytes received on this port go only to MAVLink; the SDK console no longer receives commands.
+- Flashing uses this port too: disconnect the ground station from it before flashing.
+- To turn SERIAL0 off, write `undef HAL_RTL8735B_SERIAL0_ENABLED` in an overlay, then `define HAL_RTL8735B_SERIAL0_ENABLED 0`.
+- The chip's own USB (the board's other USB-C) does not carry MAVLink: in the SDK's public source, the USB device side has only headers, no implementation.
 
 RC receiver and GPS (build and host tests only; never tried with real devices):
 
@@ -108,7 +117,7 @@ Mounting orientation:
 
 ### Custom boards
 
-Other RTL8735B boards are described with `--extra-hwdef`: serial ports with `undef` followed by a new `define`; buses, outputs and pins with the keywords below, where `undef <keyword>` first clears the whole group before you write it again.
+Other RTL8735B boards are described with `--extra-hwdef`: serial ports with `undef` followed by a new `define`; buses, outputs and pins use the keywords below: each line adds one entry; to replace a whole group, first `undef <keyword>` to clear it, then write it again.
 
 | Keyword | Fields | Value in `hub8735ultra` |
 |---|---|---|
@@ -264,7 +273,7 @@ Do not unplug USB while flashing. Close other programs that open serial ports by
 | UART | To be rechecked | 8N1 only |
 | Wi-Fi MAVLink (UDP) | Verified on a board (T2) | STA mode |
 | Wi-Fi MAVLink (TCP) | Build only | Chosen at build time, either this or UDP |
-| Console / USB MAVLink | Not implemented | |
+| Console MAVLink (SERIAL0) | Build only | LOG UART through the board's USB serial port at 115200 baud; SDK and HAL text messages land between packets. The chip's own USB is not used. See *Console MAVLink* under *Board types* |
 | RC input | Build only | Serial RC (AP_RCProtocol), on SERIAL4 by default; protocols with 8N1 and no inversion (CRSF, ELRS and others) work, SBUS does not (wiring in *Board types*). Host tests cover trying the formats in turn; never tried with a receiver. RC override from a ground station goes over MAVLink, not through RC input; its use on a board is to be rechecked |
 | GPS | Build only | On SERIAL3 by default; on SERIAL1, change `SERIAL1_PROTOCOL` (wiring in *Board types*). Host tests cover the automatic baud rate changes; never tried with a GPS |
 | PWM output | To be rechecked | Brushed motor PWM has driven motors before; normal PWM for ESCs, OneShot and OneShot125 not tried on a board, see *Motor outputs* |

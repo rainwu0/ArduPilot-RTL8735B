@@ -88,7 +88,7 @@ class UndefTest(unittest.TestCase):
             ('RTL8735B_SPIBUS', 'RTL8735B_SPIBUS 1 1 PIN_F7 PIN_F5 PIN_F6 2000000',
              'HAL_RTL8735B_SPI_BUSES', '{1,1,PIN_F7,PIN_F5,PIN_F6,2000000U}'),
             ('RTL8735B_RCOUT', 'RTL8735B_RCOUT PIN_F10', 'HAL_RTL8735B_RCOUT_PINS', 'PIN_F10'),
-            ('RTL8735B_ADC', 'RTL8735B_ADC 4 PIN_F3', 'HAL_RTL8735B_ADC_PINS', '{4,PIN_F3,3}'),
+            ('RTL8735B_ADC', 'RTL8735B_ADC 4 PIN_F0', 'HAL_RTL8735B_ADC_PINS', '{4,PIN_F0,0}'),
         ]
         for keyword, row, macro, expected in cases:
             with self.subTest(keyword=keyword):
@@ -191,8 +191,9 @@ class RulesTest(unittest.TestCase):
     def test_adc_pin_maps_to_channel(self):
         for pin, channel in (('PIN_F0', 0), ('PIN_F1', 1), ('PIN_F2', 2), ('PIN_F3', 3)):
             with self.subTest(pin=pin):
-                # PF1、PF2 是預設 I²C1 的腳：先把 I²C 換到 I2C2（PE4、PE3）
+                # PF1、PF2 是預設 I²C1 的腳：先把 I²C 換到 I2C2（PE4、PE3）；PF3 是 SERIAL0 的 RX：關掉 SERIAL0
                 header = generate(['undef RTL8735B_I2CBUS', 'RTL8735B_I2CBUS 1 2 PIN_E4 PIN_E3 400000 external',
+                                   'undef HAL_RTL8735B_SERIAL0_ENABLED', 'define HAL_RTL8735B_SERIAL0_ENABLED 0',
                                    'undef RTL8735B_ADC', 'RTL8735B_ADC 2 ' + pin])
                 self.assertEqual(table(header, 'HAL_RTL8735B_ADC_PINS'), ['{2,%s,%u}' % (pin, channel)])
 
@@ -248,9 +249,11 @@ class RulesTest(unittest.TestCase):
         self.assertRejectedNaming(['RTL8735B_SPIDEV imu2 1 PIN_F8 3 1000000 8000000'], 'PIN_F8', 'RTL8735B_SPIDEV')
         self.assertRejectedNaming(['undef RTL8735B_ADC', 'RTL8735B_ADC 2 PIN_F1'], 'PIN_F1', 'RTL8735B_I2CBUS', 'RTL8735B_ADC')
         self.assertRejectedNaming(['RTL8735B_GPIO 4 PIN_F6 in'], 'PIN_F6', 'RTL8735B_SPIBUS')
-        # 啟用中的序列埠腳位也算；停用的不算（SERIAL0 的 LOG UART 腳位停用，可以另作他用）
+        # 啟用中的序列埠腳位也算；停用的不算（疊加檔關掉 SERIAL0 後，LOG UART 的腳位可以另作他用）
         self.assertRejectedNaming(['RTL8735B_GPIO 8 PIN_D15 out'], 'PIN_D15', 'HAL_RTL8735B_SERIAL1_TX_PIN')
-        header = generate(['RTL8735B_GPIO 17 PIN_F4 out'])
+        self.assertRejectedNaming(['RTL8735B_GPIO 17 PIN_F4 out'], 'PIN_F4', 'HAL_RTL8735B_SERIAL0_TX_PIN')
+        header = generate(['undef HAL_RTL8735B_SERIAL0_ENABLED', 'define HAL_RTL8735B_SERIAL0_ENABLED 0',
+                           'RTL8735B_GPIO 17 PIN_F4 out'])
         self.assertIn('{17,PIN_F4,1}', table(header, 'HAL_RTL8735B_GPIO_PINS'))
 
     def test_spi_device_names_are_unique(self):

@@ -32,10 +32,6 @@ Tools/scripts/rtl8735b_test.sh
 - `test_rtl8735b_upload.py`：從 SDK 取出燒錄工具；
 - `test_rtl8735b_flash_layout.py`：以 SDK 的分割表 JSON 為底產生分割表。
 
-## 要 FatFs 才跑的項目
-
-`hal/` 的 SD 卡一組裡，檔案系統後端經 FatFs 到區塊存取的那部分要 FatFs 的原始碼與本平台的 `ffconf.h`：預設在 HAL 的 `fatfs/`，也可以用環境變數 `RTL8735B_FATFS_DIR` 指定。沒有就略過那部分，不算失敗。
-
 `Tools/scripts/rtl8735b_test.sh --build` 另外交叉建置一次 `hub8735ultra` 的 copter，需要的環境照 HAL README〈取得與建置〉。
 
 ## 加測試

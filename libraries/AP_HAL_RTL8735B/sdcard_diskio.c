@@ -7,11 +7,15 @@
  *   不自己初始化卡，重試的時機與間隔留在後端一處決定。
  * - 時間戳 get_fattime() 也在後端（要用 ArduPilot 的時鐘）。
  * - 寫入在 rtl8735b_sdcard_write() 回傳時已交給卡，CTRL_SYNC 不必再做事。
+ * - 長檔名的工作區向 heap 要（fatfs/ffconf.h 的 FF_USE_LFN 3），ff_memalloc／ff_memfree 在本檔。
+ *   FatFs 附的範例 ffsystem.c 也只是 malloc／free，這裡不收那個檔。
  */
 
 #include "hwdef.h"
 
 #if defined(HAL_RTL8735B_SDCARD_ENABLED) && HAL_RTL8735B_SDCARD_ENABLED
+
+#include <stdlib.h>
 
 #include <ff.h>
 #include <diskio.h>
@@ -19,6 +23,18 @@
 #include "sdcard_shim.h"
 
 #define SDCARD_PDRV 0
+
+#if FF_USE_LFN == 3
+void *ff_memalloc(UINT msize)
+{
+    return malloc(msize);
+}
+
+void ff_memfree(void *mblock)
+{
+    free(mblock);
+}
+#endif
 
 static DRESULT _result(int ret)
 {

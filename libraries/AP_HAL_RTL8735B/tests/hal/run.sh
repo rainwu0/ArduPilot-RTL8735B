@@ -164,15 +164,10 @@ run_sdcard() {
         "$test_dir/sdcard_shim_host_test.cpp" "$out/sdcard-shim.o" -o "$out/sdcard-shim-test"
     timeout 60 "$out/sdcard-shim-test"
 
-    # 檔案系統後端、FatFs、磁碟介面與上面的 sdcard_shim 一起測。FatFs 的原始碼與本平台的 ffconf.h
-    # 預設在 HAL 的 fatfs/，可用 RTL8735B_FATFS_DIR 指定；沒有時略過這部分，不算失敗。
+    # 檔案系統後端、HAL 的 fatfs/（FatFs 與本平台的 ffconf.h）、磁碟介面與上面的 sdcard_shim 一起測。
     # FatFs 是第三方程式，不加 -Werror。
-    local fatfs=${RTL8735B_FATFS_DIR:-$lib_dir/fatfs} libs="$lib_dir/.." f
-    if [ ! -f "$fatfs/ff.c" ]; then
-        echo "SKIP hal/sdcard 的 FatFs 部分：$fatfs 沒有 FatFs 原始碼"
-        return 0
-    fi
-    for f in ff ffunicode ffsystem; do
+    local fatfs="$lib_dir/fatfs" libs="$lib_dir/.." f
+    for f in ff ffunicode; do
         cc -std=gnu11 -O1 -I"$fatfs" -c "$fatfs/$f.c" -o "$out/$f.o"
     done
     cc "${CFLAGS[@]}" -I"$test_dir/fatfs_fakes" -I"$fatfs" -I"$lib_dir" \
@@ -181,7 +176,7 @@ run_sdcard() {
         -I"$lib_dir" -isystem "$libs" \
         "$libs/AP_Filesystem/AP_Filesystem_RTL8735B.cpp" "$libs/AP_Filesystem/AP_Filesystem_backend.cpp" \
         "$test_dir/sdcard_fatfs_host_test.cpp" "$out/sdcard-shim.o" "$out/sdcard-diskio.o" \
-        "$out/ff.o" "$out/ffunicode.o" "$out/ffsystem.o" -o "$out/sdcard-fatfs-test"
+        "$out/ff.o" "$out/ffunicode.o" -o "$out/sdcard-fatfs-test"
     timeout 120 "$out/sdcard-fatfs-test"
 }
 

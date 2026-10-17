@@ -218,6 +218,18 @@ Security limits:
 - MAVLink over Wi-Fi (UDP) has no authentication at all. While there is no ground station yet, or after the ground station has sent nothing for more than 3 seconds, any source that sends packets to the local port (including other flight controllers or programs on the same subnet) is taken as the new ground station, and its RC override is accepted too. With no ground station, the HEARTBEAT is broadcast to the whole subnet. Use it only on a dedicated network you control.
 - TCP has no authentication either. Once the ground station has sent nothing for more than 3 seconds, a new connection from any host on the subnet replaces it.
 
+## SD card
+
+The board's microSD card is read and written through FatFs (`libraries/AP_Filesystem/AP_Filesystem_RTL8735B.cpp`), and the ground station's MAVLink FTP sees the files on the card.
+
+- The `rtl8735b-empty` board type turns it on by default (`define HAL_RTL8735B_SDCARD_ENABLED 1` in the hwdef), and so do `hub8735ultra` and `amb82-mini`, which include it. For a custom board without an SD card slot, add the line `undef HAL_RTL8735B_SDCARD_ENABLED` to the overlay.
+- Format the card as FAT32 or exFAT on a computer first. A card without a filesystem can also be formatted from the ground station with the MAVLink command `MAV_CMD_STORAGE_FORMAT`, which erases the whole card.
+- The card is mounted the first time a file is accessed after boot. Without a card, a mount is retried at most once every 3 seconds; after a card is inserted, the next access mounts it.
+- Logging: filesystem logging is built into the firmware but not written by default (`LOG_BACKEND_TYPE` defaults to 0). To write logs to the card, set `LOG_BACKEND_TYPE` to 1; logs go to `/APM/LOGS`. With that set and no card inserted, the pre-arm checks report `Logging failed` or `No SD card`.
+- The SD signals stay at 3.3 V; the 1.8 V high-speed modes are not used.
+
+FatFs is in `fatfs/`: R0.14b, taken from ArduPilot's ChibiOS submodule (`ext/fatfs` at commit `9aebaf4a40`, which `modules/ChibiOS` points to), with the same content as ChaN's R0.14b release. `fatfs/ffconf.h` is this platform's configuration, taken from ArduPilot's `libraries/AP_HAL_ChibiOS/hwdef/common/ffconf.h`.
+
 ## Flashing
 
 ### `--upload`
@@ -259,6 +271,7 @@ Do not unplug USB while flashing. Close other programs that open serial ports by
 - `ArduCopter/takeoff_check.cpp`: this platform has no ESC telemetry (`HAL_WITH_ESC_TELEM` is 0), so the original pre-takeoff check is not compiled at all, and after arming the motors stay at ground idle. Changed so that without ESC telemetry only the motor RPM check is skipped and the CPU load check still runs (this HAL does not report system load yet, so for now it does not block); builds with ESC telemetry are not affected. This repository takes the commit of upstream PR 34070 (https://github.com/ArduPilot/ardupilot/pull/34070, by yuiseki) as it is; as of 2026-10-07 the PR has not been merged upstream.
 - `libraries/AP_HAL/AP_HAL_Boards.h`: `HAL_BOARD_RTL8735B` is 100, clear of the platform numbers upstream assigns in sequence.
 - `Tools/ardupilotwaf/boards.py` (waf board registration) and `libraries/AP_Filesystem/AP_Filesystem.h` (this platform's newlib has no `dirent.h`, so the definitions are added here): add this platform without changing the behavior of other platforms.
+- `libraries/AP_Filesystem/AP_Filesystem.cpp` and `AP_Filesystem_config.h`: add this platform's SD card backend `AP_Filesystem_RTL8735B` (a new file) without changing the behavior of other platforms.
 
 ## Feature status
 
@@ -279,7 +292,7 @@ Do not unplug USB while flashing. Close other programs that open serial ports by
 | PWM output | To be rechecked | Brushed motor PWM has driven motors before; normal PWM for ESCs, OneShot and OneShot125 not tried on a board, see *Motor outputs* |
 | AnalogIn | Build only | 12-bit, converted to volts linearly with a 3.3 V full scale; accuracy and zero offset not measured on a board (the zero offset can be corrected with parameters such as `BATT_VLT_OFFSET`). Only the analog pins listed in the board hwdef work; on hub8735ultra that is D2. How much voltage a pin tolerates is not known, so keep the pin at or below 3.3 V. A battery voltage has to go through a divider first, with the ratio set in `BATT_VOLT_MULT` |
 | Parameters in Flash | Verified on a board (T2) | Kept across reboots; kept across power loss not verified. Losing power during the erase at the boot after a sector change brings all parameters back to defaults, see *Flash layout* |
-| SD card | Not implemented | |
+| SD card | Build and host tests only, not tried on a board | Mounting, reading and writing, MAVLink FTP and filesystem logging have not run on a board yet. Host tests with a fake card in RAM cover mounting and retries, formatting, file and directory operations, remounting after a write error, and a pulled card; for usage see *SD card* |
 | `--upload` flashing | Build only | Neither `COMn` (Windows tool) nor `/dev/tty*` (Linux tool) tried on a board; for manual flashing see *Flashing* |
 | Firmware OTA update | Not provided | This repository does not provide Wi-Fi firmware updates; update firmware by flashing, see *Flashing* |
 | Custom board builds | Build only | `--extra-hwdef` |
@@ -290,3 +303,5 @@ Do not unplug USB while flashing. Close other programs that open serial ports by
 This repository as a whole is distributed under GPL-3.0: most ArduPilot and port files are GPL-3.0-or-later, and some upstream files have other compatible licenses, as stated in each file's header. The Realtek SDK has its own license terms (`Realtek_Disclaimer-2019.pdf` in the SDK root); it is not in this repository and has to be obtained separately. The built firmware contains Realtek's precompiled libraries; this repository does not provide firmware images, and neither do its Releases or CI artifacts. Before distributing firmware you built yourself, check for yourself that it complies with both GPL-3.0 and Realtek's terms.
 
 Several parts of this port are adapted from ArduPilot's ESP32 port (`libraries/AP_HAL_ESP32` and `Tools/ardupilotwaf/esp32.py` in ArduPilot 9f648ccabc): `Semaphores.cpp`, `Semaphores.h`, `system.cpp`, `hwdef/scripts/rtl8735b_hwdef.py`, and the hwdef generation and cmake setup in `Tools/ardupilotwaf/rtl8735b.py`; each file's header says so. How the Scheduler is split into FreeRTOS tasks also follows the ESP32 port's design. Both are GPL-3.0-or-later.
+
+The SD card filesystem backend `libraries/AP_Filesystem/AP_Filesystem_RTL8735B.cpp` is adapted from `AP_Filesystem_FATFS.cpp` in ArduPilot 9f648ccabc, as its header says. FatFs in `fatfs/` is under ChaN's FatFs license (BSD-style; see `fatfs/LICENSE.txt` and each file's header) and can be distributed together with GPL-3.0 code.

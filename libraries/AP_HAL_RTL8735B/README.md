@@ -218,6 +218,18 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 - Wi-Fi 上的 MAVLink（UDP）沒有任何驗證。還沒有地面站、或地面站停止送封包超過 3 秒時，送封包到本機埠的任何來源（包括同網段的其他飛控或程式）都會被當成新的地面站，它送來的 RC override 也會被接受；沒有地面站時，HEARTBEAT 會廣播到整個子網路。只在自己控制的專用網路使用。
 - TCP 同樣沒有驗證。地面站停止送資料超過 3 秒後，同網段任一主機的新連線就會取代它。
 
+## SD 卡
+
+板上的 microSD 卡經 FatFs 讀寫（`libraries/AP_Filesystem/AP_Filesystem_RTL8735B.cpp`），地面站的 MAVLink FTP 看得到卡上的檔案。
+
+- 板型 `rtl8735b-empty` 預設打開（hwdef 的 `define HAL_RTL8735B_SDCARD_ENABLED 1`），include 它的 `hub8735ultra`、`amb82-mini` 也一樣。沒有 SD 卡座的自訂板，在疊加檔加一行 `undef HAL_RTL8735B_SDCARD_ENABLED`。
+- 卡先在電腦上格式化成 FAT32 或 exFAT。卡上沒有檔案系統時，也可以從地面站送 MAVLink 的 `MAV_CMD_STORAGE_FORMAT` 格式化，整張卡的資料會清掉。
+- 開機後第一次存取檔案時掛載。沒插卡時每 3 秒最多重試一次，插卡後下一次存取就會掛上。
+- 記錄：檔案系統記錄有編進韌體，但預設不寫（`LOG_BACKEND_TYPE` 預設 0）。要寫進卡，把 `LOG_BACKEND_TYPE` 設成 1，記錄放在 `/APM/LOGS`。設了之後沒插卡，解鎖前檢查會報 `Logging failed` 或 `No SD card`。
+- SD 訊號固定 3.3 V，不用 1.8 V 的高速模式。
+
+FatFs 在 `fatfs/`：R0.14b，取自 ArduPilot 的 ChibiOS 子模組（`modules/ChibiOS` 固定的提交 `9aebaf4a40` 的 `ext/fatfs`），內容與 ChaN 發行的 R0.14b 相同。`fatfs/ffconf.h` 是本平台的設定，取自 ArduPilot 的 `libraries/AP_HAL_ChibiOS/hwdef/common/ffconf.h`。
+
 ## 燒錄
 
 ### `--upload`
@@ -259,6 +271,7 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 - `ArduCopter/takeoff_check.cpp`：本平台沒有 ESC 遙測（`HAL_WITH_ESC_TELEM` 為 0），原本的起飛前檢查整段不編譯，解鎖後馬達會停在地面怠速。改為沒有 ESC 遙測時只略過馬達轉速檢查，CPU 負載檢查照常（本 HAL 尚未提供系統負載，所以目前不會擋）；有 ESC 遙測的建置不受影響。本庫直接採用上游 PR 34070（https://github.com/ArduPilot/ardupilot/pull/34070，作者 yuiseki）的提交；到 2026-10-07 這個 PR 尚未被上游合併。
 - `libraries/AP_HAL/AP_HAL_Boards.h`：`HAL_BOARD_RTL8735B` 為 100，避開上游依序分配的平台編號。
 - `Tools/ardupilotwaf/boards.py`（waf 的板型登記）與 `libraries/AP_Filesystem/AP_Filesystem.h`（本平台的 newlib 沒有 `dirent.h`，在此補上定義）：加入本平台，不改變其他平台的行為。
+- `libraries/AP_Filesystem/AP_Filesystem.cpp`、`AP_Filesystem_config.h`：加入本平台的 SD 卡後端 `AP_Filesystem_RTL8735B`（新檔），不改變其他平台的行為。
 
 ## 功能狀態
 
@@ -279,7 +292,7 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 | PWM 輸出 | 待複驗 | 有刷馬達 PWM 先前驅動過馬達；電調用的一般 PWM、OneShot、OneShot125 未上板，見〈馬達輸出〉 |
 | AnalogIn | 僅建置 | 12 位元，以滿刻度 3.3 V 線性換算成電壓，精度與零點偏移未經板上量測（零點可用 `BATT_VLT_OFFSET` 等參數修正）。只有板型 hwdef 列出的類比腳能用，hub8735ultra 是 D2；腳位能承受的電壓上限不明，腳上的電壓不要超過 3.3 V。電池電壓要先經分壓，分壓比設在 `BATT_VOLT_MULT` |
 | 參數存在 Flash | 板上驗證（T2） | 重開機後保留；斷電後保留未驗證。換扇區後那次開機抹除期間斷電，參數會全部回預設，見〈Flash 版面〉 |
-| SD 卡 | 未實作 | |
+| SD 卡 | 僅建置與主機測試、未上板 | 掛載、讀寫、MAVLink FTP、檔案系統記錄都還沒在板上跑過。主機測試以 RAM 上的假卡涵蓋掛載與重試、格式化、檔案與目錄操作、寫入出錯後重掛、拔卡；用法見〈SD 卡〉 |
 | `--upload` 燒錄 | 僅建置 | `COMn`（Windows 版工具）與 `/dev/tty*`（Linux 版工具）都未上板；手動燒錄見〈燒錄〉 |
 | 韌體 OTA 更新 | 不提供 | 本儲存庫不提供 Wi-Fi 韌體更新；更新韌體以燒錄進行，見〈燒錄〉 |
 | 自訂板建置 | 僅建置 | `--extra-hwdef` |
@@ -290,3 +303,5 @@ Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通
 本儲存庫整體依 GPL-3.0 散布：ArduPilot 與本移植的檔案多為 GPL-3.0-or-later，個別上游檔案另有相容的授權，以各檔檔頭為準。Realtek SDK 另有授權條款（SDK 根目錄的 `Realtek_Disclaimer-2019.pdf`），不在本儲存庫內，需自行取得。建置出的韌體含 Realtek 的預編譯函式庫；本儲存庫不提供韌體映像，Releases 與 CI 產物也不提供。散布自行建置的韌體前，請自行確認是否同時符合 GPL-3.0 與 Realtek 的條款。
 
 本移植有幾處改寫自 ArduPilot 的 ESP32 移植（ArduPilot 9f648ccabc 的 `libraries/AP_HAL_ESP32` 與 `Tools/ardupilotwaf/esp32.py`）：`Semaphores.cpp`、`Semaphores.h`、`system.cpp`、`hwdef/scripts/rtl8735b_hwdef.py`，以及 `Tools/ardupilotwaf/rtl8735b.py` 中 hwdef 產生與 cmake 設定的部分，各檔檔頭有註明。Scheduler 分成哪些 FreeRTOS task 也依照 ESP32 移植的設計。兩者同為 GPL-3.0-or-later。
+
+SD 卡的檔案系統後端 `libraries/AP_Filesystem/AP_Filesystem_RTL8735B.cpp` 改寫自 ArduPilot 9f648ccabc 的 `AP_Filesystem_FATFS.cpp`，檔頭有註明。`fatfs/` 的 FatFs 依 ChaN 的 FatFs 授權（BSD 型，見 `fatfs/LICENSE.txt` 與各檔檔頭），可以和 GPL-3.0 一起散布。

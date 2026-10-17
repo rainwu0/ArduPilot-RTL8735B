@@ -18,7 +18,7 @@ Tools/scripts/rtl8735b_test.sh
 | `test_rtl8735b_flash_layout.py` | Flash 版面、分割表、映像大小檢查 |
 | `test_sdk_extract.py` | 建置時從 SDK 取得原始碼清單的工具 |
 | `test_rtl8735b_upload.py` | `--upload` 燒錄的參數與流程 |
-| `hal/` | 序列埠、SPI／I²C、IO（GPIO、類比輸入、PWM、看門狗）、RC 輸入、參數儲存、排程、SD 卡區塊存取 |
+| `hal/` | 序列埠、SPI／I²C、IO（GPIO、類比輸入、PWM、看門狗）、RC 輸入、參數儲存、排程、SD 卡（區塊存取，以及從檔案系統後端經 FatFs 到區塊存取） |
 | `hal_wifi/` | Wi-Fi 帳密產生器、SDK 的 C 包裝、WiFiDriver 的 UDP 與 TCP |
 
 - `hal/`、`hal_wifi/` 把正式的 HAL 原始碼和替身（`fakes/` 等目錄裡的 SDK、FreeRTOS、AP_HAL）一起在主機上編譯執行。替身不是硬體模型：主機測試通過，不代表在開發板上能用。板上的驗證結果見 HAL README〈功能狀態〉。
@@ -31,6 +31,10 @@ Tools/scripts/rtl8735b_test.sh
 - `test_sdk_extract.py`：用真的 SDK 原始碼清單驗證；
 - `test_rtl8735b_upload.py`：從 SDK 取出燒錄工具；
 - `test_rtl8735b_flash_layout.py`：以 SDK 的分割表 JSON 為底產生分割表。
+
+## 要 FatFs 才跑的項目
+
+`hal/` 的 SD 卡一組裡，檔案系統後端經 FatFs 到區塊存取的那部分要 FatFs 的原始碼與本平台的 `ffconf.h`：預設在 HAL 的 `fatfs/`，也可以用環境變數 `RTL8735B_FATFS_DIR` 指定。沒有就略過那部分，不算失敗。
 
 `Tools/scripts/rtl8735b_test.sh --build` 另外交叉建置一次 `hub8735ultra` 的 copter，需要的環境照 HAL README〈取得與建置〉。
 

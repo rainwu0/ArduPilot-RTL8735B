@@ -21,6 +21,7 @@ for ssid_len in 7 0; do
     c++ -std=c++17 -Wall -Wextra -Werror -pthread \
         -I"$test_dir/wifi_fakes" -I"$lib_dir/.." -I"$lib_dir" \
         "$lib_dir/WiFiDriver.cpp" \
+        "$lib_dir/StatusText.cpp" \
         "$lib_dir/../AP_HAL/utility/RingBuffer.cpp" \
         "$lib_dir/../AP_HAL/utility/packetise.cpp" \
         "$test_dir/wifi_driver_host_test.cpp" \

@@ -78,7 +78,7 @@ run_io() {
     cc "${CFLAGS[@]}" -I"$test_dir/io_fakes" -I"$lib_dir" \
         -c "$lib_dir/IOConfig.c" -o "$out/io-config.o"
     c++ "${CXXFLAGS[@]}" -pthread -I"$test_dir/io_fakes" -I"$lib_dir" \
-        "$lib_dir/RCOutput.cpp" "$test_dir/io_contract_host_test.cpp" "$out/io-config.o" \
+        "$lib_dir/RCOutput.cpp" "$lib_dir/StatusText.cpp" "$test_dir/io_contract_host_test.cpp" "$out/io-config.o" \
         -o "$out/io-contract-test"
     timeout 30 "$out/io-contract-test"
 

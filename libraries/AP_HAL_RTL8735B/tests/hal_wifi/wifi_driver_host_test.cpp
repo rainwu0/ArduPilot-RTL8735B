@@ -6,6 +6,8 @@
 #include "WiFiDriver.h"
 #include "wifi_shim.h"
 
+#include <GCS_MAVLink/GCS.h>
+
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -448,9 +450,12 @@ void test_link_loss_reconnects()
     assert(d.status().gcs_known);
 
     fake.associated = 0;
+    fake_statustext().clear();
     d._link_step(1 + WiFiDriver::LINK_CHECK_INTERVAL_MS);
     auto s = d.status();
     assert(s.state == LinkState::WAIT_RETRY && s.link_losses == 1 && !s.gcs_known);
+    // 斷線也以 STATUSTEXT（警告）送出：Wi-Fi 斷了，地面站仍可能從 SERIAL0 讀到
+    assert(fake_statustext().find("[4] WiFi: link lost (") == 0);
     assert(fake.close_calls == 1 && fake.leave_calls == 1);
 
     // 斷線期間主迴圈照常寫入，不阻塞；重連時清掉

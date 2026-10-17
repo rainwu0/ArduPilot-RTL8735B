@@ -5,6 +5,7 @@
 
 #include "WiFiDriver.h"
 
+#include "StatusText.h"
 #include "wifi_shim.h"
 
 #include <AP_HAL/utility/packetise.h>
@@ -271,7 +272,7 @@ void WiFiDriver::_link_lost(uint32_t now_ms, const char *reason)
     _gcs_known.store(false);
     _local_address.store(0);
     _link_losses.fetch_add(1);
-    ::printf("WiFi: link lost (%s), reconnecting\n", reason);
+    RTL8735B::report_warning("WiFi: link lost (%s), reconnecting", reason);
     _set_state(LinkState::WAIT_RETRY, now_ms);
 }
 

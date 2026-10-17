@@ -2,9 +2,8 @@
 
 #include "RCOutput.h"
 
-#include <stdio.h>
-
 #include "IOConfig.h"
+#include "StatusText.h"
 #include "io_shim.h"
 
 using namespace RTL8735B;
@@ -124,7 +123,7 @@ bool RCOutput::_brushed_hold_low(uint8_t chan)
         _report_clock_conflict(chan);
     } else if (status != 0 && (reported_hold_low_failures & (1UL << chan)) == 0) {
         reported_hold_low_failures |= 1UL << chan;
-        printf("RTL8735B: brushed PWM ch%u could not be set to zero duty\n", (unsigned)chan + 1U);
+        RTL8735B::report_warning("RTL8735B: brushed PWM ch%u could not be set to zero duty", (unsigned)chan + 1U);
     }
     return status == 0;
 }
@@ -137,11 +136,11 @@ void RCOutput::_report_clock_conflict(uint8_t chan)
     }
     _clock_reported_mask |= 1UL << chan;
     if (_mode[chan] == MODE_PWM_BRUSHED) {
-        printf("RTL8735B: brushed PWM ch%u unavailable (PWM clock in use by OneShot125 output); "
-               "output stopped\n", (unsigned)chan + 1U);
+        RTL8735B::report_warning("RTL8735B: brushed PWM ch%u unavailable (PWM clock in use by OneShot125 output); "
+                                 "output stopped", (unsigned)chan + 1U);
     } else {
-        printf("RTL8735B: OneShot125 ch%u unavailable (PWM clock in use by brushed output); "
-               "output stopped\n", (unsigned)chan + 1U);
+        RTL8735B::report_warning("RTL8735B: OneShot125 ch%u unavailable (PWM clock in use by brushed output); "
+                                 "output stopped", (unsigned)chan + 1U);
     }
 }
 
@@ -237,13 +236,13 @@ void RCOutput::_report_rate(uint8_t chan)
         return;
     }
     if (_mode[chan] == MODE_PWM_BRUSHED) {
-        printf("RTL8735B: brushed PWM ch%u %u Hz unsupported (%u-%u Hz); output held at zero\n",
-               (unsigned)chan + 1U, (unsigned)_requested_hz[chan],
-               (unsigned)RTL8735B_RC_BRUSHED_MIN_HZ, (unsigned)RTL8735B_RC_BRUSHED_MAX_HZ);
+        RTL8735B::report_warning("RTL8735B: brushed PWM ch%u %u Hz unsupported (%u-%u Hz); output held at zero",
+                                 (unsigned)chan + 1U, (unsigned)_requested_hz[chan],
+                                 (unsigned)RTL8735B_RC_BRUSHED_MIN_HZ, (unsigned)RTL8735B_RC_BRUSHED_MAX_HZ);
     } else if (is_us_mode(_mode[chan])) {
-        printf("RTL8735B: PWM ch%u %u Hz unsupported (%u-%u Hz); output stopped\n",
-               (unsigned)chan + 1U, (unsigned)_requested_hz[chan],
-               (unsigned)RTL8735B_RC_MIN_HZ, (unsigned)RTL8735B_RC_MAX_HZ);
+        RTL8735B::report_warning("RTL8735B: PWM ch%u %u Hz unsupported (%u-%u Hz); output stopped",
+                                 (unsigned)chan + 1U, (unsigned)_requested_hz[chan],
+                                 (unsigned)RTL8735B_RC_MIN_HZ, (unsigned)RTL8735B_RC_MAX_HZ);
     } else {
         return;
     }
@@ -440,7 +439,7 @@ void RCOutput::set_output_mode(uint32_t mask, enum output_mode mode)
             if (mode != MODE_PWM_NONE && (unsigned)mode < 32U &&
                 (reported_unsupported_modes & (1UL << (unsigned)mode)) == 0) {
                 reported_unsupported_modes |= 1UL << (unsigned)mode;
-                printf("RTL8735B: unsupported RC output mode %u; output stopped\n", (unsigned)mode);
+                RTL8735B::report_warning("RTL8735B: unsupported RC output mode %u; output stopped", (unsigned)mode);
             }
             _mode[chan] = MODE_PWM_NONE;
             _has_valid_write[chan] = false;

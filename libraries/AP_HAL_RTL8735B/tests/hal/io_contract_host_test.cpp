@@ -2,6 +2,8 @@
 #include "RCOutput.h"
 #include "io_shim.h"
 
+#include <GCS_MAVLink/GCS.h>
+
 #include <assert.h>
 #include <mutex>
 #include <stdint.h>
@@ -64,6 +66,7 @@ private:
 
 void reset_fake_outputs()
 {
+    fake_statustext().clear();
     apply_count = 0;
     apply_ticks_count = 0;
     hold_low_count = 0;
@@ -540,6 +543,11 @@ static void test_brushed_rate_reported_only_when_write_rejected()
                "RTL8735B: brushed PWM ch1 9000 Hz unsupported (10000-32000 Hz); output held at zero\n"
                "RTL8735B: brushed PWM ch2 9000 Hz unsupported (10000-32000 Hz); output held at zero\n"
                "RTL8735B: brushed PWM ch1 40000 Hz unsupported (10000-32000 Hz); output held at zero\n");
+        // 同樣的文字也以 STATUSTEXT（警告）送給地面站
+        assert(fake_statustext() ==
+               "[4] RTL8735B: brushed PWM ch1 9000 Hz unsupported (10000-32000 Hz); output held at zero\n"
+               "[4] RTL8735B: brushed PWM ch2 9000 Hz unsupported (10000-32000 Hz); output held at zero\n"
+               "[4] RTL8735B: brushed PWM ch1 40000 Hz unsupported (10000-32000 Hz); output held at zero\n");
     }
 }
 

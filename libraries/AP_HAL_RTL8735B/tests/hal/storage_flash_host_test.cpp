@@ -349,6 +349,82 @@ static void power_loss_sweep()
            lost_power, total, first_erase_bytes, erase_window_resets);
 }
 
+/*
+  換扇區後的下一次開機：AP_FlashStorage::init() 把資料全部寫進另一個扇區（write_all），再抹除寫滿的舊扇區。
+  在抹除的每一步斷電，重開機後只能是「全部歸零」（看得見的重置）或「資料完整」，絕不能出現舊值。
+  護欄：write_all 略過全為 0 的區塊；若舊扇區的標頭在尾端抹除後仍有效，提早停止的 load 會留下舊值。
+  情境：X 先寫非零、換扇區前改回 0，那一筆落在寫滿的扇區尾端。
+ */
+static void erase_window_never_restores_old_values()
+{
+    const uint32_t sec1_hdr = RTL8735B_STORAGE_FLASH_BASE + RTL8735B_STORAGE_FLASH_SECTOR_SIZE;
+    const uint16_t x_ofs = 100;
+    const uint8_t x_nonzero[8] = {3, 3, 3, 3, 3, 3, 3, 3};
+    const uint8_t x_zero[8] = {};
+    // 寫到換扇區為止；zero_at 那一步把 X 改回 0。回傳換扇區時的步數
+    auto fill_until_switch = [&](int zero_at) {
+        flash.reset();
+        now_ms = 1;
+        StoragePtr s = boot();
+        s->write_block(x_ofs, x_nonzero, sizeof(x_nonzero));
+        flush(*s);
+        const uint8_t hdr_before = flash.mem[sec1_hdr];
+        unsigned n = 0;
+        for (; n < 20000 && flash.mem[sec1_hdr] == hdr_before; n++) {
+            if (int(n) == zero_at) {
+                s->write_block(x_ofs, x_zero, sizeof(x_zero));
+            }
+            uint8_t d[8];
+            for (int i = 0; i < 8; i++) { d[i] = uint8_t(n + i + 1); }
+            s->write_block(uint16_t(2000 + (n % 500) * 8), d, sizeof(d));
+            flush(*s);
+        }
+        assert(flash.mem[sec1_hdr] != hdr_before);
+        return n;
+    };
+    const unsigned steps = fill_until_switch(-1);
+    fill_until_switch(int(steps) - 3);
+    const StorageFlashFake switched = flash;
+
+    // 不斷電的那次開機：資料完整、X 是 0；記下 write_all 寫了多少位元組
+    const unsigned long before = flash.programmed_bytes;
+    const unsigned erases_before = flash.erase_calls;
+    std::vector<uint8_t> expect;
+    {
+        StoragePtr s = boot();
+        expect = read_all(*s);
+    }
+    assert(expect[x_ofs] == 0 && expect[2000] != 0);
+    // 抹除之後寫的（AVAILABLE 標頭）不算：斷電預算依序先耗在 write_all，再耗在每次抹除
+    const long write_all_bytes = long(flash.programmed_bytes - before - flash.programmed_since_erase);
+    const unsigned sector_erases = flash.erase_calls - erases_before;
+    assert(sector_erases == RTL8735B_STORAGE_FLASH_SECTOR_SIZE / RTL8735B_STORAGE_FLASH_ERASE_SIZE);
+
+    const std::vector<uint8_t> all_zero(HAL_STORAGE_SIZE, 0);
+    unsigned resets = 0;
+    for (unsigned k = 0; k <= sector_erases; k++) {
+        // write_all 全部落地、k 次 4 KiB 抹除完成後斷電（k 等於抹除次數時，斷在寫回 AVAILABLE 標頭）
+        flash = switched;
+        flash.program_budget = write_all_bytes + long(k);
+        { StoragePtr cut = boot(); }
+        assert(!flash.powered);
+        flash.power_restore();
+        StoragePtr again = boot();
+        const std::vector<uint8_t> got = read_all(*again);
+        if (got == all_zero) {
+            resets++;
+        } else {
+            if (got != expect) {
+                fprintf(stderr, "erase cut after %u of %u erases: X=%u (want 0)\n",
+                        k, sector_erases, got[x_ofs]);
+            }
+            assert(got == expect);
+        }
+    }
+    printf("erase-window cuts: %u, full reset: %u, intact: %u\n",
+           sector_erases + 1, resets, sector_erases + 1 - resets);
+}
+
 static void write_fault_recovery()
 {
     flash.reset();
@@ -461,6 +537,8 @@ int main()
     write_fault_recovery();
     sector_rotation_and_arming();
     power_loss_sweep();
+    erase_window_never_restores_old_values();
     puts("PASS: flash storage shim guard/verify, persist across reboot, health, armed no-erase, "
-         "sector rotation, power-loss atomicity, fault recovery, RAM-only fallback");
+         "sector rotation, power-loss atomicity, erase window without old values, fault recovery, "
+         "RAM-only fallback");
 }

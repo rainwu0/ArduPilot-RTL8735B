@@ -168,6 +168,7 @@ FLASH_LAYOUT sdk-d1b6426
 - This repository does not provide Wi-Fi firmware updates and does not write fw2; fw2 is only a record in the partition table.
 - The layout is read at `./waf configure`: after changing `FLASH_LAYOUT` in hwdef or an overlay, configure again.
 - Parameters are stored at 0xF80000–0xFA0000, the same in all three layouts. The NOR file system area (0xF64000–0x1000000) of the Arduino package (93d6351) and the newer SDK (eb5c090) covers this range; it only conflicts when the Flash file system is enabled, and this port does not enable it.
+- Parameters are stored with ArduPilot's `AP_FlashStorage`, alternating between two 64 KiB sectors. Losing power in the middle of a write loses only that last write. One exception: after one sector fills and storage moves to the other, the next boot erases the full sector (16 erases of 4 KiB; the time has not been measured). Losing power or pressing reset during that time brings all parameters back to their defaults on the next boot; the pre-arm checks show the missing calibration. Sector changes are infrequent, but keep saving parameters to a file with the ground station as usual, and load them back when needed.
 
 ## Motor outputs
 
@@ -268,7 +269,7 @@ Do not unplug USB while flashing. Close other programs that open serial ports by
 | GPS | Build only | On SERIAL3 by default; on SERIAL1, change `SERIAL1_PROTOCOL` (wiring in *Board types*). Host tests cover the automatic baud rate changes; never tried with a GPS |
 | PWM output | To be rechecked | Brushed motor PWM has driven motors before; normal PWM for ESCs, OneShot and OneShot125 not tried on a board, see *Motor outputs* |
 | AnalogIn | Build only | Raw samples only; the reference voltage is not confirmed, so there is no conversion to volts. Features that need a voltage (analog battery monitoring, RSSI, airspeed, rangefinders) always get a failure from `set_pin()` and report themselves unavailable, instead of getting an invalid voltage |
-| Parameters in Flash | Verified on a board (T2) | Kept across reboots; kept across power loss not verified |
+| Parameters in Flash | Verified on a board (T2) | Kept across reboots; kept across power loss not verified. Losing power during the erase at the boot after a sector change brings all parameters back to defaults, see *Flash layout* |
 | SD card | Not implemented | |
 | `--upload` flashing | Build only | Neither `COMn` (Windows tool) nor `/dev/tty*` (Linux tool) tried on a board; for manual flashing see *Flashing* |
 | Firmware OTA update | Not provided | This repository does not provide Wi-Fi firmware updates; update firmware by flashing, see *Flashing* |

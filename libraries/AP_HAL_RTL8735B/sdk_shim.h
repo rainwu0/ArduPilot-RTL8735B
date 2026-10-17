@@ -13,7 +13,8 @@
 
 enum {
     RTL8735B_UART_COUNT = 5,
-    RTL8735B_UART_LOG_RESERVED = 1,
+    // LOG UART（板上 USB 轉 UART 的那一組）：SDK 開機時就設定好並用來印 printf，shim 沿用它的設定
+    RTL8735B_UART_LOG = 1,
     RTL8735B_UART_IRQ_RX = 0,
     RTL8735B_UART_IRQ_TX = 1,
 };

@@ -599,8 +599,23 @@ extern "C" void rtl8735b_irq_restore(uint32_t previous_primask)
     (void)previous_primask;
 }
 
+// SERIAL0 是 LOG UART（SDK 的 UART 1），和其他埠一樣經 shim 開啟、收發；分辨 LOG UART 由 shim 負責。
+void test_log_uart_opens_like_other_ports()
+{
+    reset_ports();
+    RTL8735B::UARTDriver console(0, 1, 164, 163, true);
+    console.begin(115200);
+    assert(console.is_initialized());
+    assert(ports[1].init_count == 1 && ports[1].baud == 115200);
+    assert(ports[1].tx_pin == 164 && ports[1].rx_pin == 163);
+    assert(console.write(reinterpret_cast<const uint8_t *>("ok"), 2) == 2);
+    console.end();
+    assert(ports[1].free_count == 1);
+}
+
 int main()
 {
+    test_log_uart_opens_like_other_ports();
     test_init_failure_and_disabled_port();
     test_begin_zero_preserves_configuration_and_transfers_owner();
     test_rx_isr_budget_order_and_overflow();

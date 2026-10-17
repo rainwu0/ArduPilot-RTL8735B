@@ -29,8 +29,7 @@ UARTDriver::UARTDriver(uint8_t logical_port, uint8_t uart_id, uint32_t tx_pin, u
     lock_read_key = 0;
     parity = 0;
     _last_options = 0;
-    if (_enabled && _uart_id < UART_INSTANCE_COUNT &&
-        _uart_id != RTL8735B_UART_LOG_RESERVED && _instances[_uart_id] == nullptr) {
+    if (_enabled && _uart_id < UART_INSTANCE_COUNT && _instances[_uart_id] == nullptr) {
         _instances[_uart_id] = this;
         _registered = true;
     }
@@ -129,7 +128,7 @@ void UARTDriver::_begin(uint32_t baud, uint16_t rx_space, uint16_t tx_space)
     const uint32_t requested_baud = baud == 0 ? _baudrate.load() : baud;
 
     if (!_enabled || !_registered || _uart_id >= UART_INSTANCE_COUNT ||
-        _uart_id == RTL8735B_UART_LOG_RESERVED || parity != 0 || _stop_bits != 1) {
+        parity != 0 || _stop_bits != 1) {
         if (_initialized.load()) {
             _end();
         }

@@ -1177,7 +1177,10 @@ class rtl8735b(Board):
 
         env.AP_LIBRARIES += [
             'AP_HAL_RTL8735B',
+            # 板上 microSD 用的 FatFs 與本平台的 ffconf.h；沒打開 SD 卡時沒有人參考，連結時不會帶進映像
+            'AP_HAL_RTL8735B/fatfs',
         ]
+        env.INCLUDES += [cfg.srcnode.find_dir('libraries/AP_HAL_RTL8735B/fatfs').abspath()]
 
         # 與 SDK 的 toolchain.cmake 一致；預編譯庫是 softfp，不能改成 hard
         cpu_flags = [

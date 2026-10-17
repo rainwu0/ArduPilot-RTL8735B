@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HAL 的主機測試（Wi-Fi 以外）：序列埠、SPI/I²C、IO 與看門狗、RC 輸入與參數儲存、排程。
+# HAL 的主機測試（Wi-Fi 以外）：序列埠、SPI/I²C、IO 與看門狗、RC 輸入與參數儲存、排程、SD 卡。
 # 正式的 HAL 原始碼配替身 SDK、FreeRTOS 與 AP_HAL 在主機上編譯執行；不開序列埠、不碰開發板。
 # HAL 原始碼預設是本目錄上兩層的 libraries/AP_HAL_RTL8735B，可用 $1 指定；只跑一組時給第二個參數。
 set -euo pipefail
@@ -155,8 +155,18 @@ run_scheduler() {
         { echo "CMakeLists.txt 在有應用程式時沒有定義 RTL8735B_APP_REQUIRED"; return 1; }
 }
 
+run_sdcard() {
+    # SD 卡區塊存取：正式的 sdcard_shim.c，SDK 的 SD 主控函式表換成 RAM 上的假卡。
+    # -Wcast-align=strict：理由同 Storage
+    cc "${CFLAGS[@]}" -O1 -Wcast-align=strict -I"$test_dir/sdcard_fakes" -I"$lib_dir" \
+        -c "$lib_dir/sdcard_shim.c" -o "$out/sdcard-shim.o"
+    c++ "${CXXFLAGS[@]}" -I"$test_dir/sdcard_fakes" -I"$lib_dir" \
+        "$test_dir/sdcard_shim_host_test.cpp" "$out/sdcard-shim.o" -o "$out/sdcard-shim-test"
+    timeout 60 "$out/sdcard-shim-test"
+}
+
 rc=0
-for suite in uart bus io rc_storage scheduler; do
+for suite in uart bus io rc_storage scheduler sdcard; do
     [ -z "$only" ] || [ "$only" = "$suite" ] || continue
     # 子殼層不放在 if 或 && 裡：那樣 set -e 會失效，前面的步驟失敗也不會中止
     set +e

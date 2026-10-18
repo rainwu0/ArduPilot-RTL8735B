@@ -219,6 +219,7 @@ FLASH_LAYOUT sdk-d1b6426
 | 4 DShot150、5 DShot300、6 DShot600 | 以 GPIO 送幀，各路同時；見下 |
 
 - 有刷與 OneShot125 共用 PWM 的時脈（有刷用 40 MHz，OneShot125 用晶片內部的 4 MHz 振盪器），同一次開機只能用其中一種；另一種停止輸出，並在主控台印出原因。
+- 解鎖中主迴圈超過 100 ms 沒跑完一圈時（例如卡住），所有 PWM 輸出停止（一般 PWM 不再送脈波、有刷馬達 duty 0），電調收不到訊號而停機、有刷馬達停轉，不會照停住前的值一直輸出；伺服也跟著放鬆。主迴圈恢復後的第一次輸出就恢復。
 - 不支援：DShot1200（7），以及 LED 輸出（NeoPixel、ProfiLED）。
 - DShot：HUB 8735 ultra 的四路輸出 PF11–PF14 是 PWM5–PWM8（`component/mbed/targets/hal/rtl8735b/pwmout_api.c:77-78` 的腳位表），而 SDK d1b6426 只有 PWM0–PWM3 的 GDMA handshake（`component/soc/8735b/fwlib/rtl8735b/include/rtl8735b_gdma.h:69-72`），PWM 硬體沒辦法逐位元換脈寬。所以 DShot 改由 CPU 直接寫 GPIO 埠的設定與清除暫存器送幀，各路同時送（`dshot_shim.c`）。
   - 每送一幀關一次中斷：DShot150 約 107 µs、DShot300 約 53 µs、DShot600 約 27 µs。建議用 DShot300。

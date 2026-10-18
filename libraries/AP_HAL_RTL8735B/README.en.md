@@ -219,6 +219,7 @@ FLASH_LAYOUT sdk-d1b6426
 | 4 DShot150, 5 DShot300, 6 DShot600 | Frames sent through GPIO, all outputs at once; see below |
 
 - Brushed and OneShot125 share the PWM clock (brushed uses 40 MHz, OneShot125 the chip's internal 4 MHz oscillator), so only one of them works in a given boot; the other stops its output and prints the reason on the console.
+- While armed, if the main loop has not completed a pass for more than 100 ms (for example because it is stuck), all PWM outputs stop (normal PWM sends no more pulses, brushed motors get duty 0), so ESCs lose their signal and stop and brushed motors stop instead of the last value being output indefinitely; servos go limp as well. Output resumes with the first output after the main loop recovers.
 - Not supported: DShot1200 (7) and LED outputs (NeoPixel, ProfiLED).
 - DShot: the four outputs PF11–PF14 on the HUB 8735 ultra are PWM5–PWM8 (the pin table in `component/mbed/targets/hal/rtl8735b/pwmout_api.c:77-78`), and SDK d1b6426 only has GDMA handshakes for PWM0–PWM3 (`component/soc/8735b/fwlib/rtl8735b/include/rtl8735b_gdma.h:69-72`), so the PWM hardware cannot change the pulse width every bit. DShot frames are therefore sent by the CPU writing the GPIO port's set and clear registers, on all outputs at once (`dshot_shim.c`).
   - Interrupts are masked while each frame is sent: about 107 µs at DShot150, 53 µs at DShot300 and 27 µs at DShot600. DShot300 is recommended.

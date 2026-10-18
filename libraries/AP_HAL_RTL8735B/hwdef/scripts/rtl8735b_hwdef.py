@@ -9,7 +9,7 @@
   RTL8735B_SPIDEV <名稱> <邏輯匯流排> <CS> <mode 0-3> <低速 Hz> <高速 Hz>
   RTL8735B_RCOUT  <腳位>                      出現的順序就是輸出通道 1、2、…
   RTL8735B_GPIO   <邏輯編號> <腳位> <in|out>
-  RTL8735B_ADC    <邏輯編號> <腳位 PIN_F0-PIN_F3>
+  RTL8735B_ADC    <邏輯編號> <腳位 PIN_F0-PIN_F3、PIN_A0-PIN_A3>    每一行一支類比腳
 
 每種關鍵字轉成 hwdef.h 的一個表格巨集（HAL_RTL8735B_*）與數量；疊加檔以「undef <關鍵字>」清空整組再重寫。
 腳位能不能當該周邊用，由 SDK 初始化時判斷。
@@ -42,18 +42,20 @@ KEYWORDS = {
 }
 
 # 表的大小與 HAL 的寫法相同：I²C 匯流排最多 4 條（SDK 的 I2C0–I2C3，bus_shim.c 每條一組狀態）；
-# SPI 匯流排與類比輸入各一個；SPI 裝置最多 4 個（bus_shim.c 的軟體 CS 表）；PWM 最多 12 路（PWM0–11）。
+# SPI 匯流排一條；SPI 裝置最多 4 個（bus_shim.c 的軟體 CS 表）；PWM 最多 12 路（PWM0–11）；類比輸入最多 8 支（ADC 通道 0–7）。
 LIMITS = {
     'RTL8735B_I2CBUS': (1, 4),
     'RTL8735B_SPIBUS': (1, 1),
     'RTL8735B_SPIDEV': (1, 4),
     'RTL8735B_RCOUT': (1, 12),
     'RTL8735B_GPIO': (1, 16),
-    'RTL8735B_ADC': (1, 1),
+    'RTL8735B_ADC': (1, 8),
 }
 
-# 類比輸入：PF0–PF3 是 ADC 通道 0–3（SDK component/mbed/targets/hal/rtl8735b/analogin_api.c 的腳位表）
-ADC_CHANNELS = {'PIN_F0': 0, 'PIN_F1': 1, 'PIN_F2': 2, 'PIN_F3': 3}
+# 類比輸入：PF0–PF3 是 ADC 通道 0–3，PA0–PA3 是外接通道 4–7（SDK component/mbed/targets/hal/rtl8735b/analogin_api.c
+# 的腳位表；component/soc/8735b/fwlib/rtl8735b/include/rtl8735b_adc.h 的 HP_ADC_CH_NO、HP_ADC_EXCH_NO）
+ADC_CHANNELS = {'PIN_F0': 0, 'PIN_F1': 1, 'PIN_F2': 2, 'PIN_F3': 3,
+                'PIN_A0': 4, 'PIN_A1': 5, 'PIN_A2': 6, 'PIN_A3': 7}
 
 
 class RTL8735BHWDef(hwdef.HWDef):
@@ -206,11 +208,16 @@ class RTL8735BHWDef(hwdef.HWDef):
 
         k = 'RTL8735B_ADC'
         rows = []
+        seen = set()
         for (logical, pin) in self.board[k]:
             if self.pin(k, pin) not in ADC_CHANNELS:
-                self.error('%s 只支援 PIN_F0–PIN_F3：%s' % (k, pin))
+                self.error('%s 只支援 PIN_F0–PIN_F3、PIN_A0–PIN_A3：%s' % (k, pin))
             # 254、255 是 ArduPilot 的 ANALOG_INPUT_BOARD_VCC、ANALOG_INPUT_NONE
-            rows.append('{%u, %s, %u}' % (self.number(k, logical, 0, 253), pin, ADC_CHANNELS[pin]))
+            n = self.number(k, logical, 0, 253)
+            if n in seen:
+                self.error('%s 的邏輯編號 %u 重複' % (k, n))
+            seen.add(n)
+            rows.append('{%u, %s, %u}' % (n, pin, ADC_CHANNELS[pin]))
             uses.append((pin, '%s %s' % (k, logical)))
         self.write_table(f, 'ADC pins', 'HAL_RTL8735B_ADC_PINS', 'HAL_RTL8735B_ADC_COUNT', rows)
 

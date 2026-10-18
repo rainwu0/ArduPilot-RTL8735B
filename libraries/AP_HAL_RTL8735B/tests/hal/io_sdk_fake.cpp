@@ -7,7 +7,7 @@
 
 int io_fake_adc_init_status;
 int io_fake_adc_cvlist_status;
-uint16_t io_fake_adc_value;
+uint16_t io_fake_adc_values[8];
 unsigned io_fake_adc_init_calls;
 uint32_t io_fake_adc_pin_en;
 uint8_t io_fake_adc_cvlist_channel = 0xFF;
@@ -76,7 +76,7 @@ extern "C" void io_fake_reset(void)
 {
     io_fake_adc_init_status = 0;
     io_fake_adc_cvlist_status = 0;
-    io_fake_adc_value = 0;
+    memset(io_fake_adc_values, 0, sizeof(io_fake_adc_values));
     io_fake_adc_init_calls = 0;
     io_fake_adc_pin_en = 0;
     io_fake_adc_cvlist_channel = 0xFF;
@@ -246,10 +246,11 @@ extern "C" hal_status_t hal_adc_init(hal_adc_adapter_t *obj)
     return io_fake_adc_init_status;
 }
 
-// 只接受一個通道（ADC 0–3）；讀取時只有轉換清單裡的那個通道有值。
+// 轉換清單只接受一個通道（ADC 0–7）。單次讀取不看轉換清單，和 SDK mbed 的 analogin_read 一樣直接讀指定通道；
+// 只有初始化時 pin_en 打開的通道讀得到值。
 extern "C" hal_status_t hal_adc_set_cvlist(hal_adc_adapter_t *, uint8_t *channels, uint8_t count)
 {
-    if (count != 1 || channels[0] > 3) {
+    if (count != 1 || channels[0] > 7) {
         return -20;
     }
     io_fake_adc_cvlist_channel = channels[0];
@@ -261,7 +262,7 @@ extern "C" hal_status_t hal_adc_deinit(hal_adc_adapter_t *) { return 0; }
 extern "C" uint16_t hal_adc_single_read(hal_adc_adapter_t *, uint8_t channel)
 {
     io_fake_adc_read_channel = channel;
-    return channel == io_fake_adc_cvlist_channel ? io_fake_adc_value : 0;
+    return channel < 8 && (io_fake_adc_pin_en & (1UL << channel)) != 0 ? io_fake_adc_values[channel] : 0;
 }
 extern "C" void hal_delay_ms(uint32_t) {}
 

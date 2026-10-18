@@ -169,24 +169,24 @@ static void test_adc_init_failure_raw_sample_and_voltage()
     }
     assert(!source->set_pin(ANALOG_INPUT_BOARD_VCC));
 
-    io_fake_adc_value = 2048;
+    io_fake_adc_values[0] = 2048;
     scheduler.service_io();
     assert(source->read_latest() == 2048.0f);
     assert(near(source->voltage_latest(), 2048.0f * 3.3f / 4095.0f));
     // 沒有 5 V 監測：ratiometric 與一般電壓相同（比照 AP_HAL_ESP32）
     assert(near(source->voltage_average_ratiometric(), 2048.0f * 3.3f / 4095.0f));
 
-    io_fake_adc_value = 4095;
+    io_fake_adc_values[0] = 4095;
     scheduler.service_io();
     assert(near(source->voltage_latest(), 3.3f));
-    io_fake_adc_value = 0;
+    io_fake_adc_values[0] = 0;
     scheduler.service_io();
     assert(near(source->voltage_latest(), 0.0f));
     assert(near(source->voltage_average(), (4095.0f + 0.0f) / 2.0f * 3.3f / 4095.0f));
 
     // AP_BattMonitor_Analog::read() 每次讀電壓前都呼叫 set_pin(同一支腳)（ArduPilot 9f648ccabc
     // AP_BattMonitor_Analog.cpp:157-160）；腳位沒變時保留累計，比照 AP_HAL_ChibiOS AnalogIn.cpp:228
-    io_fake_adc_value = 2048;
+    io_fake_adc_values[0] = 2048;
     scheduler.service_io();
     assert(source->set_pin(2));
     assert(near(source->voltage_average(), 2048.0f * 3.3f / 4095.0f));
@@ -581,16 +581,31 @@ static int alt_board_scenario()
     io_fake_fire_irq(2, IRQ_RISE);
     assert(irq_a_count == 1 && irq_pin == 24);
 
-    // 類比：PF3 是 ADC 通道 3，pin_en、轉換清單與讀取都用通道 3
+    // 類比：PF3 是 ADC 通道 3，PA2、PA3 是外接通道 6、7。初始化打開表裡每一個通道，轉換清單用第一條；
+    // 每支腳各自讀自己的通道、各自累計，互不覆蓋
     RTL8735B::AnalogIn analog;
     analog.init();
-    assert(analog.valid_analog_pin(4) && !analog.valid_analog_pin(2));
-    assert(io_fake_adc_pin_en == (1U << 3) && io_fake_adc_cvlist_channel == 3);
+    assert(analog.valid_analog_pin(4) && analog.valid_analog_pin(9) && analog.valid_analog_pin(10));
+    assert(!analog.valid_analog_pin(2));
+    assert(io_fake_adc_pin_en == ((1U << 3) | (1U << 6) | (1U << 7)) && io_fake_adc_cvlist_channel == 3);
+    assert(io_fake_adc_init_calls == 1);
     AP_HAL::AnalogSource *source = analog.channel(4);
-    assert(source != nullptr);
-    io_fake_adc_value = 1234;
+    AP_HAL::AnalogSource *current = analog.channel(9);
+    AP_HAL::AnalogSource *other = analog.channel(10);
+    assert(source != nullptr && current != nullptr && other != nullptr);
+    io_fake_adc_values[3] = 1234;
+    io_fake_adc_values[6] = 300;
+    io_fake_adc_values[7] = 4000;
     scheduler.service_io();
-    assert(io_fake_adc_read_channel == 3 && source->read_latest() == 1234.0f);
+    assert(source->read_latest() == 1234.0f);
+    assert(current->read_latest() == 300.0f && other->read_latest() == 4000.0f);
+    io_fake_adc_values[6] = 500;
+    scheduler.service_io();
+    assert(current->read_average() == 400.0f && source->read_average() == 1234.0f);
+    // set_pin 換到另一支腳：之後讀新腳的通道
+    assert(current->set_pin(10));
+    scheduler.service_io();
+    assert(current->read_latest() == 4000.0f);
     return 0;
 }
 #endif

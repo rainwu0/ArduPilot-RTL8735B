@@ -6,6 +6,7 @@
 #include <AP_HAL/AP_HAL_Macros.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "IOConfig.h"
 #include "io_shim.h"
@@ -55,7 +56,6 @@ bool AnalogIn::Source::set_pin(uint8_t pin)
     return _bind(pin);
 }
 
-// 目前 _timer_tick 只讀 hwdef 的第一條 RTL8735B_ADC，再餵給所有 Source；板型只列一條時沒有問題。
 bool AnalogIn::Source::_bind(uint8_t pin)
 {
     if (rtl8735b_analog_pin(pin) == RTL8735B_INVALID_PIN) {
@@ -107,10 +107,10 @@ float AnalogIn::Source::voltage_average_ratiometric()
     return voltage_average();
 }
 
-void AnalogIn::Source::add_sample(uint16_t sample)
+void AnalogIn::Source::add_sample(uint8_t pin, uint16_t sample)
 {
     _semaphore.take_blocking();
-    if (_valid) {
+    if (_valid && _pin == pin) {
         _latest = (float)sample;
         _sum += sample;
         _count++;
@@ -123,10 +123,10 @@ void AnalogIn::Source::add_sample(uint16_t sample)
     _semaphore.give();
 }
 
-bool AnalogIn::Source::active()
+int16_t AnalogIn::Source::bound_pin()
 {
     _semaphore.take_blocking();
-    const bool value = _valid;
+    const int16_t value = _valid ? int16_t(_pin) : int16_t(-1);
     _semaphore.give();
     return value;
 }
@@ -193,25 +193,35 @@ void AnalogIn::_timer_tick()
         return;
     }
 
+    // Source 建立後不會刪除：在鎖內複製指標，讀 ADC 時不必拿著鎖
+    Source *sources[MAX_CHANNELS];
     _channels_semaphore.take_blocking();
-    bool active = false;
-    for (uint8_t i = 0; i < _num_channels; i++) {
-        active = active || (_channels[i] != nullptr && _channels[i]->active());
-    }
+    const uint8_t count = _num_channels;
+    memcpy(sources, _channels, sizeof(sources[0]) * count);
     _channels_semaphore.give();
-    if (!active) {
-        return;
-    }
 
-    const int32_t sample = rtl8735b_adc_read_u16(rtl8735b_adc_logical_pin(0));
-    if (sample < 0 || sample > 4095) {
-        return;
-    }
-    _channels_semaphore.take_blocking();
-    for (uint8_t i = 0; i < _num_channels; i++) {
-        if (_channels[i] != nullptr) {
-            _channels[i]->add_sample((uint16_t)sample);
+    // 每個 Source 讀自己綁定那支腳的通道；同一圈裡同一支腳只讀一次
+    int16_t read_pins[MAX_CHANNELS];
+    int32_t read_samples[MAX_CHANNELS];
+    uint8_t reads = 0;
+    for (uint8_t i = 0; i < count; i++) {
+        const int16_t pin = sources[i] != nullptr ? sources[i]->bound_pin() : int16_t(-1);
+        if (pin < 0) {
+            continue;
+        }
+        int32_t sample = -1;
+        uint8_t r = 0;
+        for (; r < reads && read_pins[r] != pin; r++) {}
+        if (r < reads) {
+            sample = read_samples[r];
+        } else {
+            sample = rtl8735b_adc_read_u16((uint8_t)pin);
+            read_pins[reads] = pin;
+            read_samples[reads] = sample;
+            reads++;
+        }
+        if (sample >= 0 && sample <= 4095) {
+            sources[i]->add_sample((uint8_t)pin, (uint16_t)sample);
         }
     }
-    _channels_semaphore.give();
 }

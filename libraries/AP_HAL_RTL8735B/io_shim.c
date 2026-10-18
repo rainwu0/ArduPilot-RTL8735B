@@ -163,15 +163,24 @@ int rtl8735b_gpio_irq_attach(uint8_t logical_pin, uint8_t trigger, uint32_t irq_
 
 int rtl8735b_adc_init(uint8_t logical_pin)
 {
-    // ADC 通道來自開發板 hwdef 的 RTL8735B_ADC 表（PF0–PF3 是通道 0–3）
+    // ADC 通道來自開發板 hwdef 的 RTL8735B_ADC 表：PF0–PF3 是通道 0–3，PA0–PA3 是外接通道 4–7
+    // （SDK component/soc/8735b/fwlib/rtl8735b/include/rtl8735b_adc.h 的 HP_ADC_CH_NO、HP_ADC_EXCH_NO，
+    // component/mbed/targets/hal/rtl8735b/analogin_api.c 的腳位表）
     const uint8_t channel = rtl8735b_adc_channel(logical_pin);
-    if (rtl8735b_analog_pin(logical_pin) == RTL8735B_INVALID_PIN || channel > 3U) {
+    if (rtl8735b_analog_pin(logical_pin) == RTL8735B_INVALID_PIN || channel > 7U) {
         return -1;
     }
     if (!adc_initialized) {
         memset(&adc_adapter, 0, sizeof(adc_adapter));
         hal_adc_load_default(&adc_adapter);
-        adc_adapter.plft_dat.pin_en.w |= 1UL << channel;
+        // 表裡每一支類比腳都在初始化時打開；轉換清單只放 logical_pin 那一個，單次讀取指定通道
+        // （和 SDK mbed 的 analogin_read 相同，analogin_api.c 以 hal_adc_single_read 讀各自的通道）
+        for (uint8_t i = 0; i < rtl8735b_adc_channel_count(); i++) {
+            const uint8_t ch = rtl8735b_adc_channel(rtl8735b_adc_logical_pin(i));
+            if (ch <= 7U) {
+                adc_adapter.plft_dat.pin_en.w |= 1UL << ch;
+            }
+        }
         hal_status_t status = hal_adc_init(&adc_adapter);
         if (status != HAL_OK) {
             return (int)status;
@@ -192,11 +201,12 @@ int rtl8735b_adc_init(uint8_t logical_pin)
 
 int32_t rtl8735b_adc_read_u16(uint8_t logical_pin)
 {
-    if (rtl8735b_analog_pin(logical_pin) == RTL8735B_INVALID_PIN || !adc_initialized) {
+    const uint8_t channel = rtl8735b_adc_channel(logical_pin);
+    if (rtl8735b_analog_pin(logical_pin) == RTL8735B_INVALID_PIN || channel > 7U || !adc_initialized) {
         return -1;
     }
     // 與 SDK analogin_read_u16 相同，回傳 12 位元原始碼；讀取 API 不提供失敗狀態。
-    return (int32_t)hal_adc_single_read(&adc_adapter, adc_channel);
+    return (int32_t)hal_adc_single_read(&adc_adapter, channel);
 }
 
 static int pwm_ensure_initialized(uint8_t channel)

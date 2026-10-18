@@ -28,8 +28,8 @@ private:
         float voltage_latest() override;
         float voltage_average_ratiometric() override;
 
-        bool active();
-        void add_sample(uint16_t sample);
+        int16_t bound_pin();   // 綁定的類比腳；沒有綁定時回傳 -1
+        void add_sample(uint8_t pin, uint16_t sample);   // 讀取期間換了腳就丟掉這筆
 
     private:
         bool _bind(uint8_t pin);   // 綁定板型 hwdef 列出的類比腳，並清掉累計的取樣

@@ -189,16 +189,32 @@ class RulesTest(unittest.TestCase):
             generate(*overlays)
 
     def test_adc_pin_maps_to_channel(self):
-        for pin, channel in (('PIN_F0', 0), ('PIN_F1', 1), ('PIN_F2', 2), ('PIN_F3', 3)):
+        # PF0–PF3 是通道 0–3，PA0–PA3 是外接通道 4–7
+        for pin, channel in (('PIN_F0', 0), ('PIN_F1', 1), ('PIN_F2', 2), ('PIN_F3', 3),
+                             ('PIN_A0', 4), ('PIN_A1', 5), ('PIN_A2', 6), ('PIN_A3', 7)):
             with self.subTest(pin=pin):
-                # PF1、PF2 是預設 I²C1 的腳：先把 I²C 換到 I2C2（PE4、PE3）；PF3 是 SERIAL0 的 RX：關掉 SERIAL0
+                # PF1、PF2 是預設 I²C1 的腳：先把 I²C 換到 I2C2（PE4、PE3）；PF3 是 SERIAL0 的 RX：關掉 SERIAL0；
+                # PA2、PA3 是 SERIAL3（UART0）的腳：關掉 SERIAL3
                 header = generate(['undef RTL8735B_I2CBUS', 'RTL8735B_I2CBUS 1 2 PIN_E4 PIN_E3 400000 external',
                                    'undef HAL_RTL8735B_SERIAL0_ENABLED', 'define HAL_RTL8735B_SERIAL0_ENABLED 0',
+                                   'undef HAL_RTL8735B_SERIAL3_ENABLED', 'define HAL_RTL8735B_SERIAL3_ENABLED 0',
                                    'undef RTL8735B_ADC', 'RTL8735B_ADC 2 ' + pin])
                 self.assertEqual(table(header, 'HAL_RTL8735B_ADC_PINS'), ['{2,%s,%u}' % (pin, channel)])
 
-    def test_adc_only_on_pf0_to_pf3(self):
-        self.assertRejected(['undef RTL8735B_ADC', 'RTL8735B_ADC 2 PIN_A0'])
+    def test_several_adc_pins(self):
+        # 每一行加一支類比腳；PA2 給類比時，SERIAL3 不能再用它
+        header = generate(['undef HAL_RTL8735B_SERIAL3_ENABLED', 'define HAL_RTL8735B_SERIAL3_ENABLED 0',
+                           'RTL8735B_ADC 9 PIN_A2'])
+        self.assertEqual(table(header, 'HAL_RTL8735B_ADC_PINS'), ['{2,PIN_F0,0}', '{9,PIN_A2,6}'])
+        self.assertEqual(count(header, 'HAL_RTL8735B_ADC_COUNT'), 2)
+        self.assertRejectedNaming(['RTL8735B_ADC 9 PIN_A2'], 'PIN_A2', 'RTL8735B_ADC', 'HAL_RTL8735B_SERIAL3_TX_PIN')
+        # 同一個邏輯編號不能用兩次
+        self.assertRejected(['undef HAL_RTL8735B_SERIAL3_ENABLED', 'define HAL_RTL8735B_SERIAL3_ENABLED 0',
+                             'RTL8735B_ADC 2 PIN_A2'])
+
+    def test_adc_only_on_pf0_to_pf3_and_pa0_to_pa3(self):
+        self.assertRejected(['undef RTL8735B_ADC', 'RTL8735B_ADC 2 PIN_A4'])
+        self.assertRejected(['undef RTL8735B_ADC', 'RTL8735B_ADC 2 PIN_E4'])
 
     def test_field_counts(self):
         self.assertRejected(['RTL8735B_GPIO 7 PIN_D17'])

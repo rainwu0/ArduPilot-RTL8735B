@@ -6,7 +6,8 @@ extern "C" {
 #endif
 extern int io_fake_adc_init_status;
 extern int io_fake_adc_cvlist_status;
-extern uint16_t io_fake_adc_value;
+// 各 ADC 通道（0–7）讀到的值；只有初始化時 pin_en 打開的通道讀得到，其他讀到 0
+extern uint16_t io_fake_adc_values[8];
 extern unsigned io_fake_adc_init_calls;
 // ADC：初始化時的 pin_en、轉換清單的通道、最後一次讀取的通道
 extern uint32_t io_fake_adc_pin_en;

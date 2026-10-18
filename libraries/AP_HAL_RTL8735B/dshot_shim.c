@@ -11,6 +11,12 @@
  * 時序：以 CPU 週期計數器（DWT CYCCNT）等到每個邊緣的目標時間再寫，匯流排寫入的固定延遲不影響脈寬。一幀期間
  * 以 PRIMASK 關中斷；安全世界的中斷從這裡關不掉，它造成的抖動要上板量。程式在 DDR、經快取執行，所以先空跑一個
  * 位元（寫到記憶體裡的假暫存器）讓迴圈進快取，再送真的。
+ *
+ * 計數器出錯時放棄這一幀：每次等待最多讀 bit_cycles + DSHOT_LEAD_CYCLES 次計數器（每讀一次至少花一個週期，
+ * 正常的等待不會超過這個次數），計數器停住或倒退時在這個次數內放棄；等到時已經晚了 (t1h − t0h) / 2 以上
+ * （計數器往前跳、或被安全世界的中斷拖住）也放棄，因為晚這麼多，電調可能把這個位元的 0 讀成 1、或 1 讀成 0。
+ * 空跑只用讀取次數的上限、不看遲到：空跑本來就是要吃下快取未命中，晚到是預期的，也不碰真的腳。
+ * 放棄時把腳全部拉低、恢復中斷，回傳 RTL8735B_DSHOT_ETIMING 並計數；下一幀照常送。
  */
 
 #include "dshot_shim.h"
@@ -56,6 +62,7 @@ static uint32_t dshot_cpu_hz_value;
 static uint8_t dshot_stopped;
 static uint8_t dshot_sent;
 static uint32_t dshot_last_end_us;
+static uint32_t dshot_dropped_frames;
 // 空跑時寫的假暫存器
 static volatile uint32_t dshot_dummy_reg;
 
@@ -142,30 +149,54 @@ uint32_t rtl8735b_dshot_cpu_hz(void)
     return dshot_calibration == DSHOT_CALIB_OK ? dshot_cpu_hz_value : 0;
 }
 
-// 內嵌在送位元的迴圈裡：讀到計數器過了目標到寫入之間的指令越少，邊緣越準
-static inline __attribute__((always_inline)) void _wait_until(uint32_t target)
+uint32_t rtl8735b_dshot_dropped_frames(void)
 {
-    while ((int32_t)(RTL8735B_DSHOT_CYCLES() - target) < 0) {
+    return dshot_dropped_frames;
+}
+
+// 等到計數器過了 target 回傳 0；讀了 budget 次還沒到（計數器停住或倒退），或到的時候已經晚超過 late_limit
+// 個週期（計數器往前跳，或被拖住），回傳 -1。內嵌在送位元的迴圈裡：讀到計數器過了目標到寫入之間的指令越少，
+// 邊緣越準
+static inline __attribute__((always_inline)) int _wait_until(uint32_t target, uint32_t budget, uint32_t late_limit)
+{
+    int32_t late;
+    while ((late = (int32_t)(RTL8735B_DSHOT_CYCLES() - target)) < 0) {
+        if (--budget == 0) {
+            return -1;
+        }
     }
+    return (uint32_t)late > late_limit ? -1 : 0;
 }
 
 // 每個位元：起點全部拉高，0 的高電位時間到時拉低送 0 的腳，1 的高電位時間到時拉低其餘的腳。
+// 計數器出錯時（見檔頭）拉低所有的腳、回傳 -1。late_limit 是遲到上限，空跑給 UINT32_MAX（不看遲到）。
 // 不內嵌、不特化：空跑與真的送幀要跑同一份程式碼，空跑才能把它載入快取（韌體的編譯器在 -Os 會把兩處呼叫
 // 各內嵌一份；只禁止內嵌時，gcc 仍可能依兩處不同的常數參數各做一份特化）
-static __attribute__((noinline, noclone)) void _send_bits(volatile uint32_t *low, volatile uint32_t *high, uint32_t all,
+static __attribute__((noinline, noclone)) int _send_bits(volatile uint32_t *low, volatile uint32_t *high, uint32_t all,
                        const uint32_t zeros[RTL8735B_DSHOT_FRAME_BITS], uint32_t bits,
-                       const rtl8735b_dshot_timing_t *timing)
+                       const rtl8735b_dshot_timing_t *timing, uint32_t late_limit)
 {
+    const uint32_t budget = timing->bit_cycles + DSHOT_LEAD_CYCLES;
     uint32_t start = RTL8735B_DSHOT_CYCLES() + DSHOT_LEAD_CYCLES;
     for (uint32_t bit = 0; bit < bits; bit++) {
-        _wait_until(start);
+        if (_wait_until(start, budget, late_limit) != 0) {
+            goto lost;
+        }
         RTL8735B_DSHOT_REG_WRITE(high, all);
-        _wait_until(start + timing->t0h_cycles);
+        if (_wait_until(start + timing->t0h_cycles, budget, late_limit) != 0) {
+            goto lost;
+        }
         RTL8735B_DSHOT_REG_WRITE(low, zeros[bit]);
-        _wait_until(start + timing->t1h_cycles);
+        if (_wait_until(start + timing->t1h_cycles, budget, late_limit) != 0) {
+            goto lost;
+        }
         RTL8735B_DSHOT_REG_WRITE(low, all);
         start += timing->bit_cycles;
     }
+    return 0;
+lost:
+    RTL8735B_DSHOT_REG_WRITE(low, all);
+    return -1;
 }
 
 int rtl8735b_dshot_send(const uint16_t frames[RTL8735B_DSHOT_MAX_SLOTS], uint32_t active,
@@ -200,11 +231,18 @@ int rtl8735b_dshot_send(const uint16_t frames[RTL8735B_DSHOT_MAX_SLOTS], uint32_
     }
     const uint32_t primask = __get_PRIMASK();
     __disable_irq();
-    _send_bits(&dshot_dummy_reg, &dshot_dummy_reg, all, zeros, 1, timing);
-    _send_bits(dshot_low, dshot_high, all, zeros, RTL8735B_DSHOT_FRAME_BITS, timing);
+    int lost = _send_bits(&dshot_dummy_reg, &dshot_dummy_reg, all, zeros, 1, timing, UINT32_MAX);
+    if (lost == 0) {
+        lost = _send_bits(dshot_low, dshot_high, all, zeros, RTL8735B_DSHOT_FRAME_BITS, timing,
+                          (timing->t1h_cycles - timing->t0h_cycles) / 2u);
+    }
     __set_PRIMASK(primask);
     dshot_last_end_us = hal_read_curtime_us();
     dshot_sent = 1;
+    if (lost != 0) {
+        dshot_dropped_frames++;
+        return RTL8735B_DSHOT_ETIMING;
+    }
     return RTL8735B_DSHOT_OK;
 }
 

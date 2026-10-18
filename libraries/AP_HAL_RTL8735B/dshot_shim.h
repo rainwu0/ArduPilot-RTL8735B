@@ -31,6 +31,8 @@ enum {
     RTL8735B_DSHOT_ECLOCK = -4,
     // 已緊急停止
     RTL8735B_DSHOT_ESTOPPED = -5,
+    // 一幀送到一半，CPU 週期計數器停住、倒退或跳太遠：腳已全部拉低，這一幀作廢，下一幀照常送
+    RTL8735B_DSHOT_ETIMING = -6,
 };
 
 #ifdef __cplusplus
@@ -46,6 +48,8 @@ uint32_t rtl8735b_dshot_cpu_hz(void);
 // 距上一幀結束不足 RTL8735B_DSHOT_MIN_GAP_US 時先等。
 int rtl8735b_dshot_send(const uint16_t frames[RTL8735B_DSHOT_MAX_SLOTS], uint32_t active,
                         const rtl8735b_dshot_timing_t *timing);
+// 開機以來因 RTL8735B_DSHOT_ETIMING 作廢的幀數
+uint32_t rtl8735b_dshot_dropped_frames(void);
 // 拉低所有接上的腳，之後 rtl8735b_dshot_send 一律回傳 ESTOPPED（AP_HAL::panic 用）
 void rtl8735b_dshot_emergency_stop(void);
 

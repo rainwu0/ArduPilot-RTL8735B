@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 // dshot_shim.c 的主機測試：GPIO 暫存器與 CPU 週期計數器換成替身，記下每次寫入的時間與中斷狀態，
-// 檢查每個位元的三個邊緣、關中斷、兩幀的間隔、接腳與校正的錯誤、緊急停止。
+// 檢查每個位元的三個邊緣、關中斷、兩幀的間隔、接腳與校正的錯誤、緊急停止，以及一幀中途計數器出錯時放棄。
 // 替身不是硬體模型：匯流排延遲、快取與中斷抖動要上板量。
-// 用法：無參數跑一般情境；nocyccnt、notcounting、wrongfreq 各跑一種校正失敗（shim 的狀態是靜態的，
-// 每種情境一個行程）。
+// 用法：無參數跑一般情境；send 跑送幀；timing 跑計數器出錯；nocyccnt、notcounting、wrongfreq 各跑一種
+// 校正失敗（shim 的狀態是靜態的，每種情境一個行程）。
 #include "dshot_frame.h"
 #include "dshot_shim.h"
 
@@ -54,6 +54,15 @@ volatile uint32_t regs[8][2];
 std::vector<std::pair<uint32_t, uint32_t>> pin_writes;   // (腳, 值)
 std::vector<uint32_t> out_dirs;
 std::vector<uint32_t> deinit_pins;
+// 計數器出錯的情境：第幾個真的暫存器寫入（或空跑的寫入）之後停住或跳一次，以及之後讀了幾次計數器
+uint32_t real_write_count;
+uint32_t dummy_write_count;
+uint32_t stall_after;
+uint32_t jump_after;
+uint32_t dummy_stall_after;
+uint32_t dummy_jump_after;
+int64_t jump_by;
+uint32_t reads_since_fault;
 
 bool is_real(const Write &w)
 {
@@ -229,6 +238,102 @@ void test_send_before_attach()
     assert(rtl8735b_dshot_cpu_hz() == 0);
 }
 
+// 一幀送到一半，週期計數器停住、往前跳太遠或倒退：在有限次讀取內放棄這一幀，腳全部拉低、中斷恢復、計數；
+// 計數器恢復後下一幀照常。小幅的延遲照送
+void test_timing_loss()
+{
+    attach_four();
+    rtl8735b_dshot_timing_t t;
+    assert(rtl8735b_dshot_timing(300, 0, rtl8735b_dshot_cpu_hz(), &t) == 0);
+    const uint32_t late_limit = (t.t1h_cycles - t.t0h_cycles) / 2;
+    uint16_t frames[RTL8735B_DSHOT_MAX_SLOTS] = {0xFFFFu, 0x0000u, 0x8001u, 0x82C6u};
+    volatile uint32_t *low = &regs[5][0];
+    assert(rtl8735b_dshot_dropped_frames() == 0);
+
+    // 停住：第 10 個寫入（第 3 位元拉高）之後計數器不再前進
+    writes.clear();
+    real_write_count = 0;
+    stall_after = 10;
+    primask = 0;
+    assert(rtl8735b_dshot_send(frames, 0xFu, &t) == RTL8735B_DSHOT_ETIMING);
+    std::vector<Write> w = real_writes();
+    assert(w.size() == 11);
+    assert(w.back().reg == low && w.back().value == 0x7800u);
+    assert(primask == 0);
+    assert(reads_since_fault <= 2 * t.bit_cycles);
+    assert(rtl8735b_dshot_dropped_frames() == 1);
+    // 計數器恢復：下一幀完整送出
+    counting = true;
+    stall_after = 0;
+    writes.clear();
+    assert(rtl8735b_dshot_send(frames, 0xFu, &t) == RTL8735B_DSHOT_OK);
+    check_frame(real_writes(), 0, frames, 0xFu, t);
+
+    // 往前跳太遠：第 16 個寫入（第 5 位元拉高）之後跳過 t0h 再超過上限，拉低 0 的邊緣晚太多
+    writes.clear();
+    real_write_count = 0;
+    jump_after = 16;
+    jump_by = t.t0h_cycles + late_limit + 50;
+    assert(rtl8735b_dshot_send(frames, 0xFu, &t) == RTL8735B_DSHOT_ETIMING);
+    w = real_writes();
+    assert(w.size() == 17);
+    assert(w.back().reg == low && w.back().value == 0x7800u);
+    assert(primask == 0);
+    assert(rtl8735b_dshot_dropped_frames() == 2);
+
+    // 小幅延遲（上限的一半）：照送完整的一幀
+    writes.clear();
+    real_write_count = 0;
+    jump_by = t.t0h_cycles + late_limit / 2;
+    assert(rtl8735b_dshot_send(frames, 0xFu, &t) == RTL8735B_DSHOT_OK);
+    assert(real_writes().size() == 48);
+    assert(rtl8735b_dshot_dropped_frames() == 2);
+
+    // 倒退：第 20 個寫入之後計數器回到很早的值
+    writes.clear();
+    real_write_count = 0;
+    jump_after = 20;
+    jump_by = -(int64_t)(1u << 20);
+    assert(rtl8735b_dshot_send(frames, 0xFu, &t) == RTL8735B_DSHOT_ETIMING);
+    w = real_writes();
+    assert(w.size() == 21);
+    assert(w.back().reg == low && w.back().value == 0x7800u);
+    assert(reads_since_fault <= 2 * t.bit_cycles);
+    assert(primask == 0);
+    assert(rtl8735b_dshot_dropped_frames() == 3);
+    jump_after = 0;
+
+    // 空跑晚到（快取未命中就是這樣）：不放棄，真的那一幀照送
+    writes.clear();
+    dummy_write_count = 0;
+    dummy_jump_after = 1;
+    jump_by = t.t0h_cycles + late_limit + 50;
+    assert(rtl8735b_dshot_send(frames, 0xFu, &t) == RTL8735B_DSHOT_OK);
+    check_frame(real_writes(), 0, frames, 0xFu, t);
+    assert(rtl8735b_dshot_dropped_frames() == 3);
+    dummy_jump_after = 0;
+    // 空跑時計數器停住：讀取次數的上限照樣放棄，不碰真的腳
+    writes.clear();
+    dummy_write_count = 0;
+    dummy_stall_after = 1;
+    assert(rtl8735b_dshot_send(frames, 0xFu, &t) == RTL8735B_DSHOT_ETIMING);
+    assert(real_writes().empty());
+    assert(reads_since_fault <= 2 * t.bit_cycles);
+    assert(primask == 0);
+    assert(rtl8735b_dshot_dropped_frames() == 4);
+    counting = true;
+    dummy_stall_after = 0;
+
+    // 呼叫時中斷本來就關著：放棄後維持關著
+    writes.clear();
+    real_write_count = 0;
+    stall_after = 10;
+    primask = 1;
+    assert(rtl8735b_dshot_send(frames, 0xFu, &t) == RTL8735B_DSHOT_ETIMING);
+    assert(primask == 1);
+    assert(rtl8735b_dshot_dropped_frames() == 5);
+}
+
 void test_calibration_failure()
 {
     assert(rtl8735b_dshot_attach(PIN_F11) == RTL8735B_DSHOT_ECLOCK);
@@ -264,6 +369,7 @@ void __disable_irq(void)
 
 uint32_t fake_cycles_read(void)
 {
+    reads_since_fault++;
     if (counting) {
         cycles += STEP;
     }
@@ -272,8 +378,29 @@ uint32_t fake_cycles_read(void)
 
 void fake_reg_write(volatile uint32_t *reg, uint32_t value)
 {
-    writes.push_back(Write{reg, value, cycles, primask});
+    const Write w{reg, value, cycles, primask};
+    writes.push_back(w);
     *reg = value;
+    if (!is_real(w)) {
+        dummy_write_count++;
+        if (dummy_stall_after != 0 && dummy_write_count == dummy_stall_after) {
+            counting = false;
+            reads_since_fault = 0;
+        }
+        if (dummy_jump_after != 0 && dummy_write_count == dummy_jump_after) {
+            cycles = (uint32_t)((int64_t)cycles + jump_by);
+        }
+        return;
+    }
+    real_write_count++;
+    if (stall_after != 0 && real_write_count == stall_after) {
+        counting = false;
+        reads_since_fault = 0;
+    }
+    if (jump_after != 0 && real_write_count == jump_after) {
+        cycles = (uint32_t)((int64_t)cycles + jump_by);
+        reads_since_fault = 0;
+    }
 }
 
 uint32_t hal_read_curtime_us(void)
@@ -339,6 +466,8 @@ int main(int argc, char **argv)
     } else if (mode == "send") {
         test_send_before_attach();
         test_send_and_gap();
+    } else if (mode == "timing") {
+        test_timing_loss();
     } else {
         test_attach();
     }

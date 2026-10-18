@@ -104,6 +104,8 @@ private:
     bool _dshot_timer_registered;
     bool _dshot_sent;
     bool _dshot_stopped;
+    // 已提示過作廢的幀（rtl8735b_dshot_send 回 ETIMING），本次開機只提示一次
+    bool _dshot_dropped_reported;
     uint32_t _dshot_last_send_us;
 
     // 排隊等送的 DShot 命令（同 ArduPilot ChibiOS 的佇列深度 8）

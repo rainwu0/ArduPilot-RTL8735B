@@ -50,6 +50,7 @@ std::vector<DshotSend> dshot_sends;
 uint32_t dshot_fail_pin = 0xFFFFFFFFu;
 int dshot_fail_code;
 bool dshot_stopped;
+int dshot_send_result = RTL8735B_DSHOT_OK;   // 沒有緊急停止時送幀回傳的值
 uint32_t now_us;
 AP_HAL::Scheduler fake_scheduler;
 AP_HAL::Util fake_util;
@@ -151,7 +152,7 @@ extern "C" int rtl8735b_dshot_send(const uint16_t frames[RTL8735B_DSHOT_MAX_SLOT
     send.active = active;
     send.timing = *timing;
     dshot_sends.push_back(send);
-    return dshot_stopped ? RTL8735B_DSHOT_ESTOPPED : RTL8735B_DSHOT_OK;
+    return dshot_stopped ? RTL8735B_DSHOT_ESTOPPED : dshot_send_result;
 }
 
 extern "C" void rtl8735b_dshot_emergency_stop(void)
@@ -907,6 +908,7 @@ void reset_dshot()
     dshot_fail_pin = 0xFFFFFFFFu;
     dshot_fail_code = 0;
     dshot_stopped = false;
+    dshot_send_result = RTL8735B_DSHOT_OK;
     now_us = 1000;
     fake_util.soft_armed = false;
 }
@@ -1160,6 +1162,42 @@ void test_dshot_stopped()
     assert(dshot_sends.size() == 1);
 }
 
+// 一幀送到一半 CPU 週期計數器出錯（ETIMING）：這一幀作廢，遙測請求留到下一幀；主控台與地面站只提示一次；
+// DShot 不停，之後照常送
+void test_dshot_timing_loss()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    RTL8735B::RCOutput output;
+    output.init();
+    output.force_safety_off();
+    output.set_output_mode(0x0FU, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+    fake_util.soft_armed = true;
+    const uint16_t plain = rtl8735b_dshot_frame(248, 0);
+    const uint16_t telem = rtl8735b_dshot_frame(248, 1);
+    fake_statustext().clear();
+    output.set_telem_request_mask(1U << 1);
+    dshot_send_result = RTL8735B_DSHOT_ETIMING;
+    write_all(output, 1100, 1100, 1100, 1100);
+    assert(dshot_sends.back().frames[1] == telem);
+    assert(fake_statustext().find("DShot frame dropped") != std::string::npos);
+    // 作廢的那一幀不算送出：遙測請求留到下一幀
+    dshot_send_result = RTL8735B_DSHOT_OK;
+    write_all(output, 1100, 1100, 1100, 1100);
+    assert(dshot_sends.back().frames[1] == telem);
+    write_all(output, 1100, 1100, 1100, 1100);
+    assert(dshot_sends.back().frames[1] == plain);
+    // 再作廢一次：不再提示，也不停止 DShot
+    fake_statustext().clear();
+    const size_t before = dshot_sends.size();
+    dshot_send_result = RTL8735B_DSHOT_ETIMING;
+    write_all(output, 1100, 1100, 1100, 1100);
+    assert(fake_statustext().empty());
+    dshot_send_result = RTL8735B_DSHOT_OK;
+    write_all(output, 1100, 1100, 1100, 1100);
+    assert(dshot_sends.size() == before + 2);
+}
+
 // DShot 命令（嗶聲、反轉、3D 等）：取代該路的油門幀並帶遙測位元，其他 DShot 通道送 0；至少送 10 次，
 // 有逾時就照每毫秒一幀算；解鎖後只收 priority 命令；排隊依序送
 void test_dshot_commands()
@@ -1314,6 +1352,7 @@ int main()
     test_dshot_esc_type_rate_and_switching();
     test_dshot_attach_failure();
     test_dshot_stopped();
+    test_dshot_timing_loss();
     test_dshot_commands();
     test_output_mode_banner();
     puts("IO contract host tests passed");

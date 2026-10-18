@@ -203,7 +203,7 @@ run_dshot() {
     cc "${CFLAGS[@]}" -O1 -Wcast-align=strict -I"$test_dir/dshot_fakes" -I"$lib_dir"         -c "$lib_dir/dshot_shim.c" -o "$out/dshot-shim.o"
     c++ "${CXXFLAGS[@]}" -I"$test_dir/dshot_fakes" -I"$lib_dir"         "$test_dir/dshot_shim_host_test.cpp" "$out/dshot-shim.o" "$lib_dir/dshot_frame.c"         -o "$out/dshot-shim-test"
     local mode
-    for mode in "" send nocyccnt notcounting wrongfreq; do
+    for mode in "" send timing nocyccnt notcounting wrongfreq; do
         timeout 30 "$out/dshot-shim-test" $mode
     done
 

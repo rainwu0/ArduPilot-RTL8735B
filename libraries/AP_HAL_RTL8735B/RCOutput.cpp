@@ -48,6 +48,7 @@ RCOutput::RCOutput() :
     _dshot_timer_registered(false),
     _dshot_sent(false),
     _dshot_stopped(false),
+    _dshot_dropped_reported(false),
     _dshot_last_send_us(0),
     _dshot_commands{},
     _dshot_command_head(0),
@@ -729,7 +730,13 @@ void RCOutput::_dshot_send_locked()
         _dshot_stopped = true;
         return;
     }
+    if (status == RTL8735B_DSHOT_ETIMING && !_dshot_dropped_reported) {
+        // 腳已拉低、這一幀作廢；下一次輸出或計時器補送時照常送（作廢的幀數見 rtl8735b_dshot_dropped_frames）
+        _dshot_dropped_reported = true;
+        RTL8735B::report_warning("RTL8735B: DShot frame dropped: CPU cycle counter stalled or jumped mid-frame");
+    }
     if (status != RTL8735B_DSHOT_OK) {
+        // 沒送出：遙測請求與命令的次數都留到下一幀
         return;
     }
     _telem_request_mask &= ~sent;

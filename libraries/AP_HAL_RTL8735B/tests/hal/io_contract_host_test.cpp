@@ -1159,6 +1159,129 @@ void test_dshot_stopped()
     fake_scheduler.run_timer();
     assert(dshot_sends.size() == 1);
 }
+
+// DShot 命令（嗶聲、反轉、3D 等）：取代該路的油門幀並帶遙測位元，其他 DShot 通道送 0；至少送 10 次，
+// 有逾時就照每毫秒一幀算；解鎖後只收 priority 命令；排隊依序送
+void test_dshot_commands()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    RTL8735B::RCOutput output;
+    output.init();
+    output.force_safety_off();
+    output.set_output_mode(0x0FU, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+    const uint16_t zero = rtl8735b_dshot_frame(0, 0);
+
+    // 全部通道；還沒寫過脈寬的通道也送命令
+    output.send_dshot_command(1, AP_HAL::RCOutput::ALL_CHANNELS, 0, 10, false);
+    for (int i = 0; i < 10; i++) {
+        write_all(output, 1000, 1000, 1000, 0);
+        assert(dshot_sends.back().active == 0xFU);
+        for (uint8_t ch = 0; ch < 4; ch++) {
+            assert(dshot_sends.back().frames[ch] == rtl8735b_dshot_frame(1, 1));
+        }
+    }
+    write_all(output, 1000, 1000, 1000, 0);
+    assert(dshot_sends.back().active == 0x7U);
+    assert(dshot_sends.back().frames[0] == zero);
+
+    // 單一通道：其他通道送 0；次數取 repeat 與 10 的大者
+    output.send_dshot_command(21, 2, 0, 12, false);
+    for (int i = 0; i < 12; i++) {
+        write_all(output, 1000, 1000, 1000, 1000);
+        assert(dshot_sends.back().active == 0xFU);
+        assert(dshot_sends.back().frames[2] == rtl8735b_dshot_frame(21, 1));
+        assert(dshot_sends.back().frames[0] == zero && dshot_sends.back().frames[3] == zero);
+    }
+    write_all(output, 1000, 1000, 1000, 1000);
+    assert(dshot_sends.back().frames[2] == zero);
+
+    // 排隊：先送完第一個再送第二個
+    output.send_dshot_command(2, 0, 0, 10, false);
+    output.send_dshot_command(3, 1, 0, 10, false);
+    for (int i = 0; i < 10; i++) {
+        write_all(output, 1000, 1000, 1000, 1000);
+        assert(dshot_sends.back().frames[0] == rtl8735b_dshot_frame(2, 1));
+    }
+    for (int i = 0; i < 10; i++) {
+        write_all(output, 1000, 1000, 1000, 1000);
+        assert(dshot_sends.back().frames[1] == rtl8735b_dshot_frame(3, 1));
+    }
+    write_all(output, 1000, 1000, 1000, 1000);
+    assert(dshot_sends.back().frames[1] == zero);
+
+    // 逾時 30 ms：30 幀；命令等著送時，計時器每 1 ms 就補一幀
+    output.send_dshot_command(4, 3, 30, 10, false);
+    now_us = 200000;
+    write_all(output, 1000, 1000, 1000, 1000);
+    const size_t start = dshot_sends.size();
+    for (int i = 1; i < 30; i++) {
+        now_us += 1000;
+        fake_scheduler.run_timer();
+    }
+    assert(dshot_sends.size() == start + 29);
+    assert(dshot_sends.back().frames[3] == rtl8735b_dshot_frame(4, 1));
+    now_us += 1000;
+    fake_scheduler.run_timer();
+    assert(dshot_sends.size() == start + 29);
+    write_all(output, 1000, 1000, 1000, 1000);
+    assert(dshot_sends.back().frames[3] == zero);
+
+    // 解鎖後只收 priority 命令；不是 DShot 的通道不收
+    fake_util.soft_armed = true;
+    output.send_dshot_command(5, 0, 0, 10, false);
+    write_all(output, 1000, 1000, 1000, 1000);
+    assert(dshot_sends.back().frames[0] == zero);
+    output.send_dshot_command(5, 0, 0, 10, true);
+    write_all(output, 1000, 1000, 1000, 1000);
+    assert(dshot_sends.back().frames[0] == rtl8735b_dshot_frame(5, 1));
+    for (int i = 0; i < 9; i++) {
+        write_all(output, 1000, 1000, 1000, 1000);
+    }
+    output.send_dshot_command(6, 9, 0, 10, true);
+    write_all(output, 1100, 1100, 1100, 1100);
+    assert(dshot_sends.back().frames[0] == rtl8735b_dshot_frame(248, 0));
+
+    // 安全開關關著時命令也不送
+    output.force_safety_on();
+    const size_t before = dshot_sends.size();
+    output.send_dshot_command(1, AP_HAL::RCOutput::ALL_CHANNELS, 0, 10, true);
+    now_us += 5000;
+    fake_scheduler.run_timer();
+    assert(dshot_sends.size() == before);
+}
+
+// 開機橫幅：連續同模式的通道合成一段，NONE 不列
+void test_output_mode_banner()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    char banner[64];
+    {
+        RTL8735B::RCOutput output;
+        output.init();
+        assert(output.get_output_mode_banner(banner, sizeof(banner)));
+        assert(strcmp(banner, "RCOut: PWM:1-4") == 0);
+    }
+    {
+        dshot_fail_pin = rtl8735b_rcout_pin(3);
+        dshot_fail_code = RTL8735B_DSHOT_EGPIO;
+        RTL8735B::RCOutput output;
+        output.init();
+        output.set_output_mode(0x03U, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+        output.set_output_mode(1U << 3, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+        assert(output.get_output_mode_banner(banner, sizeof(banner)));
+        assert(strcmp(banner, "RCOut: DS300:1-2 PWM:3") == 0);
+    }
+    {
+        reset_dshot();
+        RTL8735B::RCOutput output;
+        output.init();
+        output.set_output_mode(0x0FU, AP_HAL::RCOutput::MODE_PWM_DSHOT1200);
+        assert(output.get_output_mode_banner(banner, sizeof(banner)));
+        assert(strcmp(banner, "RCOut: None") == 0);
+    }
+}
 }
 
 int main()
@@ -1191,6 +1314,8 @@ int main()
     test_dshot_esc_type_rate_and_switching();
     test_dshot_attach_failure();
     test_dshot_stopped();
+    test_dshot_commands();
+    test_output_mode_banner();
     puts("IO contract host tests passed");
     return 0;
 }

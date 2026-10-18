@@ -48,7 +48,10 @@ RCOutput::RCOutput() :
     _dshot_timer_registered(false),
     _dshot_sent(false),
     _dshot_stopped(false),
-    _dshot_last_send_us(0)
+    _dshot_last_send_us(0),
+    _dshot_commands{},
+    _dshot_command_head(0),
+    _dshot_command_count(0)
 {
     for (uint8_t i = 0; i < CHANNELS; i++) {
         _dshot_slot[i] = -1;
@@ -97,6 +100,8 @@ uint16_t dshot_rate_khz(AP_HAL::RCOutput::output_mode mode)
 // 主程式每次 push 送一幀；沒有 push 時（例如主迴圈卡住），計時器在上一幀之後這麼久補送同樣的幀，
 // 讓電調不因收不到訊號而停機（最低約 250 Hz）
 constexpr uint32_t DSHOT_KEEPALIVE_US = 4000;
+// 有命令在排隊時，計時器補送的間隔
+constexpr uint32_t DSHOT_COMMAND_INTERVAL_US = 1000;
 }
 
 bool RCOutput::_is_dshot(uint8_t chan) const
@@ -683,7 +688,8 @@ void RCOutput::_set_dshot_mode(uint8_t chan, enum output_mode mode)
 }
 
 // 各 DShot 通道依目前的脈寬同時送一幀。安全開關關著時不送任何幀；未解鎖時送數值 0（停止）；脈寬 0 的通道不送。
-// 遙測請求只帶在下一幀，送出後清掉。
+// 遙測請求只帶在下一幀，送出後清掉。有排隊的命令時，命令的通道送命令（帶遙測位元），其他 DShot 通道送 0，
+// 同 ArduPilot ChibiOS 的 RCOutput_serial.cpp。
 void RCOutput::_dshot_send_locked()
 {
     if (_dshot_mask == 0 || _dshot_stopped || !_dshot_timing_valid ||
@@ -691,18 +697,27 @@ void RCOutput::_dshot_send_locked()
         return;
     }
     const uint8_t armed = hal.util->get_soft_armed() ? 1 : 0;
+    DshotCommand *const command = _dshot_command_count != 0 ? &_dshot_commands[_dshot_command_head] : nullptr;
     uint16_t frames[RTL8735B_DSHOT_MAX_SLOTS] = {};
     uint32_t active = 0;
     uint32_t sent = 0;
     for (uint8_t chan = 0; chan < CHANNELS; chan++) {
-        if (!_is_dshot(chan) || _value_us[chan] == 0 || _dshot_slot[chan] < 0) {
+        if (!_is_dshot(chan) || _dshot_slot[chan] < 0) {
             continue;
         }
         const uint8_t slot = (uint8_t)_dshot_slot[chan];
-        const uint8_t telem = (_telem_request_mask & (1UL << chan)) != 0;
-        frames[slot] = rtl8735b_dshot_frame(rtl8735b_dshot_throttle_value(_value_us[chan], armed), telem);
+        if (command != nullptr) {
+            const bool target = (command->chan_mask & (1UL << chan)) != 0;
+            frames[slot] = rtl8735b_dshot_frame(target ? command->command : 0, target ? 1 : 0);
+        } else {
+            if (_value_us[chan] == 0) {
+                continue;
+            }
+            const uint8_t telem = (_telem_request_mask & (1UL << chan)) != 0;
+            frames[slot] = rtl8735b_dshot_frame(rtl8735b_dshot_throttle_value(_value_us[chan], armed), telem);
+            sent |= 1UL << chan;
+        }
         active |= 1UL << slot;
-        sent |= 1UL << chan;
     }
     if (active == 0) {
         return;
@@ -714,21 +729,85 @@ void RCOutput::_dshot_send_locked()
         _dshot_stopped = true;
         return;
     }
-    if (status == RTL8735B_DSHOT_OK) {
-        _telem_request_mask &= ~sent;
+    if (status != RTL8735B_DSHOT_OK) {
+        return;
+    }
+    _telem_request_mask &= ~sent;
+    if (command != nullptr && --command->frames_left == 0) {
+        _dshot_command_head = (uint8_t)((_dshot_command_head + 1U) % DSHOT_COMMAND_QUEUE);
+        _dshot_command_count--;
     }
 }
 
-// 計時器執行緒（較主執行緒優先）：主程式太久沒 push 時補送。號誌被拿著就跳過，不等。
+// 計時器執行緒（較主執行緒優先）：主程式太久沒 push 時補送；有命令在排隊時每毫秒補一幀，讓命令照次數送完。
+// 號誌被拿著就跳過，不等。
 void RCOutput::_dshot_timer_tick()
 {
     if (!_semaphore.take_nonblocking()) {
         return;
     }
-    if (_dshot_sent && (uint32_t)(AP_HAL::micros() - _dshot_last_send_us) >= DSHOT_KEEPALIVE_US) {
+    const uint32_t interval_us = _dshot_command_count != 0 ? DSHOT_COMMAND_INTERVAL_US : DSHOT_KEEPALIVE_US;
+    if ((_dshot_sent || _dshot_command_count != 0) &&
+        (uint32_t)(AP_HAL::micros() - _dshot_last_send_us) >= interval_us) {
         _dshot_send_locked();
     }
     _semaphore.give();
+}
+
+// 命令幀取代油門幀（解鎖後只收 priority 命令）。次數至少 10、至少 repeat_count；有逾時時至少逾時的毫秒數
+// （命令排隊時約每毫秒送一幀）。佇列滿了就丟掉新的命令。
+void RCOutput::send_dshot_command(uint8_t command, uint8_t chan, uint32_t command_timeout_ms,
+                                  uint16_t repeat_count, bool priority)
+{
+    RCLock lock(_semaphore);
+    if (!priority && hal.util->get_soft_armed()) {
+        return;
+    }
+    uint32_t chan_mask;
+    if (chan == ALL_CHANNELS) {
+        chan_mask = _dshot_mask;
+    } else if (chan < CHANNELS && _is_dshot(chan)) {
+        chan_mask = 1UL << chan;
+    } else {
+        return;
+    }
+    if (chan_mask == 0 || _dshot_command_count >= DSHOT_COMMAND_QUEUE) {
+        return;
+    }
+    uint32_t frames = repeat_count > 10U ? repeat_count : 10U;
+    if (command_timeout_ms > frames) {
+        frames = command_timeout_ms;
+    }
+    DshotCommand &slot = _dshot_commands[(_dshot_command_head + _dshot_command_count) % DSHOT_COMMAND_QUEUE];
+    slot.command = command;
+    slot.chan_mask = chan_mask;
+    slot.frames_left = frames;
+    _dshot_command_count++;
+}
+
+// 開機橫幅：連續同模式的通道合成一段（同 ArduPilot ChibiOS 的 RCOutput::get_output_mode_banner）
+bool RCOutput::get_output_mode_banner(char banner_msg[], uint8_t banner_msg_len) const
+{
+    RCLock lock(_semaphore);
+    bool any = false;
+    for (uint8_t chan = 0; chan < CHANNELS; chan++) {
+        any |= _mode[chan] != MODE_PWM_NONE;
+    }
+    if (!any) {
+        hal.util->snprintf(banner_msg, banner_msg_len, "RCOut: None");
+        return true;
+    }
+    hal.util->snprintf(banner_msg, banner_msg_len, "RCOut:");
+    uint8_t low = 0;
+    for (uint8_t chan = 1; chan <= CHANNELS; chan++) {
+        if (chan == CHANNELS || _mode[chan] != _mode[low]) {
+            if (_mode[low] != MODE_PWM_NONE) {
+                append_to_banner(banner_msg, banner_msg_len, _mode[low], low + 1, chan);
+            }
+            low = chan;
+        }
+    }
+    return true;
 }
 
 void RCOutput::set_telem_request_mask(uint32_t mask)

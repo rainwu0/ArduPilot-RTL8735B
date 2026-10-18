@@ -38,6 +38,9 @@ public:
     void set_dshot_rate(uint8_t dshot_rate, uint16_t loop_rate_hz) override;
     void set_dshot_esc_type(DshotEscType esc_type) override;
     DshotEscType get_dshot_esc_type() const override;
+    void send_dshot_command(uint8_t command, uint8_t chan = ALL_CHANNELS, uint32_t command_timeout_ms = 0,
+                            uint16_t repeat_count = 10, bool priority = false) override;
+    bool get_output_mode_banner(char banner_msg[], uint8_t banner_msg_len) const override;
 
 private:
     // 路數來自開發板 hwdef 的 RTL8735B_RCOUT
@@ -102,4 +105,15 @@ private:
     bool _dshot_sent;
     bool _dshot_stopped;
     uint32_t _dshot_last_send_us;
+
+    // 排隊等送的 DShot 命令（同 ArduPilot ChibiOS 的佇列深度 8）
+    struct DshotCommand {
+        uint8_t command;
+        uint32_t chan_mask;
+        uint32_t frames_left;
+    };
+    static constexpr uint8_t DSHOT_COMMAND_QUEUE = 8;
+    DshotCommand _dshot_commands[DSHOT_COMMAND_QUEUE];
+    uint8_t _dshot_command_head;
+    uint8_t _dshot_command_count;
 };

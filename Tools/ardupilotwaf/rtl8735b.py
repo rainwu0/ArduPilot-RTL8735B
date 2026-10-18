@@ -137,6 +137,9 @@ def pre_build(self):
     lib_vars = OrderedDict()
     lib_vars['RTL8735B_WIFI_CREDENTIALS_SOURCE'] = generate_wifi_credentials(self)
     lib_vars['RTL8735B_PARTITION_TABLE'] = generate_partition_table(self)
+    # 版面名稱與 fw1、fw2 的位址與長度：cmake 只把它們加成應用程式原始碼的編譯定義（app/rtl8735b_app.h）。
+    # 版面已由 generate_partition_table 檢查過
+    lib_vars.update(rtl8735b_flash_layout.app_defines(self.env.RTL8735B_FLASH_LAYOUT))
     lib_vars['ARDUPILOT_CMD'] = self.cmd
     lib_vars['WAF_BUILD_TARGET'] = self.targets
     lib_vars['ARDUPILOT_LIB'] = self.bldnode.find_or_declare('lib/').abspath()

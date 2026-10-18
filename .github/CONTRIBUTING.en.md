@@ -21,7 +21,8 @@ Do not open a public issue for security problems (for example something that let
 ## Sending pull requests
 
 - Follow ArduPilot's conventions: each commit touches only one subsystem (for example `AP_HAL_RTL8735B:`, `hwdef:`, `waf:`, `Tools:`), and the commit message is in English, in the form `Subsystem: summary`.
-- The home page, CONTRIBUTING, the HAL README and Getting started come in Traditional Chinese (Taiwan) and English: when you change one version, change the other in the same commit. Other READMEs and code comments are in Traditional Chinese (Taiwan).
+- The home page, CONTRIBUTING, the HAL README, Getting started and the CHANGELOG come in Traditional Chinese (Taiwan) and English: when you change one version, change the other in the same commit. Other READMEs and code comments are in Traditional Chinese (Taiwan).
+- For changes users can see (behavior, overlay syntax, parameters, build or flashing steps), add an entry under `[Unreleased]` in `libraries/AP_HAL_RTL8735B/CHANGELOG.md` and `CHANGELOG.en.md`, in the Keep a Changelog sections (Added, Changed, Fixed, Removed and so on).
 - Run the tests before sending; if you changed the HAL or anything build-related, add `--build` to also cross-build once (this needs the SDK, see *Getting and building* in the HAL README):
 
   ```bash

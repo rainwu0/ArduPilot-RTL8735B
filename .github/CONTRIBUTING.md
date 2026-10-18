@@ -21,7 +21,8 @@ English: [CONTRIBUTING.en.md](CONTRIBUTING.en.md)
 ## 送 PR
 
 - 照 ArduPilot 的慣例：一個提交只動一個子系統（例如 `AP_HAL_RTL8735B:`、`hwdef:`、`waf:`、`Tools:`），提交訊息用英文寫成 `Subsystem: summary`。
-- 首頁、CONTRIBUTING、HAL README 和〈從零開始〉有台灣用語的繁體中文、英文兩版：改其中一版時，另一版在同一個提交裡一起改。其他 README 與程式註解用台灣用語的繁體中文。
+- 首頁、CONTRIBUTING、HAL README、〈從零開始〉和 CHANGELOG 有台灣用語的繁體中文、英文兩版：改其中一版時，另一版在同一個提交裡一起改。其他 README 與程式註解用台灣用語的繁體中文。
+- 使用者看得到的改動（行為、疊加檔的寫法、參數、建置或燒錄的步驟），在 `libraries/AP_HAL_RTL8735B/CHANGELOG.md` 與 `CHANGELOG.en.md` 的 `[Unreleased]` 底下加一條，分類照 Keep a Changelog（新增、變更、修正、移除等）。
 - 送之前先跑測試；改了 HAL 或建置相關的檔案，加 `--build` 再交叉建置一次（要 SDK，見 HAL README〈取得與建置〉）：
 
   ```bash

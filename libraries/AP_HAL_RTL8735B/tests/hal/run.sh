@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HAL 的主機測試（Wi-Fi 以外）：序列埠、SPI/I²C、IO 與看門狗、RC 輸入與參數儲存、排程、SD 卡。
+# HAL 的主機測試（Wi-Fi 以外）：序列埠、SPI/I²C、IO 與看門狗、RC 輸入與參數儲存、排程、SD 卡、DShot。
 # 正式的 HAL 原始碼配替身 SDK、FreeRTOS 與 AP_HAL 在主機上編譯執行；不開序列埠、不碰開發板。
 # HAL 原始碼預設是本目錄上兩層的 libraries/AP_HAL_RTL8735B，可用 $1 指定；只跑一組時給第二個參數。
 set -euo pipefail
@@ -180,8 +180,14 @@ run_sdcard() {
     timeout 120 "$out/sdcard-fatfs-test"
 }
 
+run_dshot() {
+    # DShot 的幀與時序（純計算，不用替身）
+    cc "${CFLAGS[@]}" -I"$lib_dir" "$lib_dir/dshot_frame.c" "$test_dir/dshot_frame_host_test.c"         -o "$out/dshot-frame-test"
+    timeout 30 "$out/dshot-frame-test"
+}
+
 rc=0
-for suite in uart bus io rc_storage scheduler sdcard; do
+for suite in uart bus io rc_storage scheduler sdcard dshot; do
     [ -z "$only" ] || [ "$only" = "$suite" ] || continue
     # 子殼層不放在 if 或 && 裡：那樣 set -e 會失效，前面的步驟失敗也不會中止
     set +e

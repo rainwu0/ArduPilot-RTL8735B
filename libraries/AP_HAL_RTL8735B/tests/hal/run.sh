@@ -184,6 +184,14 @@ run_dshot() {
     # DShot 的幀與時序（純計算，不用替身）
     cc "${CFLAGS[@]}" -I"$lib_dir" "$lib_dir/dshot_frame.c" "$test_dir/dshot_frame_host_test.c"         -o "$out/dshot-frame-test"
     timeout 30 "$out/dshot-frame-test"
+
+    # GPIO 送幀：正式的 dshot_shim.c，GPIO 暫存器與 CPU 週期計數器換成會記時間的替身
+    cc "${CFLAGS[@]}" -O1 -Wcast-align=strict -I"$test_dir/dshot_fakes" -I"$lib_dir"         -c "$lib_dir/dshot_shim.c" -o "$out/dshot-shim.o"
+    c++ "${CXXFLAGS[@]}" -I"$test_dir/dshot_fakes" -I"$lib_dir"         "$test_dir/dshot_shim_host_test.cpp" "$out/dshot-shim.o" "$lib_dir/dshot_frame.c"         -o "$out/dshot-shim-test"
+    local mode
+    for mode in "" send nocyccnt notcounting wrongfreq; do
+        timeout 30 "$out/dshot-shim-test" $mode
+    done
 }
 
 rc=0

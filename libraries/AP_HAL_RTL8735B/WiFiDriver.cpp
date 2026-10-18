@@ -108,6 +108,7 @@ WiFiDriver::Status WiFiDriver::status() const
     s.tx_bytes = _tx_bytes.load();
     s.tx_dropped_bytes = _tx_dropped_bytes.load();
     s.tx_errors = _tx_errors.load();
+    s.tx_retried = _tx_retried.load();
     return s;
 }
 
@@ -268,6 +269,7 @@ void WiFiDriver::_close_sockets()
 void WiFiDriver::_link_lost(uint32_t now_ms, const char *reason)
 {
     _close_sockets();
+    _tx_retry.reset();
     rtl8735b_wifi_leave();
     _gcs_known.store(false);
     _local_address.store(0);
@@ -381,6 +383,7 @@ void WiFiDriver::_service_tx(uint32_t now_ms)
             _writebuf.peekbytes(_datagram, n);
             generation = _tx_generation;
         }
+        _tx_retry.check_generation(generation);
 
         bool attempted = true;
         int sent = 0;
@@ -396,10 +399,15 @@ void WiFiDriver::_service_tx(uint32_t now_ms)
             } else {
                 attempted = false;
                 _tx_dropped_bytes.fetch_add(n);
+                _tx_retry.reset();
             }
         }
 
-        {
+        // 緩衝不足時留著這一個資料包，下一步再送（WiFiTxRetry.h）；其他結果都推進緩衝區
+        const WiFiTxRetry::Action action = attempted ?
+            _tx_retry.on_result(sent == n, sent == RTL8735B_WIFI_ERR_NOBUFS, now_ms, generation) :
+            WiFiTxRetry::Action::DROP;
+        if (action != WiFiTxRetry::Action::KEEP) {
             // 送出期間主迴圈可能已清空或重設緩衝區；世代不同就不推進。
             WITH_SEMAPHORE(_write_mutex);
             if (generation == _tx_generation) {
@@ -410,12 +418,20 @@ void WiFiDriver::_service_tx(uint32_t now_ms)
         if (!attempted) {
             continue;
         }
-        if (sent != n) {
-            // UDP 本來就可能遺失：送出失敗的訊框丟棄並計數，不在此重試，避免卡住後面的資料；
-            // 這一步不再送，下一步再試後面的訊框。
+        switch (action) {
+        case WiFiTxRetry::Action::KEEP:
+            // 這一步不再送，下一步再送同一個資料包。
+            return;
+        case WiFiTxRetry::Action::DROP:
+            // 其他錯誤，或緩衝不足重試到上限：丟掉並計數；這一步不再送，下一步再試後面的訊框。
             _tx_errors.fetch_add(1);
             _tx_dropped_bytes.fetch_add(n);
             return;
+        case WiFiTxRetry::Action::SENT_RETRIED:
+            _tx_retried.fetch_add(1);
+            break;
+        case WiFiTxRetry::Action::SENT:
+            break;
         }
         _tx_datagrams.fetch_add(1);
         _tx_bytes.fetch_add(n);

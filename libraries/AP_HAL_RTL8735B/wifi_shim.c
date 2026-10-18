@@ -165,7 +165,10 @@ int rtl8735b_udp_sendto(int fd, const uint8_t *buffer, uint16_t length, uint32_t
     to.sin_port = htons(port);
     to.sin_addr.s_addr = htonl(address);
     const ssize_t n = lwip_sendto(fd, buffer, length, MSG_DONTWAIT, (const struct sockaddr *)&to, sizeof(to));
-    return n < 0 ? RTL8735B_WIFI_ERR_SOCKET : (int)n;
+    if (n >= 0) {
+        return (int)n;
+    }
+    return (errno == ENOBUFS || errno == ENOMEM) ? RTL8735B_WIFI_ERR_NOBUFS : RTL8735B_WIFI_ERR_SOCKET;
 }
 
 void rtl8735b_udp_close(int fd)

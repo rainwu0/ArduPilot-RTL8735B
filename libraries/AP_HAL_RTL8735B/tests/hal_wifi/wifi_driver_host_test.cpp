@@ -50,6 +50,7 @@ struct FakeNet {
     uint32_t address = kLocalIp;
     uint32_t netmask = kMask;
     int send_result_override = 0;   // < 0 表示送出失敗
+    int nobufs_sends = 0;           // 接下來幾次 UDP 送出回緩衝不足；< 0 表示一直回
     uint32_t start_calls = 0;
     uint32_t join_calls = 0;
     uint32_t leave_calls = 0;
@@ -58,6 +59,7 @@ struct FakeNet {
     uint16_t opened_port = 0;
     std::deque<Datagram> inbound;
     std::vector<Datagram> sent;
+    std::vector<std::vector<uint8_t>> attempts;   // 每一次 UDP 送出的內容，含失敗的
     std::atomic<uint32_t> sdk_calls{0};
     // 讓 join 阻塞，模擬 SDK 同步連線
     bool block_join = false;
@@ -185,6 +187,8 @@ void test_begin_creates_one_task_and_buffers()
     assert(fake.created_tasks == 1);
     assert(fake.task_priority == WiFiDriver::TASK_PRIO);
     assert(fake.task_stack == WiFiDriver::TASK_STACK_WORDS);
+    // 緩衝不足重試的 500 ms 期間，後面的 MAVLink 留在送出緩衝區（200 Hz HIGHRES_IMU 約 15 KB/s）
+    assert(WiFiDriver::TX_BUFFER_SIZE == 16384);
     assert(d.txspace() >= WiFiDriver::TX_BUFFER_SIZE);
     d.begin(115200, 512, 512);
     assert(fake.created_tasks == 1);
@@ -437,6 +441,115 @@ void test_restart_restarts_incomplete_frame_wait()
     assert(fake.sent[0].address == kGcs && fake.sent[0].port == kGcsPort && fake.sent[0].data == fresh);
     assert(d.status().tx_dropped_bytes == 0 && d.status().tx_errors == 0);
     assert(!d.tx_pending());
+}
+
+// 每次往前 1 ms 走一步，直到驅動又做了一次 UDP 送出；回傳那一步的時間
+uint32_t step_until_send(WiFiDriver &d, uint32_t now)
+{
+    const size_t before = net->attempts.size();
+    for (int i = 0; i < 100 && net->attempts.size() == before; i++) {
+        d._link_step(++now);
+    }
+    assert(net->attempts.size() > before);
+    return now;
+}
+
+// 地面站送一個封包過來，讓驅動學到它；回傳時間
+uint32_t learn_gcs(WiFiDriver &d, uint32_t now)
+{
+    net->inbound.push_back({kGcs, kGcsPort, {1}});
+    d._link_step(now);
+    assert(d.status().gcs_known);
+    return now;
+}
+
+// Wi-Fi 驅動的封包緩衝不足：同一個資料包留著，下一步原樣再送，送出後算一次重試成功，不丟資料
+void test_nobufs_keeps_datagram_and_resends()
+{
+    FakeNet fake;
+    reset(fake);
+    WiFiDriver d(WiFiDriver::Protocol::UDP, kLocalPort, kGcsPort);
+    bring_up(d);
+    uint32_t now = learn_gcs(d, 1);
+    const auto a = mav2(30, 28);
+    fake.nobufs_sends = 3;
+    write_all(d, a);
+    now = step_until_send(d, now);
+    assert(fake.sent.empty() && d.tx_pending());
+    for (int i = 0; i < 3; i++) {
+        d._link_step(++now);
+    }
+    assert(fake.attempts.size() == 4);
+    for (const auto &attempt : fake.attempts) {
+        assert(attempt == a);
+    }
+    assert(fake.sent.size() == 1 && fake.sent[0].address == kGcs && fake.sent[0].data == a);
+    const WiFiDriver::Status s = d.status();
+    assert(s.tx_retried == 1 && s.tx_errors == 0 && s.tx_dropped_bytes == 0);
+    assert(s.tx_datagrams == 1 && s.tx_bytes == a.size());
+    assert(!d.tx_pending());
+}
+
+// 從第一次被拒起 RETRY_MS 仍送不出：丟掉並計數；下一個資料包重新開始，不算重試
+void test_nobufs_gives_up_after_retry_ms()
+{
+    using RTL8735B::WiFiTxRetry;
+    FakeNet fake;
+    reset(fake);
+    WiFiDriver d(WiFiDriver::Protocol::UDP, kLocalPort, kGcsPort);
+    bring_up(d);
+    uint32_t now = learn_gcs(d, 1);
+    const auto a = mav2(30, 28);
+    fake.nobufs_sends = -1;
+    write_all(d, a);
+    const uint32_t first = step_until_send(d, now);
+    now = first;
+    while (now < first + WiFiTxRetry::RETRY_MS - 1) {
+        d._link_step(++now);
+    }
+    assert(d.status().tx_errors == 0 && d.tx_pending());
+    d._link_step(++now);
+    assert(now == first + WiFiTxRetry::RETRY_MS);
+    assert(d.status().tx_errors == 1 && d.status().tx_dropped_bytes == a.size());
+    assert(!d.tx_pending() && fake.sent.empty());
+
+    fake.nobufs_sends = 0;
+    const auto b = mav2(33, 28);
+    write_all(d, b);
+    step_until_send(d, now);
+    assert(fake.sent.size() == 1 && fake.sent[0].data == b);
+    assert(d.status().tx_retried == 0 && d.status().tx_errors == 1);
+}
+
+// 重試中斷線：重連後只送重連後寫入的資料，斷線前的重試不再算數
+void test_link_loss_abandons_retry()
+{
+    FakeNet fake;
+    reset(fake);
+    WiFiDriver d(WiFiDriver::Protocol::UDP, kLocalPort, kGcsPort);
+    bring_up(d);
+    uint32_t now = learn_gcs(d, 1);
+    fake.nobufs_sends = -1;
+    write_all(d, mav2(30, 28));
+    now = step_until_send(d, now);
+
+    fake.associated = 0;
+    now += WiFiDriver::LINK_CHECK_INTERVAL_MS;
+    d._link_step(now);
+    assert(d.status().state == LinkState::WAIT_RETRY);
+    fake.associated = 1;
+    fake.nobufs_sends = 0;
+    now += WiFiDriver::RETRY_DELAY_MS;
+    d._link_step(now);
+    d._link_step(now);
+    assert(d.status().state == LinkState::UP && !d.tx_pending());
+
+    now = learn_gcs(d, now + 1);
+    const auto b = mav2(33, 28);
+    write_all(d, b);
+    step_until_send(d, now);
+    assert(fake.sent.size() == 1 && fake.sent[0].data == b);
+    assert(d.status().tx_retried == 0 && d.status().tx_errors == 0);
 }
 
 void test_link_loss_reconnects()
@@ -836,6 +949,13 @@ int rtl8735b_udp_sendto(int fd, const uint8_t *buffer, uint16_t length, uint32_t
 {
     net->sdk_calls++;
     assert(fd == net->open_result);
+    net->attempts.push_back(std::vector<uint8_t>(buffer, buffer + length));
+    if (net->nobufs_sends != 0) {
+        if (net->nobufs_sends > 0) {
+            net->nobufs_sends--;
+        }
+        return RTL8735B_WIFI_ERR_NOBUFS;
+    }
     if (net->send_result_override < 0) {
         return RTL8735B_WIFI_ERR_SOCKET;
     }
@@ -943,6 +1063,9 @@ int main()
     test_rx_overflow_drops_whole_datagram();
     test_send_failure_drops_frame_and_stalled_frame_is_resynced();
     test_restart_restarts_incomplete_frame_wait();
+    test_nobufs_keeps_datagram_and_resends();
+    test_nobufs_gives_up_after_retry_ms();
+    test_link_loss_abandons_retry();
     test_link_loss_reconnects();
     test_end_keeps_task_and_rebegin();
     test_uart_api_does_not_block_while_sdk_join_blocks();

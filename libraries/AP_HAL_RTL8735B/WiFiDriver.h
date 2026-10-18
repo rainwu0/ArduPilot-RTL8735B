@@ -5,6 +5,7 @@
 #include <AP_HAL/UARTDriver.h>
 #include <AP_HAL/utility/RingBuffer.h>
 #include <AP_HAL_RTL8735B/Semaphores.h>
+#include <AP_HAL_RTL8735B/WiFiTxRetry.h>
 
 #include <FreeRTOS.h>
 #include <task.h>
@@ -27,6 +28,8 @@ namespace RTL8735B {
     （廣播在 802.11 沒有確認與重送，且以基本速率送出，只用來讓地面站發現本機）。
   - 收到第一個資料包後把來源位址與埠當成地面站，之後的每個 MAVLink 訊框以一個資料包單播給它；
     地面站活躍期間只接受它的封包，靜默超過 PEER_TIMEOUT_MS 後回到廣播，並接受下一個送來封包的來源。
+  - 送出時 Wi-Fi 驅動的封包緩衝不足，那一個資料包留著，下一步再送，最多 WiFiTxRetry::RETRY_MS；
+    其他送出失敗直接丟掉（WiFiTxRetry.h）。
 
   TCP：
   - 在 local_port 等待連線，同時只服務一個地面站；沒有地面站時送出的資料丟棄。
@@ -69,7 +72,8 @@ public:
         uint32_t tx_datagrams;        // UDP：資料包數；TCP：送出次數
         uint32_t tx_bytes;
         uint32_t tx_dropped_bytes;    // 未連線、沒有地面站時的資料，送出失敗或無法成框
-        uint32_t tx_errors;
+        uint32_t tx_errors;           // 送出失敗而丟掉的資料包（UDP 含緩衝不足重試到上限的）
+        uint32_t tx_retried;          // UDP：緩衝不足、重試之後送出的資料包（WiFiTxRetry.h）
     };
 
     // Wi-Fi task：優先權與 UART/IO task 相同（Scheduler.h 的 UART_PRIO 3），低於主迴圈 4；
@@ -77,7 +81,8 @@ public:
     static constexpr UBaseType_t TASK_PRIO = 3;
     static constexpr uint32_t TASK_STACK_WORDS = 8192 / sizeof(StackType_t);
     static constexpr uint32_t RX_BUFFER_SIZE = 4096;
-    static constexpr uint32_t TX_BUFFER_SIZE = 8192;
+    // 緩衝不足重試的 WiFiTxRetry::RETRY_MS 期間，後面的 MAVLink 留在這裡（200 Hz HIGHRES_IMU 約 15 KB/s）
+    static constexpr uint32_t TX_BUFFER_SIZE = 16384;
     static constexpr uint32_t PEER_TIMEOUT_MS = 3000;     // 換地面站的條件
     static constexpr uint32_t RETRY_DELAY_MS = 1000;
     static constexpr uint32_t LINK_CHECK_INTERVAL_MS = 100;
@@ -152,6 +157,7 @@ private:
     uint32_t _tx_incomplete_since_ms;
     uint32_t _tx_incomplete_generation;   // 開始計時時的 _tx_generation；清空過緩衝區就重新計時
     bool _tx_incomplete;
+    WiFiTxRetry _tx_retry;
     uint8_t _datagram[DATAGRAM_MAX];
 
     std::atomic<bool> _gcs_known{false};
@@ -178,6 +184,7 @@ private:
     std::atomic<uint32_t> _tx_bytes{0};
     std::atomic<uint32_t> _tx_dropped_bytes{0};
     std::atomic<uint32_t> _tx_errors{0};
+    std::atomic<uint32_t> _tx_retried{0};
 };
 
 }

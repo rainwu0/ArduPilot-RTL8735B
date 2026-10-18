@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Wi-Fi 鏈路的主機測試：帳密產生器、SDK C 包裝（替身 SDK）、WiFiDriver 的 UDP 與 TCP（替身 shim 與 task）。
+# Wi-Fi 鏈路的主機測試：帳密產生器、SDK C 包裝（替身 SDK）、UDP 送出的重試判斷、WiFiDriver 的 UDP 與 TCP
+# （替身 shim 與 task）。
 # 不開無線電、不開序列埠。HAL 原始碼預設是本目錄上兩層的 libraries/AP_HAL_RTL8735B，可用 $1 指定。
 set -euo pipefail
 ulimit -c 0
@@ -13,6 +14,12 @@ RTL8735B_HAL="$lib_dir" python3 "$test_dir/test_wifi_config.py"
 cc -std=c11 -Wall -Wextra -Werror -I"$test_dir/wifi_sdk_fakes" -I"$lib_dir" \
     "$lib_dir/wifi_shim.c" "$test_dir/wifi_shim_host_test.c" -o "$out/wifi-shim-test"
 timeout 30 "$out/wifi-shim-test"
+
+# WiFiDriver 送出時的判斷，只有標頭，不依賴 SDK 與 FreeRTOS
+for t in wifi_tx_retry; do
+    c++ -std=c++17 -Wall -Wextra -Werror -I"$lib_dir/.." "$test_dir/${t}_host_test.cpp" -o "$out/$t-test"
+    timeout 30 "$out/$t-test"
+done
 
 # 真的 RingBuffer 與 mavlink_packetise（AP_HAL/utility）；AP_HAL、FreeRTOS、MAVLink 常數用替身。
 for ssid_len in 7 0; do

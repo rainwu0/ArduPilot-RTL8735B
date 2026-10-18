@@ -22,6 +22,7 @@ enum {
     RTL8735B_WIFI_ERR_SOCKET = -5,
     RTL8735B_WIFI_NONE = -6,         // 沒有等待中的連線（非錯誤）
     RTL8735B_WIFI_ERR_CLOSED = -7,   // 對端已關閉 TCP 連線
+    RTL8735B_WIFI_ERR_NOBUFS = -8,   // 送出緩衝不足（lwIP 的 ENOBUFS、ENOMEM），稍後可以重試
 };
 
 #ifdef __cplusplus
@@ -56,7 +57,10 @@ int rtl8735b_udp_open(uint16_t local_port);
 // 非阻塞接收一個資料包：> 0 為位元組數，0 為沒有資料，< 0 為錯誤。
 int rtl8735b_udp_recvfrom(int fd, uint8_t *buffer, uint16_t length, uint32_t *address, uint16_t *port);
 
-// 非阻塞送出一個資料包：回傳送出的位元組數或 < 0。
+// 非阻塞送出一個資料包：回傳送出的位元組數或 < 0。緩衝不足時回傳 RTL8735B_WIFI_ERR_NOBUFS：
+// Wi-Fi 驅動要不到封包緩衝、或判定介面沒起來時，SDK d1b6426 的 rltk_wlan_send 都回 -1
+// （component/wifi/driver/src/osdep/lwip_intf.c），ethernetif.c 的 low_level_output 把它轉成 ERR_BUF
+// （component/lwip/lwip_v2.1.2/port/realtek/freertos/ethernetif.c），lwIP 再轉成 ENOBUFS（src/api/err.c）。
 int rtl8735b_udp_sendto(int fd, const uint8_t *buffer, uint16_t length, uint32_t address, uint16_t port);
 
 void rtl8735b_udp_close(int fd);

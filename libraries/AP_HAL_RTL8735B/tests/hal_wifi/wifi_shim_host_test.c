@@ -39,6 +39,7 @@ static struct sockaddr_in last_sendto;
 static int last_send_flags;
 static size_t last_send_size;
 static int send_result;
+static int send_errno;
 static int closed_fd;
 static int autoreconnect_result;
 static int powersave_result;
@@ -79,6 +80,7 @@ static void reset(void)
     recv_result = -1;
     recv_errno = EWOULDBLOCK;
     send_result = 0;
+    send_errno = EHOSTUNREACH;
     closed_fd = -1;
     autoreconnect_result = 0;
     powersave_result = RTW_SUCCESS;
@@ -194,7 +196,11 @@ ssize_t lwip_sendto(int s, const void *data, size_t size, int flags, const struc
     memcpy(&last_sendto, to, sizeof(last_sendto));
     last_send_flags = flags;
     last_send_size = size;
-    return send_result < 0 ? -1 : (ssize_t)size;
+    if (send_result < 0) {
+        errno = send_errno;
+        return -1;
+    }
+    return (ssize_t)size;
 }
 int lwip_listen(int s, int backlog)
 {
@@ -386,8 +392,13 @@ static void test_udp_io(void)
     assert(last_sendto.sin_addr.s_addr == lwip_htonl(0xc0a801ffu));
     assert(last_sendto.sin_port == lwip_htons(14550));
     send_result = -1;
-    assert(rtl8735b_udp_sendto(7, buffer, 9, 0xc0a801ffu, 14550) < 0);
-    assert(rtl8735b_udp_sendto(-1, buffer, 9, 0xc0a801ffu, 14550) < 0);
+    assert(rtl8735b_udp_sendto(7, buffer, 9, 0xc0a801ffu, 14550) == RTL8735B_WIFI_ERR_SOCKET);
+    /* 驅動要不到封包緩衝（lwIP 的 ERR_BUF、ERR_MEM）：回緩衝不足，由 WiFiDriver 留著重試 */
+    send_errno = ENOBUFS;
+    assert(rtl8735b_udp_sendto(7, buffer, 9, 0xc0a801ffu, 14550) == RTL8735B_WIFI_ERR_NOBUFS);
+    send_errno = ENOMEM;
+    assert(rtl8735b_udp_sendto(7, buffer, 9, 0xc0a801ffu, 14550) == RTL8735B_WIFI_ERR_NOBUFS);
+    assert(rtl8735b_udp_sendto(-1, buffer, 9, 0xc0a801ffu, 14550) == RTL8735B_WIFI_ERR_ARG);
 }
 
 static void test_tcp_listen(void)

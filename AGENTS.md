@@ -8,7 +8,7 @@ ArduPilot is safety-critical autopilot software controlling real vehicles. Every
 
 ## 0. This repository: the RTL8735B port
 
-This is not the ArduPilot repository. It is an unofficial, individually maintained port of ArduPilot to the Realtek RTL8735B SoC, based on ArduPilot master `9f648ccabc`. The rest of this file is ArduPilot's own guide, kept as it is because it still applies to the code here. Where it disagrees with this section, this section wins.
+This is not the ArduPilot repository. It is an unofficial, individually maintained port of ArduPilot to the Realtek RTL8735B SoC, based on ArduPilot master `9f648ccabc`. The rest of this file is ArduPilot's own guide and applies to the code here. Where it disagrees with this section, this section wins.
 
 - **Scope**: the HAL in `libraries/AP_HAL_RTL8735B/`, and only what the chip needs to fit into ArduPilot (waf, hwdef, scripts under `Tools/`). Keep changes to ArduPilot's shared code minimal, and list them in the HAL README section 〈對 ArduPilot 共用程式的修改〉. Features for a particular vehicle belong in that vehicle's own project.
 - **Where things go**: issues and pull requests for this port go to this repository, against `main`. Do not open RTL8735B issues or pull requests on ArduPilot, and do not use ArduPilot's Discord or Discourse for them. The channels in section 9 are for ArduPilot itself.

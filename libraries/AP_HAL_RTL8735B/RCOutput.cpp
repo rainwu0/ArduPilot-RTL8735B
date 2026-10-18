@@ -6,6 +6,7 @@
 
 #include "IOConfig.h"
 #include "StatusText.h"
+#include "app/rtl8735b_app.h"
 #include "dshot_shim.h"
 #include "io_shim.h"
 
@@ -98,9 +99,13 @@ uint16_t dshot_rate_khz(AP_HAL::RCOutput::output_mode mode)
     }
 }
 
-// 主程式每次 push 送一幀；沒有 push 時（例如主迴圈卡住），計時器在上一幀之後這麼久補送同樣的幀，
+// 主程式每次 push 送一幀；主迴圈太久沒 push 時，計時器在上一幀之後這麼久補送同樣的幀，
 // 讓電調不因收不到訊號而停機（最低約 250 Hz）
 constexpr uint32_t DSHOT_KEEPALIVE_US = 4000;
+// 計時器補送時，主迴圈已經超過這麼久沒跑完一圈（rtl8735b_ardupilot_ms_since_main_loop），油門幀改送 0（停轉），
+// 不再補送停住前的油門：解鎖中主迴圈卡住時，馬達不會照那個油門一直轉。400 Hz 的主迴圈每 2.5 ms 跑完一圈，
+// 100 ms 是 40 圈
+constexpr uint32_t DSHOT_STALE_MS = 100;
 // 有命令在排隊時，計時器補送的間隔
 constexpr uint32_t DSHOT_COMMAND_INTERVAL_US = 1000;
 }
@@ -690,14 +695,15 @@ void RCOutput::_set_dshot_mode(uint8_t chan, enum output_mode mode)
 
 // 各 DShot 通道依目前的脈寬同時送一幀。安全開關關著時不送任何幀；未解鎖時送數值 0（停止）；脈寬 0 的通道不送。
 // 遙測請求只帶在下一幀，送出後清掉。有排隊的命令時，命令的通道送命令（帶遙測位元），其他 DShot 通道送 0，
-// 同 ArduPilot ChibiOS 的 RCOutput_serial.cpp。
-void RCOutput::_dshot_send_locked()
+// 同 ArduPilot ChibiOS 的 RCOutput_serial.cpp。resend：計時器補送；主迴圈停住超過 DSHOT_STALE_MS 時油門幀送 0。
+void RCOutput::_dshot_send_locked(bool resend)
 {
     if (_dshot_mask == 0 || _dshot_stopped || !_dshot_timing_valid ||
         _safety_state == AP_HAL::Util::SAFETY_DISARMED) {
         return;
     }
     const uint8_t armed = hal.util->get_soft_armed() ? 1 : 0;
+    const bool stale = resend && rtl8735b_ardupilot_ms_since_main_loop() > DSHOT_STALE_MS;
     DshotCommand *const command = _dshot_command_count != 0 ? &_dshot_commands[_dshot_command_head] : nullptr;
     uint16_t frames[RTL8735B_DSHOT_MAX_SLOTS] = {};
     uint32_t active = 0;
@@ -715,7 +721,8 @@ void RCOutput::_dshot_send_locked()
                 continue;
             }
             const uint8_t telem = (_telem_request_mask & (1UL << chan)) != 0;
-            frames[slot] = rtl8735b_dshot_frame(rtl8735b_dshot_throttle_value(_value_us[chan], armed), telem);
+            const uint16_t value = stale ? 0 : rtl8735b_dshot_throttle_value(_value_us[chan], armed);
+            frames[slot] = rtl8735b_dshot_frame(value, telem);
             sent |= 1UL << chan;
         }
         active |= 1UL << slot;
@@ -747,6 +754,7 @@ void RCOutput::_dshot_send_locked()
 }
 
 // 計時器執行緒（較主執行緒優先）：主程式太久沒 push 時補送；有命令在排隊時每毫秒補一幀，讓命令照次數送完。
+// 主迴圈停住太久時補送的油門幀是 0（見 DSHOT_STALE_MS）。這裡不提示：主迴圈可能正卡在拿著別的鎖的地方。
 // 號誌被拿著就跳過，不等。
 void RCOutput::_dshot_timer_tick()
 {
@@ -756,7 +764,7 @@ void RCOutput::_dshot_timer_tick()
     const uint32_t interval_us = _dshot_command_count != 0 ? DSHOT_COMMAND_INTERVAL_US : DSHOT_KEEPALIVE_US;
     if ((_dshot_sent || _dshot_command_count != 0) &&
         (uint32_t)(AP_HAL::micros() - _dshot_last_send_us) >= interval_us) {
-        _dshot_send_locked();
+        _dshot_send_locked(true);
     }
     _semaphore.give();
 }

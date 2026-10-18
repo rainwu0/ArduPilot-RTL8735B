@@ -61,7 +61,8 @@ private:
     void _set_dshot_mode(uint8_t chan, enum output_mode mode);
     void _report_dshot_failure(uint8_t chan, int status);
     void _update_dshot_timing();
-    void _dshot_send_locked();
+    // resend：計時器補送（不是主程式的 push）
+    void _dshot_send_locked(bool resend = false);
     void _dshot_timer_tick();
 
     uint16_t _freq_hz[CHANNELS];

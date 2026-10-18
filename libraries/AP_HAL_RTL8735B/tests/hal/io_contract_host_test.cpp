@@ -125,6 +125,14 @@ uint32_t AP_HAL::micros()
     return now_us;
 }
 
+// 主迴圈的時鐘（HAL_RTL8735B_Class.cpp 的 rtl8735b_ardupilot_ms_since_main_loop）：測試直接設距上一圈幾毫秒
+uint32_t main_loop_ms_ago;
+
+extern "C" uint32_t rtl8735b_ardupilot_ms_since_main_loop(void)
+{
+    return main_loop_ms_ago;
+}
+
 extern "C" int rtl8735b_dshot_attach(uint32_t pin)
 {
     if (pin == dshot_fail_pin) {
@@ -910,6 +918,7 @@ void reset_dshot()
     dshot_stopped = false;
     dshot_send_result = RTL8735B_DSHOT_OK;
     now_us = 1000;
+    main_loop_ms_ago = 0;
     fake_util.soft_armed = false;
 }
 
@@ -1075,6 +1084,66 @@ void test_dshot_safety_and_keepalive()
     now_us = 60000;
     fake_scheduler.run_timer();
     assert(dshot_sends.size() == 2);
+}
+
+// 解鎖中主迴圈停住、不再 push：計時器補送在主迴圈停住不久時照舊用最後的油門；停住太久就改送 0（停轉），
+// 不再把停住前的油門一直送給電調。命令照舊；主迴圈恢復後照常送油門
+void test_dshot_keepalive_stops_motors_when_main_loop_stalls()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    RTL8735B::RCOutput output;
+    output.init();
+    output.force_safety_off();
+    output.set_output_mode(0x0FU, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+    fake_util.soft_armed = true;
+    const uint16_t run = rtl8735b_dshot_frame(rtl8735b_dshot_throttle_value(1500, 1), 0);
+    const uint16_t stop = rtl8735b_dshot_frame(0, 0);
+    now_us = 10000;
+    write_all(output, 1500, 1500, 1500, 1500);
+    assert(dshot_sends.size() == 1 && dshot_sends[0].frames[0] == run);
+
+    // 主迴圈停住不久（50 ms）：補送照舊
+    main_loop_ms_ago = 50;
+    now_us += 5000;
+    fake_scheduler.run_timer();
+    assert(dshot_sends.size() == 2);
+    for (uint8_t ch = 0; ch < 4; ch++) {
+        assert(dshot_sends.back().frames[ch] == run);
+    }
+
+    // 停住太久（250 ms）：補送改成 0，之後一直送 0
+    main_loop_ms_ago = 250;
+    for (int i = 0; i < 3; i++) {
+        now_us += 5000;
+        fake_scheduler.run_timer();
+        assert(dshot_sends.back().active == dshot_sends[0].active);
+        for (uint8_t ch = 0; ch < 4; ch++) {
+            assert(dshot_sends.back().frames[ch] == stop);
+        }
+    }
+    assert(dshot_sends.size() == 5);
+
+    // 命令照舊：停住期間排進的命令照樣送（命令通道送命令，其他送 0）
+    output.send_dshot_command(5, 1, 0, 10, true);
+    now_us += 1000;
+    fake_scheduler.run_timer();
+    assert(dshot_sends.back().frames[1] == rtl8735b_dshot_frame(5, 1));
+    assert(dshot_sends.back().frames[0] == rtl8735b_dshot_frame(0, 0));
+    for (int i = 0; i < 9; i++) {
+        now_us += 1000;
+        fake_scheduler.run_timer();
+    }
+
+    // 主迴圈恢復：push 照常送油門
+    main_loop_ms_ago = 0;
+    write_all(output, 1500, 1500, 1500, 1500);
+    for (uint8_t ch = 0; ch < 4; ch++) {
+        assert(dshot_sends.back().frames[ch] == run);
+    }
+    now_us += 5000;
+    fake_scheduler.run_timer();
+    assert(dshot_sends.back().frames[0] == run);
 }
 
 // 電調型別決定位寬；速率改成別的 DShot 時所有 DShot 通道一起改；DShot 通道改回 PWM 要重開機：
@@ -1349,6 +1418,7 @@ int main()
     test_dshot_mode_and_frames();
     test_dshot_telemetry_request();
     test_dshot_safety_and_keepalive();
+    test_dshot_keepalive_stops_motors_when_main_loop_stalls();
     test_dshot_esc_type_rate_and_switching();
     test_dshot_attach_failure();
     test_dshot_stopped();

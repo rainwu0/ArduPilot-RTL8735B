@@ -15,6 +15,9 @@
 #   RTL8735B_APP_DIR   開發板的應用程式目錄（hwdef 的 env RTL8735B_APP_DIR，絕對路徑）；空字串表示沒有
 #   RTL8735B_PARTITION_TABLE  waf 在建置目錄產生的分割表 JSON（hwdef 的 FLASH_LAYOUT，
 #                      hwdef/scripts/rtl8735b_flash_layout.py），取代 SDK 範例專案的那一份
+#   RTL8735B_FLASH_LAYOUT  hwdef 的 FLASH_LAYOUT 名稱；RTL8735B_FLASH_FW1_ADDR、RTL8735B_FLASH_FW1_LEN、
+#                      RTL8735B_FLASH_FW2_ADDR、RTL8735B_FLASH_FW2_LEN 是該版面 fw1、fw2 的位址與長度（十六進位），
+#                      只成為應用程式原始碼的編譯定義（見 app/rtl8735b_app.h）
 #
 # SDK 的 config.cmake 會在 configure 時以 sed -i 改寫 SDK 內的檔案，但預設值下內容不變；
 # 檔案時間由 sdk_mtime.cmake 在內容未變時還原，避免 SDK 端整份重編。
@@ -115,19 +118,35 @@ add_executable(${app} main.c ${RTL8735B_WIFI_CREDENTIALS_SOURCE} $<TARGET_OBJECT
 target_compile_definitions(${app} PRIVATE ${sdk_defines})
 target_compile_options(${app} PRIVATE $<$<COMPILE_LANGUAGE:C>:${WARN_ERR_FLAGS}>)
 target_include_directories(${app} PUBLIC ${sdk_includes})
+# 給應用程式的介面（rtl8735b_app.h）：這個目錄只放這個標頭，main.c 與應用程式都看得到，HAL 的其他標頭看不到
+target_include_directories(${app} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../app)
 
 # 開發板的應用程式（選用）：目錄中的 .c 與入口一起編譯，沿用 SDK 的 include 與巨集，
-# 由 main.c 呼叫其中的 rtl8735b_app_init()
+# 由韌體在 rtl8735b_app.h 寫明的時機呼叫其中的 rtl8735b_app_*()。
+# Flash 版面的編譯定義只加在應用程式的原始碼上：韌體本身不多出任何定義
 if(RTL8735B_APP_DIR)
     file(GLOB app_sources CONFIGURE_DEPENDS "${RTL8735B_APP_DIR}/*.c")
     if(NOT app_sources)
         message(FATAL_ERROR "RTL8735B_APP_DIR has no .c files: ${RTL8735B_APP_DIR}")
     endif()
+    foreach(v RTL8735B_FLASH_LAYOUT RTL8735B_FLASH_FW1_ADDR RTL8735B_FLASH_FW1_LEN
+              RTL8735B_FLASH_FW2_ADDR RTL8735B_FLASH_FW2_LEN)
+        # 不寫 if(NOT ${v})：0x60000 這種值不是 CMake 認得的數字，會被當成變數名稱
+        if("${${v}}" STREQUAL "")
+            message(FATAL_ERROR "${v} is not set (passed by Tools/ardupilotwaf/rtl8735b.py)")
+        endif()
+    endforeach()
     message(STATUS "RTL8735B_APP_DIR=${RTL8735B_APP_DIR}")
     target_sources(${app} PRIVATE ${app_sources})
     target_include_directories(${app} PRIVATE ${RTL8735B_APP_DIR})
     # main.c 不提供空的 rtl8735b_app_init：應用程式漏寫入口時連結失敗，而不是悄悄什麼都不做
     target_compile_definitions(${app} PRIVATE RTL8735B_APP_REQUIRED=1)
+    set_property(SOURCE ${app_sources} APPEND PROPERTY COMPILE_DEFINITIONS
+        "RTL8735B_FLASH_LAYOUT_NAME=\"${RTL8735B_FLASH_LAYOUT}\""
+        RTL8735B_FLASH_FW1_ADDR=${RTL8735B_FLASH_FW1_ADDR}
+        RTL8735B_FLASH_FW1_LEN=${RTL8735B_FLASH_FW1_LEN}
+        RTL8735B_FLASH_FW2_ADDR=${RTL8735B_FLASH_FW2_ADDR}
+        RTL8735B_FLASH_FW2_LEN=${RTL8735B_FLASH_FW2_LEN})
 endif()
 
 if(NOT DEFINED ARDUPILOT_CMD)

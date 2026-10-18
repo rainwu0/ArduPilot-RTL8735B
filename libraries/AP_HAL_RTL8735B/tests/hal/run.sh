@@ -146,14 +146,27 @@ run_scheduler() {
     # 韌體入口 main.c 的 rtl8735b_app_init：沒有開發板的應用程式時是空的弱符號；有應用程式
     # （CMake 定義 RTL8735B_APP_REQUIRED）時不提供，應用程式漏寫入口就在連結時報錯，不會悄悄變成空函式。
     local main_c="$lib_dir/targets/cmake/main.c" sym
-    cc "${CFLAGS[@]}" -I"$test_dir/main_fakes" -c "$main_c" -o "$out/main-noapp.o"
+    cc "${CFLAGS[@]}" -I"$test_dir/main_fakes" -I"$lib_dir/app" -c "$main_c" -o "$out/main-noapp.o"
     sym=$(nm "$out/main-noapp.o" | awk '$NF == "rtl8735b_app_init" {print $(NF-1)}')
     [ "$sym" = W ] || { echo "沒有應用程式時 rtl8735b_app_init 應是弱符號（W），實際是 '$sym'"; return 1; }
-    cc "${CFLAGS[@]}" -DRTL8735B_APP_REQUIRED=1 -I"$test_dir/main_fakes" -c "$main_c" -o "$out/main-app.o"
+    cc "${CFLAGS[@]}" -DRTL8735B_APP_REQUIRED=1 -I"$test_dir/main_fakes" -I"$lib_dir/app" -c "$main_c" -o "$out/main-app.o"
     sym=$(nm "$out/main-app.o" | awk '$NF == "rtl8735b_app_init" {print $(NF-1)}')
     [ "$sym" = U ] || { echo "有應用程式時 rtl8735b_app_init 要由應用程式提供（U），實際是 '$sym'"; return 1; }
     grep -q 'RTL8735B_APP_REQUIRED' "$lib_dir/targets/cmake/CMakeLists.txt" ||
         { echo "CMakeLists.txt 在有應用程式時沒有定義 RTL8735B_APP_REQUIRED"; return 1; }
+
+    # after_setup、before_reset 是選用的：有沒有應用程式都是空的弱符號，應用程式要用才定義
+    local obj hook
+    for obj in main-noapp main-app; do
+        for hook in rtl8735b_app_after_setup rtl8735b_app_before_reset; do
+            sym=$(nm "$out/$obj.o" | awk -v h="$hook" '$NF == h {print $(NF-1)}')
+            [ "$sym" = W ] || { echo "$obj.o 的 $hook 應是弱符號（W），實際是 '$sym'"; return 1; }
+        done
+    done
+
+    # 給開發板應用程式的主迴圈時刻（AppStatus.h）
+    c++ "${CXXFLAGS[@]}" -I"$lib_dir" "$test_dir/app_status_host_test.cpp" -o "$out/app-status-test"
+    timeout 60 "$out/app-status-test"
 }
 
 run_sdcard() {

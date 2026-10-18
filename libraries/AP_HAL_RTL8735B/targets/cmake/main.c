@@ -8,12 +8,14 @@
  * （見 SDK project/realtek_amebapro2_v0_example/src/main.c）。
  * 這裡只初始化 console，把 ArduPilot 的入口（AP_HAL_MAIN 展開的 ardupilot_main，
  * 見 AP_HAL/board/rtl8735b.h 的 AP_MAIN）放進一個 task，呼叫開發板的應用程式，再啟動排程器。
+ * 應用程式能用的介面集中在 libraries/AP_HAL_RTL8735B/app/rtl8735b_app.h。
  */
 
 #include <stddef.h>
 #include <stdio.h>
 #include "FreeRTOS.h"
 #include "task.h"
+#include "rtl8735b_app.h"
 
 extern void console_init(void);
 extern int ardupilot_main(int argc, char *const argv[]);
@@ -39,6 +41,17 @@ __attribute__((weak)) void rtl8735b_app_init(void)
 {
 }
 #endif
+
+// 選用的時機（app/rtl8735b_app.h）：有沒有應用程式都是空的弱符號，應用程式要用才定義
+// ArduPilot 的主 task 在 setup() 之後、第一次主迴圈之前呼叫（HAL_RTL8735B_Class.cpp）
+__attribute__((weak)) void rtl8735b_app_after_setup(void)
+{
+}
+
+// Scheduler::reboot() 在輸出安全之後、重置之前呼叫
+__attribute__((weak)) void rtl8735b_app_before_reset(void)
+{
+}
 
 int main(void)
 {

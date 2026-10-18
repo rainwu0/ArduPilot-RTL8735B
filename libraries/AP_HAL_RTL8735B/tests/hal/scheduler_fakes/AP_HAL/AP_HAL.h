@@ -36,7 +36,7 @@ public:
 
 class RCOutput {
 public:
-    void force_safety_on() {}
+    void force_safety_on();  // 測試記下呼叫順序（scheduler_host_test.cpp）
 };
 
 class Storage {

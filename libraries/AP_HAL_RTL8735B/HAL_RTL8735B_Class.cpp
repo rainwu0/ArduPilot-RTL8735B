@@ -35,6 +35,8 @@
 #include "RCOutput.h"
 #include "WiFiDriver.h"
 #include "wdt_shim.h"
+#include "AppStatus.h"
+#include "app/rtl8735b_app.h"
 
 // UART1（SDK LOG）保留給 SDK；UART2 遙測、UART0 GPS、UART3 序列 RC。
 static RTL8735B::UARTDriver serial0Driver(0, RTL8735B_UART_CONFIGS[0].uart_id,
@@ -120,6 +122,7 @@ static Empty::Flash flashDriver;
 #if HAL_WITH_DSP
 static Empty::DSP dspDriver;
 #endif
+static RTL8735B::MainLoopClock mainLoopClock;
 
 HAL_RTL8735B::HAL_RTL8735B() :
     AP_HAL::HAL(
@@ -182,13 +185,40 @@ void HAL_RTL8735B::run(int argc, char * const argv[], Callbacks* callbacks) cons
     schedulerInstance.watchdog_pat();
     scheduler->set_system_initialized();
 
+    // 開發板的應用程式（app/rtl8735b_app.h）：沒有應用程式、或應用程式沒定義時是 main.c 的空弱符號
+    rtl8735b_app_after_setup();
+
     for (;;) {
         callbacks->loop();
+        mainLoopClock.mark(AP_HAL::millis());
         schedulerInstance.watchdog_pat();
     }
 }
 
 static HAL_RTL8735B hal_rtl8735b;
+
+// 給開發板的應用程式的查詢與操作（app/rtl8735b_app.h）。查詢只讀變數，不拿鎖、不阻塞
+
+extern "C" int rtl8735b_ardupilot_armed(void)
+{
+    return hal_rtl8735b.util->get_soft_armed() ? 1 : 0;
+}
+
+extern "C" int rtl8735b_ardupilot_system_initialized(void)
+{
+    return schedulerInstance.is_system_initialized() ? 1 : 0;
+}
+
+extern "C" uint32_t rtl8735b_ardupilot_ms_since_main_loop(void)
+{
+    return mainLoopClock.ms_since([] { return AP_HAL::millis(); });
+}
+
+// RCOutput::force_safety_on() 拿 RCOutput 的遞迴互斥鎖：可以從任何 task 呼叫，不能從中斷或計時器回呼呼叫
+extern "C" void rtl8735b_ardupilot_outputs_safe(void)
+{
+    hal_rtl8735b.rcout->force_safety_on();
+}
 
 const AP_HAL::HAL& AP_HAL::get_HAL()
 {

@@ -27,6 +27,7 @@
 #include <task.h>
 
 #include "sdk_shim.h"
+#include "app/rtl8735b_app.h"
 
 extern const AP_HAL::HAL& hal;
 
@@ -175,7 +176,10 @@ void Scheduler::reboot(bool hold_in_bootloader)
 {
     // TODO(rtl8735b): hold_in_bootloader 沒有對應。燒錄模式由重置時 PA5 的電位決定，
     // 軟體無法選擇。
+    // 先讓輸出安全，再請開發板的應用程式把會影響下一次開機的硬體放回安全狀態（app/rtl8735b_app.h）：
+    // 應用程式就算卡住，輸出也已經安全
     hal.rcout->force_safety_on();
+    rtl8735b_app_before_reset();
     printf("Rebooting\n");
     rtl8735b_system_reset();
     for (;;) {

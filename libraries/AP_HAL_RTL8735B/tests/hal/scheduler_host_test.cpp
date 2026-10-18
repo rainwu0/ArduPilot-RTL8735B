@@ -12,9 +12,11 @@
 #include "sdk_shim.h"
 
 #include <inttypes.h>
+#include <setjmp.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 using RTL8735B::Scheduler;
 
@@ -83,9 +85,32 @@ const char *thread_name(TaskHandle_t task)
     return task == &main_task_tag ? "主執行緒" : "其他執行緒";
 }
 
+// 重開機的呼叫順序：S 輸出安全、B 應用程式的 before_reset、R 重置
+char reboot_events[8];
+unsigned reboot_event_count;
+bool reset_returns;  // 為真時替身的重置記下 R 後跳回測試，否則 abort()
+jmp_buf reset_jump;
+
+void reboot_record(char event)
+{
+    if (reboot_event_count < sizeof(reboot_events) - 1) {
+        reboot_events[reboot_event_count++] = event;
+    }
+}
+
 } // namespace
 
 const AP_HAL::HAL &hal = fake_hal;
+
+void AP_HAL::RCOutput::force_safety_on()
+{
+    reboot_record('S');
+}
+
+extern "C" void rtl8735b_app_before_reset(void)
+{
+    reboot_record('B');
+}
 
 void AP_HAL::Scheduler::call_delay_cb() {}
 
@@ -111,6 +136,10 @@ void rtl8735b_delay_us(uint32_t us)
 
 void rtl8735b_system_reset(void)
 {
+    if (reset_returns) {
+        reboot_record('R');
+        longjmp(reset_jump, 1);
+    }
     abort();
 }
 
@@ -313,6 +342,21 @@ void test_main_thread_spin_yields()
     expect(longest_gap <= 21000, "主執行緒連續輪詢時，最長 %" PRIu64 " us 沒有讓出 CPU（要求 <= 21000）", longest_gap);
 }
 
+// 韌體自己重開機：先讓輸出安全，再請開發板的應用程式處理兼作開機模式腳的硬體，最後重置。
+// 應用程式就算卡住，輸出也已經安全（app/rtl8735b_app.h 的 rtl8735b_app_before_reset）
+void test_reboot_order()
+{
+    reboot_event_count = 0;
+    if (setjmp(reset_jump) == 0) {
+        reset_returns = true;
+        sched.reboot(false);
+    }
+    reset_returns = false;
+    reboot_events[reboot_event_count] = '\0';
+    expect(strcmp(reboot_events, "SBR") == 0,
+           "重開機的順序應是輸出安全（S）、應用程式（B）、重置（R），實際是 \"%s\"", reboot_events);
+}
+
 } // namespace
 
 int main()
@@ -326,6 +370,7 @@ int main()
     test_call_just_before_tick_edge();
     test_sweep();
     test_main_thread_spin_yields();
+    test_reboot_order();
 
     printf("現況：其他執行緒 delay_microseconds 掃描中短於要求 %u/%u 次（未要求，待追蹤）\n",
            other_short_waits, other_waits);

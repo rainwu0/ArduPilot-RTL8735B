@@ -258,9 +258,9 @@ Do not unplug USB while flashing. Close other programs that open serial ports by
 | Item | Status | Notes |
 |---|---|---|
 | Build system | Verified on a board (T1, T2) | |
-| Scheduling and semaphores | Verified on a board (T2) | The Copter main loop runs on the board (heartbeat, parameters, attitude updates); whether it actually reaches 400 Hz is not measured |
+| Scheduling and semaphores | Verified on a board (T2, T4) | The Copter main loop runs on the board (heartbeat, parameters, attitude updates); in normal running it measured 399.9 Hz over 120 seconds, with 0.07% long loops (T4). The main thread yields one tick after 20 ms of continuous busy-waiting: with the IMU's SCLK pulled, the main loop and lower-priority tasks kept running, but whether the yield triggered was not recorded; an IMU that delivers no samples at all has not been tried on a board (T4) |
 | SPI | Verified on a board (T2) | BMI160 |
-| I²C | Verified on a board (T2) | BMP280 and QMC5883L share bus 1. The barometer occasionally fails to initialize at boot, cause unknown (also seen once in T2). Timeout handling not tried on a board: after a transfer times out, the controller is reinitialized and the bus cleared if needed; the bus is disabled only after 3 timeouts in a row. Several buses at once (each with its own timeouts and disabling) has been checked only in host tests, not on a board |
+| I²C | Verified on a board (T2, T3) | BMP280 and QMC5883L share bus 1. The bus is cleared at boot: over 23 warm reboots, the first boot after writing the image and a cold boot, the barometer always initialized, and the occasional failure at boot recorded in T2 did not appear again (T3); the T3 image had the code from before each bus got its own task, and later versions have not been tried on a board. Timeout handling not tried on a board: after a transfer times out, the controller is reinitialized and the bus cleared if needed; the bus is disabled only after 3 timeouts in a row. Several buses at once (each with its own timeouts and disabling) has been checked only in host tests, not on a board |
 | UART | To be rechecked | 8N1 only |
 | Wi-Fi MAVLink (UDP) | Verified on a board (T2) | STA mode |
 | Wi-Fi MAVLink (TCP) | Build only | Chosen at build time, either this or UDP |

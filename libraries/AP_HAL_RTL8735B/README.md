@@ -222,7 +222,7 @@ FLASH_LAYOUT sdk-d1b6426
 - 不支援：DShot1200（7），以及 LED 輸出（NeoPixel、ProfiLED）。
 - DShot：HUB 8735 ultra 的四路輸出 PF11–PF14 是 PWM5–PWM8（`component/mbed/targets/hal/rtl8735b/pwmout_api.c:77-78` 的腳位表），而 SDK d1b6426 只有 PWM0–PWM3 的 GDMA handshake（`component/soc/8735b/fwlib/rtl8735b/include/rtl8735b_gdma.h:69-72`），PWM 硬體沒辦法逐位元換脈寬。所以 DShot 改由 CPU 直接寫 GPIO 埠的設定與清除暫存器送幀，各路同時送（`dshot_shim.c`）。
   - 每送一幀關一次中斷：DShot150 約 107 µs、DShot300 約 53 µs、DShot600 約 27 µs。建議用 DShot300。
-  - 主程式每次輸出送一幀；主迴圈超過 4 ms 沒有輸出時，由計時器補送上一幀。
+  - 主程式每次輸出送一幀；主迴圈超過 4 ms 沒有輸出時，由計時器補送上一幀。主迴圈超過 100 ms 沒跑完一圈時（例如卡住），補送的油門改成 0，馬達停轉，不會照停住前的油門一直轉；主迴圈恢復後照常輸出。
   - 第一次切到 DShot 時以 CPU 的週期計數器量 CPU 頻率；量不到或不是 500 MHz 就不送 DShot，並在主控台印出原因。
   - 一幀送到一半，週期計數器停住、倒退，或跳得太遠（例如被關不掉的中斷拖住），會讓位元的寬度出錯：這時腳全部拉低、這一幀作廢，下一次輸出照常送。第一次發生時在主控台與地面站提示一次。
   - 所有 DShot 輸出要在同一個 GPIO 埠；排針上的 PWM 腳都在埠 F。

@@ -224,6 +224,7 @@ FLASH_LAYOUT sdk-d1b6426
   - Interrupts are masked while each frame is sent: about 107 µs at DShot150, 53 µs at DShot300 and 27 µs at DShot600. DShot300 is recommended.
   - Each output from the main program sends one frame; when the main loop has not output for more than 4 ms, a timer resends the last frame.
   - The first switch to DShot measures the CPU clock with the CPU cycle counter; if the counter is missing or the clock is not 500 MHz, DShot is not sent and the reason is printed on the console.
+  - If the cycle counter stalls, goes backwards or jumps too far in the middle of a frame (for example when an interrupt that cannot be masked holds up the loop), the bit widths would come out wrong: all pins are pulled low and that frame is dropped, and the next output is sent as usual. The first time this happens, a warning goes to the console and the ground station.
   - All DShot outputs have to be on the same GPIO port; the PWM pins on the headers are all on port F.
   - Once an output switches to DShot, its pin stays GPIO for the rest of the boot. Changing `MOT_PWM_TYPE` needs a reboot.
   - The `RCOut:` line in the boot messages shows each output's mode, for example `RCOut: DS300:1-4`.

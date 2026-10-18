@@ -21,7 +21,8 @@ function(rtl8735b_sdk_extract out_var file)
     set(${out_var} "${code}" PARENT_SCOPE)
 endfunction()
 
-# SDK 範例的原始檔清單（out_sources 與 app_sources），去掉範例本身：main.c、RTSP、NN 模型與工具。
+# SDK 範例的原始檔清單（out_sources 與 app_sources），去掉範例本身：main.c、RTSP、NN 模型與工具；
+# 也去掉 GPL-2.0-only 的 ethernet_api.c（檔頭第 14–16 行），本 HAL 不用乙太網路。
 function(rtl8735b_sdk_sources out_var)
     set(out_sources)
     set(app_sources)
@@ -31,7 +32,7 @@ function(rtl8735b_sdk_sources out_var)
     set(sources ${out_sources} ${app_sources})
     list(REMOVE_DUPLICATES sources)
     list(FILTER sources EXCLUDE REGEX
-        "/src/main\\.c$|/src/test_model/|/mmfv2/module_rtsp2\\.c$|/mmfv2/module_vipnn\\.c$")
+        "/src/main\\.c$|/src/test_model/|/mmfv2/module_rtsp2\\.c$|/mmfv2/module_vipnn\\.c$|/ethernet_api\\.c$")
     # 本 HAL 直接依賴的檔案；SDK 換版後清單結構改變而少了它們時，在 configure 就停下
     foreach(required tasks.c port.c sockets.c libc_wrap.c flash_api.c)
         set(found FALSE)

@@ -127,6 +127,13 @@ class SdkImportTests(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn('sockets.c', r.stdout + r.stderr)
 
+    def test_ethernet_api_excluded(self):
+        # SDK 的 ethernet_api.c 是 GPL-2.0-only（檔頭第 14–16 行），本 HAL 不用乙太網路，不編進映像
+        r = self.run_sources(REQUIRED + ('ethernet_api.c', 'extra.c'))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('/sdk/x/extra.c', r.stdout + r.stderr)
+        self.assertNotIn('ethernet_api.c', r.stdout + r.stderr)
+
 
 @unittest.skipUnless(os.environ.get('AMEBAPRO2_SDK'), '需要 AMEBAPRO2_SDK')
 class RealSdkTests(unittest.TestCase):

@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # 取得建置 RTL8735B 需要的 Realtek SDK 與工具鏈。
 # 用法：Tools/scripts/rtl8735b_get_sdk.sh [SDK目錄]
-# 預設 SDK 目錄是原始碼樹旁的 ../ambpro2_sdk（waf 的預設位置；也可用環境變數 AMEBAPRO2_SDK 指定）。
+# 預設 SDK 目錄是原始碼樹旁的 ../ambpro2_sdk（waf 的預設位置）。放在別處時，以參數指定給本腳本，
+# 建置時再用環境變數 AMEBAPRO2_SDK 告訴 waf。
 set -euo pipefail
 
 SDK_URL=https://github.com/ambiot/ambpro2_sdk.git

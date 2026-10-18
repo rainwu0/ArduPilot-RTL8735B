@@ -82,6 +82,17 @@ def validate(name):
                                   % (name, rec, label, reserved[0], reserved[0] + reserved[1]))
 
 
+def app_defines(name):
+    '''開發板的應用程式讀得到的版面定義（app/rtl8735b_app.h）：版面名稱與 fw1、fw2 的位址、長度'''
+    records = get(name)
+    defines = {'RTL8735B_FLASH_LAYOUT': name}
+    for rec in ('fw1', 'fw2'):
+        addr, length = records[rec]
+        defines['RTL8735B_FLASH_%s_ADDR' % rec.upper()] = '0x%X' % addr
+        defines['RTL8735B_FLASH_%s_LEN' % rec.upper()] = '0x%X' % length
+    return defines
+
+
 def partition_table(sdk_table, name):
     '''以 SDK 的分割表（json.load 的結果）為底，改寫 PARTAB 各記錄的位址與長度，回傳新的 dict'''
     table = json.loads(json.dumps(sdk_table))

@@ -44,6 +44,17 @@ class LayoutTest(unittest.TestCase):
     def test_default_is_realtek_ota(self):
         self.assertEqual(fl.DEFAULT, 'realtek-ota')
 
+    def test_app_defines(self):
+        # 開發板的應用程式讀得到的版面名稱與 fw1、fw2 的位址、長度（app/rtl8735b_app.h）
+        self.assertEqual(fl.app_defines('realtek-ota'), {
+            'RTL8735B_FLASH_LAYOUT': 'realtek-ota',
+            'RTL8735B_FLASH_FW1_ADDR': '0x60000', 'RTL8735B_FLASH_FW1_LEN': '0x400000',
+            'RTL8735B_FLASH_FW2_ADDR': '0x520000', 'RTL8735B_FLASH_FW2_LEN': '0x400000',
+        })
+        self.assertEqual(fl.app_defines('arduino-default')['RTL8735B_FLASH_FW2_LEN'], '0x10000')
+        with self.assertRaisesRegex(fl.LayoutError, '不認得'):
+            fl.app_defines('hub8735ultra')
+
     def test_slots(self):
         self.assertEqual((fl.LAYOUTS['realtek-ota']['fw1'], fl.LAYOUTS['realtek-ota']['fw2']),
                          ((0x60000, 0x400000), (0x520000, 0x400000)))

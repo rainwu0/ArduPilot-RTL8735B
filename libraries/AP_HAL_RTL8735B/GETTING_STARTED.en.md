@@ -69,7 +69,7 @@ password=your-hotspot-password
 
 - Everything after the equals sign is used exactly as written. **Do not add quotes, and do not leave extra spaces around the equals sign or at the end of a line**, or the quotes and spaces become part of the name or password. Spaces inside the name are fine.
 - A stray quote or space gives **no** warning at build time. You only find out in step 7, from `SSID length N` in the boot messages: N is the number of bytes in the hotspot name, 1 for each letter or digit and 3 for each Chinese character.
-- The password must be 8–63 characters, or 64 hexadecimal characters; for an open network, leave `password=` empty. If the length is wrong, the build fails and says why.
+- The password must be 8–63 characters, or 64 hexadecimal characters, and only printable ASCII (letters, digits, symbols and spaces), with no Chinese or other characters; for an open network, leave `password=` empty. If the length or the characters are wrong, the build fails and says why.
 - Keep this file out of every git repository; you can `chmod 600 ~/wifi.txt`.
 
 Before building, tell the build system where it is:
@@ -120,7 +120,7 @@ The flashing tool's file name contains a space, hence the quotes.
 
 ## 6. Flash (on Windows)
 
-1. **Unpack the flashing tool**: on Windows, unpack `Pro2_PG_tool _v1.3.0.zip` in `Downloads`. `uartfwburn.exe` is in the unpacked subfolder `Pro2_PG_tool _v1.3.0\`; open PowerShell in that subfolder.
+1. **Unpack the flashing tool**: on Windows, unpack `Pro2_PG_tool _v1.3.0.zip` in `Downloads`. `uartfwburn.exe` is in the unpacked subfolder `Pro2_PG_tool _v1.3.0\` (if there is no such subfolder, look for it in the unpacked folder itself); open PowerShell in the folder that holds `uartfwburn.exe`.
 2. **Connect the board and find the COM port**: the board has two USB-C ports, and only one of them goes to the CH340 USB-to-serial chip. When you plug that one in, `USB-SERIAL CH340 (COMx)` appears under "Ports (COM & LPT)" in Device Manager; that is the port to use, so note its COM number. The other port does not show `USB-SERIAL CH340`.
    - If it still does not appear after you try the other port, try another cable.
    - If the driver did not install by itself, download the CH340 driver from the website of the chip maker, WCH.
@@ -161,7 +161,7 @@ WiFi: up, local 192.168.x.x:14555
 - **If you paste boot messages into a report, mask the `set ssid [...]` line first**: the SDK prints your hotspot name there.
 
 If something is wrong:
-- **`Config Error: Baro: unable to initialise driver` repeats every 5 seconds**: first press reset once. The barometer occasionally fails to initialize at boot, and the cause is not yet known; if it still happens after a reset, check the barometer's wiring and 3.3 V.
+- **`Config Error: Baro: unable to initialise driver` repeats every 5 seconds**: the barometer was not found. Check the barometer's wiring and 3.3 V, then press reset. v0.1.0 occasionally showed this error at boot for no reason, which v0.1.1 fixes; with v0.1.0, try pressing reset once first.
 - **`WiFi: no STA credentials` appears**: the image has no Wi-Fi credentials; go back to step 5 and check for `帳密取自`.
 - **`WiFi: up` never appears**: check the hotspot name and password; a 2.4 GHz hotspot is best.
 
@@ -171,7 +171,7 @@ If something is wrong:
 2. Until the board finds a ground station, it broadcasts heartbeats to UDP 14550, so ground station software listening on that port picks them up:
    - **QGroundControl**: listens on UDP 14550 by default; open it and wait for it to connect.
    - **Mission Planner**: choose UDP as the connection type at the top right, press Connect, and enter 14550 as the port.
-3. The first time Windows receives UDP, the firewall may ask; allow it on "Private networks".
+3. The first time Windows receives UDP, the firewall may ask; allow it on "Private networks". If Windows has put this hotspot under "Public networks", allow it on "Public networks" instead, or change this hotspot to "Private" in the Windows network settings.
 
 (The steps for these two ground stations have not yet been tried by following this page.)
 
@@ -181,7 +181,7 @@ When it works:
 - the ground station downloads the parameters, a little over 900 of them;
 - with the board level, roll and pitch are close to 0; lift the front (the end opposite the USB connectors) by about 45° and pitch becomes about +40°.
 
-**If there are other flight controllers on the same hotspot, the ground station may connect to one of them.** Check that the heartbeats come from the IP you noted in step 7.
+**If there are other flight controllers on the same hotspot, the ground station may connect to one of them.** The simplest way around this is to have only this board on the hotspot; if your ground station shows where the connection comes from, check that it is the IP you noted in step 7.
 
 ## What next
 

@@ -1146,6 +1146,76 @@ void test_dshot_keepalive_stops_motors_when_main_loop_stalls()
     assert(dshot_sends.back().frames[0] == run);
 }
 
+// 解鎖中主迴圈停住超過 100 ms：所有 PWM 通道停止輸出（一般 PWM 停用、有刷以 duty 0 拉低），只停一次；
+// 未解鎖時不動；主迴圈恢復後第一次 push 恢復輸出
+void test_pwm_stops_when_main_loop_stalls()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    {
+        RTL8735B::RCOutput output;
+        output.init();
+        output.force_safety_off();
+        for (uint8_t chan = 0; chan < 4; chan++) {
+            output.enable_ch(chan);
+        }
+        fake_util.soft_armed = true;
+        write_all(output, 1500, 1500, 1500, 1500);
+        for (uint8_t chan = 0; chan < 4; chan++) {
+            assert(output_active[chan] && output_pulse[chan] == 1500);
+        }
+        // 停住不久（50 ms）：照舊輸出
+        main_loop_ms_ago = 50;
+        fake_scheduler.run_timer();
+        for (uint8_t chan = 0; chan < 4; chan++) {
+            assert(output_active[chan]);
+        }
+        // 停住太久（250 ms）：全部停止，之後不重複停
+        main_loop_ms_ago = 250;
+        fake_scheduler.run_timer();
+        for (uint8_t chan = 0; chan < 4; chan++) {
+            assert(!output_active[chan]);
+        }
+        const unsigned stops = stop_count;
+        fake_scheduler.run_timer();
+        assert(stop_count == stops);
+        // 主迴圈恢復：第一次 push 恢復全部通道，包括這次沒寫到的
+        main_loop_ms_ago = 0;
+        output.cork();
+        output.write(0, 1600);
+        output.push();
+        assert(output_active[0] && output_pulse[0] == 1600);
+        for (uint8_t chan = 1; chan < 4; chan++) {
+            assert(output_active[chan] && output_pulse[chan] == 1500);
+        }
+        // 未解鎖時主迴圈停住：不動（未解鎖的輸出由 AP_Motors 自己壓到最低）
+        fake_util.soft_armed = false;
+        main_loop_ms_ago = 250;
+        fake_scheduler.run_timer();
+        assert(output_active[0] && output_pulse[0] == 1600);
+    }
+
+    // 有刷馬達：停止是 duty 0 拉低，馬達不再照最後的 duty 轉
+    reset_fake_outputs();
+    reset_dshot();
+    RTL8735B::RCOutput brushed;
+    brushed.init();
+    brushed.force_safety_off();
+    setup_brushed(brushed, 0x0FU, 16000);
+    for (uint8_t chan = 0; chan < 4; chan++) {
+        brushed.enable_ch(chan);
+    }
+    brushed.set_esc_scaling(1000, 2000);
+    fake_util.soft_armed = true;
+    write_all(brushed, 1500, 1500, 1500, 1500);
+    assert(output_is_ticks[0] && output_duty_ticks[0] != 0);
+    main_loop_ms_ago = 250;
+    fake_scheduler.run_timer();
+    for (uint8_t chan = 0; chan < 4; chan++) {
+        assert(output_low_driven[chan] && output_duty_ticks[chan] == 0);
+    }
+}
+
 // 電調型別決定位寬；速率改成別的 DShot 時所有 DShot 通道一起改；DShot 通道改回 PWM 要重開機：
 // 停送並說明，不碰 PWM
 void test_dshot_esc_type_rate_and_switching()
@@ -1419,6 +1489,7 @@ int main()
     test_dshot_telemetry_request();
     test_dshot_safety_and_keepalive();
     test_dshot_keepalive_stops_motors_when_main_loop_stalls();
+    test_pwm_stops_when_main_loop_stalls();
     test_dshot_esc_type_rate_and_switching();
     test_dshot_attach_failure();
     test_dshot_stopped();

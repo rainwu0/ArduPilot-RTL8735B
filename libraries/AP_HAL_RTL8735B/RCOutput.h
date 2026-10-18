@@ -48,6 +48,7 @@ private:
     void _stop_channel(uint8_t chan);
     bool _brushed_hold_low(uint8_t chan);
     void _apply_channel(uint8_t chan);
+    void _apply_all_channels();
     void _commit_write(uint8_t chan, uint16_t pulse_us);
     void _refresh_rate(uint8_t chan);
     void _report_rate(uint8_t chan);
@@ -63,7 +64,8 @@ private:
     void _update_dshot_timing();
     // resend：計時器補送（不是主程式的 push）
     void _dshot_send_locked(bool resend = false);
-    void _dshot_timer_tick();
+    // 計時器每 1 ms：主迴圈停住時停 PWM、DShot 的補送
+    void _timer_tick();
 
     uint16_t _freq_hz[CHANNELS];
     // 最後一次 set_freq 要求的頻率；切換輸出模式時依新模式重新判斷是否支援。
@@ -102,7 +104,8 @@ private:
     DshotEscType _dshot_esc_type;
     rtl8735b_dshot_timing_t _dshot_timing;
     bool _dshot_timing_valid;
-    bool _dshot_timer_registered;
+    // 主迴圈停住時計時器已停掉 PWM，等主迴圈恢復後的第一次 push 恢復
+    bool _pwm_stalled;
     bool _dshot_sent;
     bool _dshot_stopped;
     // 已提示過作廢的幀（rtl8735b_dshot_send 回 ETIMING），本次開機只提示一次

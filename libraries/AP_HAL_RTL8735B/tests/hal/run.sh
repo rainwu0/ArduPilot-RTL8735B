@@ -193,6 +193,13 @@ run_dshot() {
     for mode in "" send nocyccnt notcounting wrongfreq; do
         timeout 30 "$out/dshot-shim-test" $mode
     done
+
+    # 暖快取的空跑與真的送幀要跑同一份程式碼：送位元的迴圈要是獨立的函式，不能被內嵌成兩份（否則空跑暖的
+    # 是另一份）。韌體的編譯器在 -Os 就內嵌了它；主機的 gcc 要到 -O3 才會，所以用 -O3 檢查
+    cc "${CFLAGS[@]}" -O3 -I"$test_dir/dshot_fakes" -I"$lib_dir" \
+        -c "$lib_dir/dshot_shim.c" -o "$out/dshot-shim-o3.o"
+    nm "$out/dshot-shim-o3.o" | grep -q ' [tT] _send_bits$' ||
+        { echo "dshot_shim.c 的 _send_bits 被內嵌：空跑暖快取沒有用"; return 1; }
 }
 
 rc=0

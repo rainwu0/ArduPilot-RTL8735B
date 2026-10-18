@@ -142,14 +142,17 @@ uint32_t rtl8735b_dshot_cpu_hz(void)
     return dshot_calibration == DSHOT_CALIB_OK ? dshot_cpu_hz_value : 0;
 }
 
-static inline void _wait_until(uint32_t target)
+// 內嵌在送位元的迴圈裡：讀到計數器過了目標到寫入之間的指令越少，邊緣越準
+static inline __attribute__((always_inline)) void _wait_until(uint32_t target)
 {
     while ((int32_t)(RTL8735B_DSHOT_CYCLES() - target) < 0) {
     }
 }
 
-// 每個位元：起點全部拉高，0 的高電位時間到時拉低送 0 的腳，1 的高電位時間到時拉低其餘的腳
-static void _send_bits(volatile uint32_t *low, volatile uint32_t *high, uint32_t all,
+// 每個位元：起點全部拉高，0 的高電位時間到時拉低送 0 的腳，1 的高電位時間到時拉低其餘的腳。
+// 不內嵌、不特化：空跑與真的送幀要跑同一份程式碼，空跑才能把它載入快取（韌體的編譯器在 -Os 會把兩處呼叫
+// 各內嵌一份；只禁止內嵌時，gcc 仍可能依兩處不同的常數參數各做一份特化）
+static __attribute__((noinline, noclone)) void _send_bits(volatile uint32_t *low, volatile uint32_t *high, uint32_t all,
                        const uint32_t zeros[RTL8735B_DSHOT_FRAME_BITS], uint32_t bits,
                        const rtl8735b_dshot_timing_t *timing)
 {

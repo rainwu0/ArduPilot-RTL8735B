@@ -8,13 +8,13 @@ The status of each feature in a given version (verified on a board, build only a
 
 ## [Unreleased]
 
-## [0.1.1] - 2026-10-18
+## [0.1.1] - 2026-10-19
 
 Compatible with v0.1.0: existing overlays, commands and parameters keep working.
 
 ### Fixed
 
-- I²C: at boot the bus is cleared before the controller is initialized, and the I²C interrupt is masked while the controller is reinitialized. The occasional `Config Error: Baro: unable to initialise driver` at boot in v0.1.0 did not come back over repeated warm and cold boots on a board.
+- I²C: at boot the bus is cleared before the controller is initialized, and the I²C interrupt is masked while the controller is reinitialized. The occasional `Config Error: Baro: unable to initialise driver` at boot in v0.1.0 did not come back over repeated warm and cold boots on a board (T3 in BOARD_TESTS; the build tested predates giving each bus its own task, and the v0.1.1 code itself has not been on a board).
 - Scheduling: when the IMU stopped delivering samples (a loose wire, for example), the main thread used to busy-wait without end, and the lower priority Wi-Fi, UART and IO tasks never ran. Now the main thread yields for one tick after busy-waiting for 20 ms, so those tasks keep running. The MAVLink a ground station receives comes from the main loop, so it still stops while the main loop is stuck waiting for the IMU. Verified by host tests only; an IMU that delivers no samples at all has not been tried on a board.
 
 ### Added

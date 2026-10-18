@@ -8,13 +8,13 @@ English: [CHANGELOG.en.md](CHANGELOG.en.md)
 
 ## [Unreleased]
 
-## [0.1.1] - 2026-10-18
+## [0.1.1] - 2026-10-19
 
 和 v0.1.0 相容：原本的疊加檔、指令與參數照舊能用。
 
 ### 修正（Fixed）
 
-- I²C：開機時先清除匯流排，再初始化控制器；重新初始化控制器時遮罩 I²C 中斷。v0.1.0 開機偶爾出現的 `Config Error: Baro: unable to initialise driver`，在板上反覆熱重開與冷開機時沒有再出現。
+- I²C：開機時先清除匯流排，再初始化控制器；重新初始化控制器時遮罩 I²C 中斷。v0.1.0 開機偶爾出現的 `Config Error: Baro: unable to initialise driver`，在板上反覆熱重開與冷開機時沒有再出現（BOARD_TESTS 的 T3；測的是改成每條匯流排各自一個 task 之前的建置，v0.1.1 這一版的程式還沒上板）。
 - 排程：IMU 停止送樣本時（例如線鬆脫），主執行緒原本一直忙等，優先權較低的 Wi-Fi、UART、IO task 都跑不到。現在主執行緒忙等超過 20 ms 就讓出一個 tick，這些 task 還能執行。地面站收到的 MAVLink 由主迴圈產生，主迴圈卡在等 IMU 時一樣收不到。只經主機測試驗證；IMU 完全不送樣本的情況還沒上板。
 
 ### 新增（Added）

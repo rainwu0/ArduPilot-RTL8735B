@@ -189,9 +189,21 @@ FLASH_LAYOUT sdk-d1b6426
 | 1 OneShot | 同上的連續 PWM（晶片沒有單發觸發） |
 | 2 OneShot125 | 脈寬 125–250 µs（1000–2000 除以 8），每階 0.25 µs；固定 1 kHz 連續輸出，不看 `RC_SPEED` |
 | 3 Brushed | `RC_SPEED` 10–32 kHz |
+| 4 DShot150、5 DShot300、6 DShot600 | 以 GPIO 送幀，各路同時；見下 |
 
 - 有刷與 OneShot125 共用 PWM 的時脈（有刷用 40 MHz，OneShot125 用晶片內部的 4 MHz 振盪器），同一次開機只能用其中一種；另一種停止輸出，並在主控台印出原因。
-- 不支援：DShot（4–7），以及 LED 輸出（NeoPixel、ProfiLED）。DShot 需要以 DMA 驅動的 PWM 通道：SDK d1b6426 的 `component/soc/8735b/fwlib/rtl8735b/include/rtl8735b_gdma.h:69-72` 只有 PWM0–PWM3 的 GDMA handshake，而 HUB 8735 ultra 的四路輸出 PF11–PF14 是 PWM5–PWM8（`component/mbed/targets/hal/rtl8735b/pwmout_api.c:77-78` 的腳位表）。
+- 不支援：DShot1200（7），以及 LED 輸出（NeoPixel、ProfiLED）。
+- DShot：HUB 8735 ultra 的四路輸出 PF11–PF14 是 PWM5–PWM8（`component/mbed/targets/hal/rtl8735b/pwmout_api.c:77-78` 的腳位表），而 SDK d1b6426 只有 PWM0–PWM3 的 GDMA handshake（`component/soc/8735b/fwlib/rtl8735b/include/rtl8735b_gdma.h:69-72`），PWM 硬體沒辦法逐位元換脈寬。所以 DShot 改由 CPU 直接寫 GPIO 埠的設定與清除暫存器送幀，各路同時送（`dshot_shim.c`）。
+  - 每送一幀關一次中斷：DShot150 約 107 µs、DShot300 約 53 µs、DShot600 約 27 µs。建議用 DShot300。
+  - 主程式每次輸出送一幀；主迴圈超過 4 ms 沒有輸出時，由計時器補送上一幀。
+  - 第一次切到 DShot 時以 CPU 的週期計數器量 CPU 頻率；量不到或不是 500 MHz 就不送 DShot，並在主控台印出原因。
+  - 所有 DShot 輸出要在同一個 GPIO 埠；排針上的 PWM 腳都在埠 F。
+  - 一路切到 DShot 之後，本次開機內那支腳維持 GPIO。改 `MOT_PWM_TYPE` 要重開機。
+  - 開機訊息的 `RCOut:` 那一行顯示各路的輸出模式，例如 `RCOut: DS300:1-4`。
+  - 支援經 `send_dshot_command` 送的 DShot 命令（例如由電調發出的嗶聲），以及 BLHeli_S 的位寬（`SERVO_DSHOT_ESC`）。
+  - 不支援：雙向 DShot（轉速回讀）、3D 與反轉的通道設定（`SERVO_BLH_3DMASK`、`SERVO_BLH_RVMASK`）、經飛控刷電調韌體（BLHeli passthrough）。
+- 電調遙測（TLM 線）：BLHeli_32、AM32 等電調的遙測線接到一個序列埠的 RX（只要接 RX），該埠設 `SERIALn_PROTOCOL` 16，鮑率自動用 115200；`MOT_PWM_TYPE` 要是 DShot，馬達極數設在 `SERVO_BLH_POLES`。電調的電流與電壓可以用 `BATTn_MONITOR` 9 當成電池監測，也記在 `ESC` 記錄與 MAVLink 的 `ESC_TELEMETRY` 訊息。不需要的自訂板，在疊加檔加一行 `undef HAL_SUPPORT_RCOUT_SERIAL`。
+- DShot 與電調遙測尚未上板。上板前未確認的事：週期計數器存在且 CPU 是 500 MHz；邊緣的抖動在電調接受的範圍內；每幀關中斷不影響 Wi-Fi 與主迴圈。
 - OneShot、OneShot125 未上板。OneShot125 上板前未確認的事：
   - 時脈來自晶片內部的 RC 振盪器，精度與溫度漂移都未量測；切到 4 MHz 後時脈是否立即可用。
   - 週期與脈寬的暫存器寫法照 Realtek 公開原始碼的有刷寫法推得（Ameba-AIoT/ameba-rtos-pro2 eb5c090 的 `component/soc/8735b/fwlib/rtl8735b/source/ram/hal_pwm.c:333-380`），實際脈寬未量測。
@@ -270,7 +282,7 @@ FatFs 在 `fatfs/`：R0.14b，取自 ArduPilot 的 ChibiOS 子模組（`modules/
 
 ## 對 ArduPilot 共用程式的修改
 
-- `ArduCopter/takeoff_check.cpp`：本平台沒有 ESC 遙測（`HAL_WITH_ESC_TELEM` 為 0），原本的起飛前檢查整段不編譯，解鎖後馬達會停在地面怠速。改為沒有 ESC 遙測時只略過馬達轉速檢查，CPU 負載檢查照常（本 HAL 尚未提供系統負載，所以目前不會擋）；有 ESC 遙測的建置不受影響。本庫直接採用上游 PR 34070（https://github.com/ArduPilot/ardupilot/pull/34070，作者 yuiseki）的提交；到 2026-10-07 這個 PR 尚未被上游合併。
+- `ArduCopter/takeoff_check.cpp`：沒有 ESC 遙測的建置（`HAL_WITH_ESC_TELEM` 為 0，例如疊加檔 `undef HAL_SUPPORT_RCOUT_SERIAL` 的自訂板），原本的起飛前檢查整段不編譯，解鎖後馬達會停在地面怠速。改為沒有 ESC 遙測時只略過馬達轉速檢查，CPU 負載檢查照常（本 HAL 尚未提供系統負載，所以目前不會擋）；有 ESC 遙測的建置（板型的預設）不受影響，照上游原本的檢查。本庫直接採用上游 PR 34070（https://github.com/ArduPilot/ardupilot/pull/34070，作者 yuiseki）的提交；到 2026-10-07 這個 PR 尚未被上游合併。
 - `libraries/AP_HAL/AP_HAL_Boards.h`：`HAL_BOARD_RTL8735B` 為 100，避開上游依序分配的平台編號。
 - `Tools/ardupilotwaf/boards.py`（waf 的板型登記）與 `libraries/AP_Filesystem/AP_Filesystem.h`（本平台的 newlib 沒有 `dirent.h`，在此補上定義）：加入本平台，不改變其他平台的行為。
 - `libraries/AP_Filesystem/AP_Filesystem.cpp`、`AP_Filesystem_config.h`：加入本平台的 SD 卡後端 `AP_Filesystem_RTL8735B`（新檔），不改變其他平台的行為。
@@ -292,6 +304,7 @@ FatFs 在 `fatfs/`：R0.14b，取自 ArduPilot 的 ChibiOS 子模組（`modules/
 | RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol），預設在 SERIAL4；支援 8N1、不反相的協定（CRSF、ELRS 等），不支援 SBUS（接法見〈板型〉）。主機測試涵蓋輪流試格式，沒有接過接收機實測。地面站的 RC override 走 MAVLink，不經過 RC 輸入；它在板上的使用待複驗 |
 | GPS | 僅建置 | 預設在 SERIAL3；接 SERIAL1 要改 `SERIAL1_PROTOCOL`（接法見〈板型〉）。主機測試涵蓋自動換鮑率，沒有接過 GPS 實測 |
 | PWM 輸出 | 待複驗 | 有刷馬達 PWM 先前驅動過馬達；電調用的一般 PWM、OneShot、OneShot125 未上板，見〈馬達輸出〉 |
+| DShot 與電調遙測 | 僅建置與主機測試、未上板 | DShot150／300／600、遙測請求位元、DShot 命令；電調的 TLM 線遙測。見〈馬達輸出〉 |
 | AnalogIn | 僅建置 | 12 位元，以滿刻度 3.3 V 線性換算成電壓，精度與零點偏移未經板上量測（零點可用 `BATT_VLT_OFFSET` 等參數修正）。只有板型 hwdef 列出的類比腳能用，hub8735ultra 是 D2；hwdef 可以列多支（PF0–PF3、PA0–PA3），各自取樣，多支同時用只建置與主機測試，PA0–PA3 的換算是否和 PF0–PF3 相同未上板確認；腳位能承受的電壓上限不明，腳上的電壓不要超過 3.3 V。電池電壓要先經分壓，分壓比設在 `BATT_VOLT_MULT` |
 | 參數存在 Flash | 板上驗證（T2） | 重開機後保留；斷電後保留未驗證。換扇區後那次開機抹除期間斷電，參數會全部回預設，見〈Flash 版面〉 |
 | SD 卡 | 僅建置與主機測試、未上板 | 掛載、讀寫、MAVLink FTP、檔案系統記錄都還沒在板上跑過。主機測試以 RAM 上的假卡涵蓋掛載與重試、格式化、檔案與目錄操作、寫入出錯後重掛、拔卡；用法見〈SD 卡〉 |

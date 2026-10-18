@@ -10,11 +10,12 @@ This page gives the overall picture; the details of each feature are in the [HAL
 
 ## What works now
 
-- The current version is **v0.1.1** (2026-10-18), compatible with v0.1.0.
+- The current version is **v0.1.1** (2026-10-19), compatible with v0.1.0.
 - ArduPilot master `9f648ccabc` (2026-09-25) plus a HAL for the RTL8735B, with ArduPilot's full history kept.
 - Board types: `hub8735ultra` (HUB 8735 ultra, vendor ideasHatch, [vendor resources](https://github.com/ideashatch/HUB-8735)), where all development happens; `amb82-mini` has only been built.
 - **With a BMI160, BMP280 and GY-271 (QMC5883L) connected as in the example, the HUB 8735 ultra works:** it boots, connects to a ground station over Wi-Fi (UDP), keeps parameters across reboots, and the attitude moves the right way when you lift the board. The wiring and the overlay are in [Connecting sensors][sensors], and the board test record is T2 in [BOARD_TESTS.md][tests-board] (in Chinese).
-- The I²C bus is cleared at boot: the occasional barometer initialization failure at boot in v0.1.0 did not come back over repeated warm and cold boots on a board.
+- The I²C bus is cleared at boot: the occasional barometer initialization failure at boot in v0.1.0 did not come back over repeated warm and cold boots on a board (T3 in [BOARD_TESTS.md][tests-board]; the build tested predates giving each bus its own task).
+- The Copter main loop runs at about 400 Hz on a board in normal operation (399.9 Hz averaged over 120 seconds, T4 in [BOARD_TESTS.md][tests-board]).
 - The board type itself has no sensors. With nothing connected, boot stops at the barometer Config Error; Wi-Fi joins the hotspot, but there is no MAVLink.
 - Host tests that run without a board or the SDK: `Tools/scripts/rtl8735b_test.sh`, described in [tests/README.md][tests] (in Chinese). Passing host tests does not mean it works on a board.
 
@@ -35,7 +36,6 @@ For the status of each item, see [Feature status][status].
   - compass orientation and calibration: so far it is only confirmed that the compass is detected;
   - the sign of roll: inferred from the pitch result, not tested directly;
   - whether parameters survive power loss: only reboots were tested;
-  - the actual main loop rate;
   - several I²C buses in use at once;
   - UART, PWM output, Wi-Fi TCP, RC input, GPS, `--upload`, AMB82-mini.
 - The IMU orientation in the example overlay was measured with the example board's mounting. If you mount it differently, test again; how is described in Connecting sensors.
@@ -49,11 +49,11 @@ For the status of each item, see [Feature status][status].
 
 ## Recent changes
 
-### v0.1.1 (2026-10-18): steadier boot, a second I²C bus
+### v0.1.1 (2026-10-19): steadier boot, a second I²C bus
 
 Compatible with v0.1.0: existing overlays, commands and parameters keep working. Both fixes take effect only after you build and flash again. The tag is `v0.1.1` (`git checkout v0.1.1`); it only marks a commit, and no firmware is attached.
 
-- Fixed: at boot the I²C bus is cleared before the controller is initialized, and the interrupt is masked while it is reinitialized. The occasional `Config Error: Baro` at boot in v0.1.0 did not come back over repeated warm and cold boots on a board.
+- Fixed: at boot the I²C bus is cleared before the controller is initialized, and the interrupt is masked while it is reinitialized. The occasional `Config Error: Baro` at boot in v0.1.0 did not come back over repeated warm and cold boots on a board (T3 in BOARD_TESTS; the build tested predates giving each bus its own task, and the v0.1.1 code itself has not been on a board).
 - Fixed: when the IMU stops delivering samples (a loose wire, for example), the main thread no longer busy-waits without end, so lower priority work such as Wi-Fi and UART keeps running. The ground station's MAVLink comes from the main loop, so it still stops while the main loop is stuck. Verified by host tests only, not yet on a board.
 - Added: up to four I²C buses in one hwdef, each with its own timeouts and disabling; see [Custom boards][custom]. Build and host tests only, not yet tried on a board.
 - Added documentation: how to wire an RC receiver (CRSF, ELRS and others; SBUS is not supported) and a GPS, and their default serial ports; see [Board types][boards]. With host tests; never tried with real devices.

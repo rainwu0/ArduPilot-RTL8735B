@@ -10,11 +10,12 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Englis
 
 ## 現在有什麼
 
-- 目前的版本是 **v0.1.1**（2026-10-18），和 v0.1.0 相容。
+- 目前的版本是 **v0.1.1**（2026-10-19），和 v0.1.0 相容。
 - ArduPilot master `9f648ccabc`（2026-09-25）加上 RTL8735B 的 HAL，保留 ArduPilot 的完整歷史。
 - 板型：`hub8735ultra`（HUB 8735 ultra，板商 ideasHatch，[板商資料](https://github.com/ideashatch/HUB-8735)），開發都在這塊上做；`amb82-mini` 只建置過。
 - **HUB 8735 ultra 照範例接上 BMI160、BMP280、GY-271（QMC5883L）就能用：** 開機、經 Wi-Fi（UDP）連上地面站、參數在重開機後保留、抬起開發板時姿態方向正確。接法和疊加檔見[〈接上感測器〉][sensors]，上板紀錄見 [BOARD_TESTS.md][tests-board] 的 T2。
-- 開機時會先清 I²C 匯流排：v0.1.0 開機偶爾出現的氣壓計初始化失敗，在板上反覆熱重開與冷開機時沒有再出現。
+- 開機時會先清 I²C 匯流排：v0.1.0 開機偶爾出現的氣壓計初始化失敗，在板上反覆熱重開與冷開機時沒有再出現（[BOARD_TESTS.md][tests-board] 的 T3；測的是改成每條匯流排各自一個 task 之前的建置）。
+- Copter 主迴圈在板上正常運作時約 400 Hz（120 秒平均 399.9 Hz，[BOARD_TESTS.md][tests-board] 的 T4）。
 - 板型本身不含感測器。什麼都沒接時開機停在氣壓計的 Config Error，Wi-Fi 會連上熱點，但不會有 MAVLink。
 - 不用開發板、不用 SDK 就能跑的主機測試：`Tools/scripts/rtl8735b_test.sh`，說明在 [tests/README.md][tests]。主機測試通過不代表在開發板上能用。
 
@@ -35,7 +36,6 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Englis
   - 羅盤的方向與校正：目前只確認偵測得到；
   - roll 的正負：由 pitch 的結果推得，沒有直接測；
   - 斷電後參數是否保留：只測了重開機；
-  - 主迴圈的實際頻率；
   - 多條 I²C 匯流排同時用；
   - UART、PWM 輸出、Wi-Fi TCP、RC 輸入、GPS、`--upload`、AMB82-mini。
 - 範例疊加檔的 IMU 方向，是在範例板的擺法下實測的。換了擺法要重測，方法寫在〈接上感測器〉。
@@ -49,11 +49,11 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Englis
 
 ## 最近的變動
 
-### v0.1.1（2026-10-18）：開機更穩，可以接第二條 I²C
+### v0.1.1（2026-10-19）：開機更穩，可以接第二條 I²C
 
 和 v0.1.0 相容：原本的疊加檔、指令與參數照舊能用。兩個修正都要重新建置、燒錄才會生效。標籤是 `v0.1.1`（`git checkout v0.1.1`），只標提交，不附韌體。
 
-- 修正：開機時先清 I²C 匯流排再初始化控制器，重新初始化時遮罩中斷。v0.1.0 開機偶爾出現的 `Config Error: Baro`，在板上反覆熱重開與冷開機時沒有再出現。
+- 修正：開機時先清 I²C 匯流排再初始化控制器，重新初始化時遮罩中斷。v0.1.0 開機偶爾出現的 `Config Error: Baro`，在板上反覆熱重開與冷開機時沒有再出現（BOARD_TESTS 的 T3；測的是改成每條匯流排各自一個 task 之前的建置，v0.1.1 這一版的程式還沒上板）。
 - 修正：IMU 停止送樣本時（例如線鬆脫），主執行緒不再一直忙等，Wi-Fi、UART 等優先權較低的工作還能執行。地面站的 MAVLink 由主迴圈產生，主迴圈卡住時一樣收不到。只經主機測試驗證，還沒上板。
 - 新增：一個 hwdef 最多四條 I²C 匯流排，各自計逾時與停用，見[〈自訂板〉][custom]。只經建置與主機測試，還沒上板。
 - 新增說明：RC 接收機（CRSF、ELRS 等，不支援 SBUS）與 GPS 的接法和預設序列埠，見[〈板型〉][boards]。附主機測試，還沒接過實物。

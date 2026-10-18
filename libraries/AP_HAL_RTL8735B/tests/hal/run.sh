@@ -77,9 +77,10 @@ run_bus() {
 run_io() {
     cc "${CFLAGS[@]}" -I"$test_dir/io_fakes" -I"$lib_dir" \
         -c "$lib_dir/IOConfig.c" -o "$out/io-config.o"
+    cc "${CFLAGS[@]}" -I"$lib_dir" -c "$lib_dir/dshot_frame.c" -o "$out/dshot-frame.o"
     c++ "${CXXFLAGS[@]}" -pthread -I"$test_dir/io_fakes" -I"$lib_dir" \
         "$lib_dir/RCOutput.cpp" "$lib_dir/StatusText.cpp" "$test_dir/io_contract_host_test.cpp" "$out/io-config.o" \
-        -o "$out/io-contract-test"
+        "$out/dshot-frame.o" -o "$out/io-contract-test"
     timeout 30 "$out/io-contract-test"
 
     cc "${CFLAGS[@]}" -I"$test_dir/io_fakes" -I"$lib_dir" \

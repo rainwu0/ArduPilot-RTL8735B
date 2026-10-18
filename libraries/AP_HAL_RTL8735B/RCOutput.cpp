@@ -2,9 +2,14 @@
 
 #include "RCOutput.h"
 
+#include <AP_HAL/AP_HAL.h>
+
 #include "IOConfig.h"
 #include "StatusText.h"
+#include "dshot_shim.h"
 #include "io_shim.h"
+
+extern const AP_HAL::HAL &hal;
 
 using namespace RTL8735B;
 
@@ -31,8 +36,24 @@ RCOutput::RCOutput() :
     _clock_reported_mask(0),
     _corked(false),
     _initialized(false),
-    _safety_state(AP_HAL::Util::SAFETY_NONE)
-{}
+    _safety_state(AP_HAL::Util::SAFETY_NONE),
+    _dshot_mask(0),
+    _dshot_attached_mask(0),
+    _dshot_reported_mask(0),
+    _telem_request_mask(0),
+    _dshot_mode(MODE_PWM_NONE),
+    _dshot_esc_type(DSHOT_ESC_NONE),
+    _dshot_timing{},
+    _dshot_timing_valid(false),
+    _dshot_timer_registered(false),
+    _dshot_sent(false),
+    _dshot_stopped(false),
+    _dshot_last_send_us(0)
+{
+    for (uint8_t i = 0; i < CHANNELS; i++) {
+        _dshot_slot[i] = -1;
+    }
+}
 
 bool RCOutput::_channel_valid(uint8_t chan) const
 {
@@ -51,6 +72,36 @@ bool is_supported_mode(AP_HAL::RCOutput::output_mode mode)
     return is_us_mode(mode) || mode == AP_HAL::RCOutput::MODE_PWM_ONESHOT125 ||
         mode == AP_HAL::RCOutput::MODE_PWM_BRUSHED;
 }
+
+// DShot1200 不做：一位元只有約 417 個 CPU 週期
+bool is_dshot_mode(AP_HAL::RCOutput::output_mode mode)
+{
+    return mode == AP_HAL::RCOutput::MODE_PWM_DSHOT150 || mode == AP_HAL::RCOutput::MODE_PWM_DSHOT300 ||
+        mode == AP_HAL::RCOutput::MODE_PWM_DSHOT600;
+}
+
+uint16_t dshot_rate_khz(AP_HAL::RCOutput::output_mode mode)
+{
+    switch (mode) {
+    case AP_HAL::RCOutput::MODE_PWM_DSHOT150:
+        return 150;
+    case AP_HAL::RCOutput::MODE_PWM_DSHOT300:
+        return 300;
+    case AP_HAL::RCOutput::MODE_PWM_DSHOT600:
+        return 600;
+    default:
+        return 0;
+    }
+}
+
+// 主程式每次 push 送一幀；沒有 push 時（例如主迴圈卡住），計時器在上一幀之後這麼久補送同樣的幀，
+// 讓電調不因收不到訊號而停機（最低約 250 Hz）
+constexpr uint32_t DSHOT_KEEPALIVE_US = 4000;
+}
+
+bool RCOutput::_is_dshot(uint8_t chan) const
+{
+    return (_dshot_mask & (1UL << chan)) != 0;
 }
 
 bool RCOutput::_output_usable(uint8_t chan) const
@@ -103,6 +154,10 @@ void RCOutput::_stop_channel(uint8_t chan)
     if (!_channel_valid(chan)) {
         return;
     }
+    // 腳已改成 GPIO：兩幀之間本來就是低電位，脈寬清成 0 之後就不再送這一路
+    if ((_dshot_attached_mask & (1UL << chan)) != 0) {
+        return;
+    }
     if (_mode[chan] == MODE_PWM_BRUSHED && _brushed_hold_low(chan)) {
         return;
     }
@@ -146,7 +201,7 @@ void RCOutput::_report_clock_conflict(uint8_t chan)
 
 void RCOutput::_apply_channel(uint8_t chan)
 {
-    if (!_channel_valid(chan) || !_initialized) {
+    if (!_channel_valid(chan) || !_initialized || (_dshot_attached_mask & (1UL << chan)) != 0) {
         return;
     }
     const RTL8735BRCChannelPolicy policy = {
@@ -331,6 +386,22 @@ void RCOutput::write(uint8_t chan, uint16_t pulse_us)
     if (!_initialized || !_channel_valid(chan)) {
         return;
     }
+    if (_is_dshot(chan)) {
+        _pending_mask &= ~(1UL << chan);
+        _pending_us[chan] = 0;
+        if (_safety_state == AP_HAL::Util::SAFETY_DISARMED) {
+            _value_us[chan] = 0;
+            return;
+        }
+        if (_corked) {
+            _pending_us[chan] = pulse_us;
+            _pending_mask |= 1UL << chan;
+            return;
+        }
+        _value_us[chan] = pulse_us;
+        _dshot_send_locked();
+        return;
+    }
     if (_safety_state == AP_HAL::Util::SAFETY_DISARMED) {
         _pending_mask &= ~(1UL << chan);
         _pending_us[chan] = 0;
@@ -388,6 +459,7 @@ void RCOutput::push()
     if (!_corked) {
         // 不經 cork 的 write() 也可能被延後，這裡同樣補寫。
         rtl8735b_pwm_flush();
+        _dshot_send_locked();
         return;
     }
     const uint32_t pending = _pending_mask;
@@ -404,12 +476,18 @@ void RCOutput::push()
     }
     for (uint8_t chan = 0; chan < CHANNELS; chan++) {
         if ((pending & (1UL << chan)) != 0) {
-            _commit_write(chan, _pending_us[chan]);
+            if (_is_dshot(chan)) {
+                _value_us[chan] = _pending_us[chan];
+            } else {
+                _commit_write(chan, _pending_us[chan]);
+            }
         }
         _pending_us[chan] = 0;
     }
     // 補寫上一次 push 時硬體還沒套用、因而延後的一般 PWM 值。
     rtl8735b_pwm_flush();
+    // DShot 的各路同時送一幀
+    _dshot_send_locked();
 }
 
 void RCOutput::set_output_mode(uint32_t mask, enum output_mode mode)
@@ -421,6 +499,25 @@ void RCOutput::set_output_mode(uint32_t mask, enum output_mode mode)
     }
     for (uint8_t chan = 0; chan < CHANNELS; chan++) {
         if ((mask & (1UL << chan)) == 0) {
+            continue;
+        }
+        if (is_dshot_mode(mode)) {
+            _set_dshot_mode(chan, mode);
+            continue;
+        }
+        if ((_dshot_attached_mask & (1UL << chan)) != 0) {
+            // 腳已改成 GPIO，本次開機內不還給 PWM（改 MOT_PWM_TYPE 本來就要重開機）：停送並說明
+            if ((_dshot_reported_mask & (1UL << chan)) == 0) {
+                _dshot_reported_mask |= 1UL << chan;
+                RTL8735B::report_warning("RTL8735B: ch%u stays a DShot pin until reboot; output stopped",
+                                         (unsigned)chan + 1U);
+            }
+            _dshot_mask &= ~(1UL << chan);
+            _mode[chan] = MODE_PWM_NONE;
+            _has_valid_write[chan] = false;
+            _value_us[chan] = 0;
+            _pending_mask &= ~(1UL << chan);
+            _pending_us[chan] = 0;
             continue;
         }
         if (is_supported_mode(mode)) {
@@ -515,4 +612,149 @@ AP_HAL::Util::safety_state RCOutput::safety_switch_state() const
 {
     RCLock lock(_semaphore);
     return _safety_state;
+}
+
+void RCOutput::_report_dshot_failure(uint8_t chan, int status)
+{
+    if ((_dshot_reported_mask & (1UL << chan)) != 0) {
+        return;
+    }
+    _dshot_reported_mask |= 1UL << chan;
+    const unsigned ch = (unsigned)chan + 1U;
+    switch (status) {
+    case RTL8735B_DSHOT_ECLOCK:
+        RTL8735B::report_warning("RTL8735B: DShot ch%u unavailable: CPU cycle counter missing or not at the "
+                                 "expected clock; output stopped", ch);
+        break;
+    case RTL8735B_DSHOT_EPORT:
+        RTL8735B::report_warning("RTL8735B: DShot ch%u unavailable: pin not on the same GPIO port as the other "
+                                 "DShot outputs; output stopped", ch);
+        break;
+    case RTL8735B_DSHOT_EGPIO:
+        RTL8735B::report_warning("RTL8735B: DShot ch%u unavailable: pin cannot be used as GPIO (already in use?); "
+                                 "output stopped", ch);
+        break;
+    default:
+        RTL8735B::report_warning("RTL8735B: DShot ch%u unavailable (%d); output stopped", ch, status);
+        break;
+    }
+}
+
+void RCOutput::_update_dshot_timing()
+{
+    const uint8_t wide = _dshot_esc_type == DSHOT_ESC_BLHELI_S || _dshot_esc_type == DSHOT_ESC_BLHELI_EDT_S;
+    _dshot_timing_valid = rtl8735b_dshot_timing(dshot_rate_khz(_dshot_mode), wide, rtl8735b_dshot_cpu_hz(),
+                                                &_dshot_timing) == 0;
+}
+
+// 切成 DShot：第一次先停掉 PWM 的輸出、把腳改成 GPIO（失敗就停用這一路並說明原因）。所有 DShot 通道同時送，
+// 速率只能一種，後來的速率套用到全部 DShot 通道。
+void RCOutput::_set_dshot_mode(uint8_t chan, enum output_mode mode)
+{
+    const uint32_t bit = 1UL << chan;
+    _pending_mask &= ~bit;
+    _pending_us[chan] = 0;
+    _has_valid_write[chan] = false;
+    _value_us[chan] = 0;
+    if ((_dshot_attached_mask & bit) == 0) {
+        _stop_channel(chan);
+        const int slot = rtl8735b_dshot_attach(rtl8735b_rcout_pin(chan));
+        if (slot < 0) {
+            _report_dshot_failure(chan, slot);
+            _mode[chan] = MODE_PWM_NONE;
+            return;
+        }
+        _dshot_slot[chan] = (int8_t)slot;
+        _dshot_attached_mask |= bit;
+    }
+    _dshot_mask |= bit;
+    _fast_mask |= bit;
+    _dshot_mode = mode;
+    for (uint8_t i = 0; i < CHANNELS; i++) {
+        if (_is_dshot(i)) {
+            _mode[i] = mode;
+        }
+    }
+    _update_dshot_timing();
+    if (!_dshot_timer_registered) {
+        _dshot_timer_registered = true;
+        hal.scheduler->register_timer_process(FUNCTOR_BIND_MEMBER(&RCOutput::_dshot_timer_tick, void));
+    }
+}
+
+// 各 DShot 通道依目前的脈寬同時送一幀。安全開關關著時不送任何幀；未解鎖時送數值 0（停止）；脈寬 0 的通道不送。
+// 遙測請求只帶在下一幀，送出後清掉。
+void RCOutput::_dshot_send_locked()
+{
+    if (_dshot_mask == 0 || _dshot_stopped || !_dshot_timing_valid ||
+        _safety_state == AP_HAL::Util::SAFETY_DISARMED) {
+        return;
+    }
+    const uint8_t armed = hal.util->get_soft_armed() ? 1 : 0;
+    uint16_t frames[RTL8735B_DSHOT_MAX_SLOTS] = {};
+    uint32_t active = 0;
+    uint32_t sent = 0;
+    for (uint8_t chan = 0; chan < CHANNELS; chan++) {
+        if (!_is_dshot(chan) || _value_us[chan] == 0 || _dshot_slot[chan] < 0) {
+            continue;
+        }
+        const uint8_t slot = (uint8_t)_dshot_slot[chan];
+        const uint8_t telem = (_telem_request_mask & (1UL << chan)) != 0;
+        frames[slot] = rtl8735b_dshot_frame(rtl8735b_dshot_throttle_value(_value_us[chan], armed), telem);
+        active |= 1UL << slot;
+        sent |= 1UL << chan;
+    }
+    if (active == 0) {
+        return;
+    }
+    const int status = rtl8735b_dshot_send(frames, active, &_dshot_timing);
+    _dshot_sent = true;
+    _dshot_last_send_us = AP_HAL::micros();
+    if (status == RTL8735B_DSHOT_ESTOPPED) {
+        _dshot_stopped = true;
+        return;
+    }
+    if (status == RTL8735B_DSHOT_OK) {
+        _telem_request_mask &= ~sent;
+    }
+}
+
+// 計時器執行緒（較主執行緒優先）：主程式太久沒 push 時補送。號誌被拿著就跳過，不等。
+void RCOutput::_dshot_timer_tick()
+{
+    if (!_semaphore.take_nonblocking()) {
+        return;
+    }
+    if (_dshot_sent && (uint32_t)(AP_HAL::micros() - _dshot_last_send_us) >= DSHOT_KEEPALIVE_US) {
+        _dshot_send_locked();
+    }
+    _semaphore.give();
+}
+
+void RCOutput::set_telem_request_mask(uint32_t mask)
+{
+    RCLock lock(_semaphore);
+    _telem_request_mask |= mask;
+}
+
+// 幀在每次 push 時送出（主迴圈的頻率），沒有 push 時由計時器補送；ArduPilot 以迴圈頻率倍數排的送幀頻率不用。
+void RCOutput::set_dshot_rate(uint8_t dshot_rate, uint16_t loop_rate_hz)
+{
+    (void)dshot_rate;
+    (void)loop_rate_hz;
+}
+
+void RCOutput::set_dshot_esc_type(DshotEscType esc_type)
+{
+    RCLock lock(_semaphore);
+    _dshot_esc_type = esc_type;
+    if (_dshot_mask != 0) {
+        _update_dshot_timing();
+    }
+}
+
+AP_HAL::RCOutput::DshotEscType RCOutput::get_dshot_esc_type() const
+{
+    RCLock lock(_semaphore);
+    return _dshot_esc_type;
 }

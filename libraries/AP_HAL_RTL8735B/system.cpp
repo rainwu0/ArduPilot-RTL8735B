@@ -23,6 +23,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include "dshot_shim.h"
 #include "io_shim.h"
 #include "sdk_shim.h"
 
@@ -38,6 +39,8 @@ void panic(const char *errormsg, ...)
     // 不能呼叫，設定的 safety 狀態也會被 force_safety_off() 解除。旗標放在 io_shim，panic 之後
     // 其他執行緒的寫入（例如 timer 執行緒上 Copter failsafe_check 的 motors->output()）只會得到歸零。
     rtl8735b_pwm_emergency_stop();
+    // DShot 的腳同樣拉低，之後不再送幀（電調收不到幀就停）
+    rtl8735b_dshot_emergency_stop();
 
     va_list ap;
 

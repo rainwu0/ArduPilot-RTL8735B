@@ -1,16 +1,22 @@
 #include "IOConfig.h"
 #include "RCOutput.h"
+#include "dshot_frame.h"
+#include "dshot_shim.h"
 #include "io_shim.h"
 
+#include <AP_HAL/AP_HAL.h>
 #include <GCS_MAVLink/GCS.h>
 
 #include <assert.h>
+#include <condition_variable>
 #include <mutex>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <string>
 #include <thread>
 #include <unistd.h>
+#include <vector>
 
 namespace {
 std::recursive_mutex semaphore_mutex;
@@ -32,6 +38,28 @@ bool output_low_driven[4];
 uint16_t output_pulse[4];
 uint16_t output_period_ticks[4];
 uint16_t output_duty_ticks[4];
+
+// DShot 送幀的替身：記下接上的腳與每次送出的幀
+struct DshotSend {
+    uint16_t frames[RTL8735B_DSHOT_MAX_SLOTS];
+    uint32_t active;
+    rtl8735b_dshot_timing_t timing;
+};
+std::vector<uint32_t> dshot_pins;
+std::vector<DshotSend> dshot_sends;
+uint32_t dshot_fail_pin = 0xFFFFFFFFu;
+int dshot_fail_code;
+bool dshot_stopped;
+uint32_t now_us;
+AP_HAL::Scheduler fake_scheduler;
+AP_HAL::Util fake_util;
+AP_HAL::HAL make_fake_hal()
+{
+    AP_HAL::HAL h(&fake_scheduler);
+    h.util = &fake_util;
+    return h;
+}
+AP_HAL::HAL fake_hal_object = make_fake_hal();
 
 // 把 stdout 暫時導到暫存檔，用來檢查 RCOutput 印出的診斷訊息。
 class StdoutCapture {
@@ -87,6 +115,48 @@ void reset_fake_outputs()
         output_oneshot125_ticks[i] = 0;
     }
 }
+}
+
+const AP_HAL::HAL &hal = fake_hal_object;
+
+uint32_t AP_HAL::micros()
+{
+    return now_us;
+}
+
+extern "C" int rtl8735b_dshot_attach(uint32_t pin)
+{
+    if (pin == dshot_fail_pin) {
+        return dshot_fail_code;
+    }
+    for (size_t i = 0; i < dshot_pins.size(); i++) {
+        if (dshot_pins[i] == pin) {
+            return (int)i;
+        }
+    }
+    dshot_pins.push_back(pin);
+    return (int)dshot_pins.size() - 1;
+}
+
+extern "C" uint32_t rtl8735b_dshot_cpu_hz(void)
+{
+    return 500000000u;
+}
+
+extern "C" int rtl8735b_dshot_send(const uint16_t frames[RTL8735B_DSHOT_MAX_SLOTS], uint32_t active,
+                                   const rtl8735b_dshot_timing_t *timing)
+{
+    DshotSend send;
+    memcpy(send.frames, frames, sizeof(send.frames));
+    send.active = active;
+    send.timing = *timing;
+    dshot_sends.push_back(send);
+    return dshot_stopped ? RTL8735B_DSHOT_ESTOPPED : RTL8735B_DSHOT_OK;
+}
+
+extern "C" void rtl8735b_dshot_emergency_stop(void)
+{
+    dshot_stopped = true;
 }
 
 namespace RTL8735B {
@@ -248,7 +318,7 @@ static void test_invalid_rate_pulse_and_mode_fail_closed()
     assert(!output_active[2]);
     assert(apply_count == 1);
 
-    output.set_output_mode(1U << 2, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+    output.set_output_mode(1U << 2, AP_HAL::RCOutput::MODE_PWM_DSHOT1200);
     uint32_t mode_mask = 0;
     assert(output.get_output_mode(mode_mask) == AP_HAL::RCOutput::MODE_PWM_NONE);
     assert(mode_mask == 0);
@@ -615,10 +685,10 @@ static void test_normal_and_oneshot_paths_unchanged()
     assert(!output_active[1]);
     assert(apply_count == 2);
 
-    // DShot 不支援：停止輸出並回報為 NONE。
+    // DShot1200 不支援：停止輸出並回報為 NONE。
     output.write(0, 1500);
     assert(output_active[0]);
-    output.set_output_mode(1U << 0, AP_HAL::RCOutput::MODE_PWM_DSHOT600);
+    output.set_output_mode(1U << 0, AP_HAL::RCOutput::MODE_PWM_DSHOT1200);
     assert(!output_active[0]);
     uint32_t mode_mask = 0;
     assert(output.get_output_mode(mode_mask) == AP_HAL::RCOutput::MODE_PWM_NONE);
@@ -829,6 +899,268 @@ static void test_oneshot_mode_uses_normal_pwm_path()
     assert(text == "RTL8735B: PWM ch3 1000 Hz unsupported (50-490 Hz); output stopped\n");
 }
 
+namespace {
+void reset_dshot()
+{
+    dshot_pins.clear();
+    dshot_sends.clear();
+    dshot_fail_pin = 0xFFFFFFFFu;
+    dshot_fail_code = 0;
+    dshot_stopped = false;
+    now_us = 1000;
+    fake_util.soft_armed = false;
+}
+
+rtl8735b_dshot_timing_t timing_for(uint16_t rate_khz, uint8_t wide)
+{
+    rtl8735b_dshot_timing_t t;
+    assert(rtl8735b_dshot_timing(rate_khz, wide, 500000000u, &t) == 0);
+    return t;
+}
+
+bool same_timing(const rtl8735b_dshot_timing_t &a, const rtl8735b_dshot_timing_t &b)
+{
+    return a.bit_cycles == b.bit_cycles && a.t0h_cycles == b.t0h_cycles && a.t1h_cycles == b.t1h_cycles;
+}
+
+void write_all(RTL8735B::RCOutput &output, uint16_t a, uint16_t b, uint16_t c, uint16_t d)
+{
+    output.cork();
+    output.write(0, a);
+    output.write(1, b);
+    output.write(2, c);
+    output.write(3, d);
+    output.push();
+}
+
+// 切成 DShot：四路接上 GPIO 送幀，不再走 PWM；push 一次送一幀，各路同時
+void test_dshot_mode_and_frames()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    RTL8735B::RCOutput output;
+    output.init();
+    output.force_safety_off();
+    output.set_freq(0x0FU, 400);
+    output.set_output_mode(0x0FU, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+    uint32_t mask = 0;
+    assert(output.get_output_mode(mask) == AP_HAL::RCOutput::MODE_PWM_DSHOT300 && mask == 0x0FU);
+    assert(dshot_pins.size() == 4);
+    for (uint8_t ch = 0; ch < 4; ch++) {
+        assert(dshot_pins[ch] == rtl8735b_rcout_pin(ch));
+    }
+    assert(fake_scheduler.has_timer_process());
+
+    // 未解鎖：各路送數值 0；脈寬 0 的那一路不送
+    write_all(output, 1000, 1500, 2000, 0);
+    assert(dshot_sends.size() == 1);
+    assert(dshot_sends[0].active == 0x7U);
+    for (uint8_t ch = 0; ch < 3; ch++) {
+        assert(dshot_sends[0].frames[ch] == rtl8735b_dshot_frame(0, 0));
+    }
+    assert(same_timing(dshot_sends[0].timing, timing_for(300, 0)));
+    // 沒有走 PWM
+    assert(apply_count == 0 && apply_ticks_count == 0 && oneshot125_count == 0);
+
+    // 解鎖後依脈寬換成油門
+    fake_util.soft_armed = true;
+    write_all(output, 1000, 1500, 2000, 1100);
+    assert(dshot_sends.size() == 2);
+    assert(dshot_sends[1].active == 0xFU);
+    assert(dshot_sends[1].frames[0] == rtl8735b_dshot_frame(0, 0));
+    assert(dshot_sends[1].frames[1] == rtl8735b_dshot_frame(1048, 0));
+    assert(dshot_sends[1].frames[2] == rtl8735b_dshot_frame(2047, 0));
+    assert(dshot_sends[1].frames[3] == rtl8735b_dshot_frame(248, 0));
+    assert(output.read(1) == 1500);
+
+    // 沒 cork 的 write 立即送
+    output.write(1, 1200);
+    assert(dshot_sends.size() == 3);
+    assert(dshot_sends[2].frames[1] == rtl8735b_dshot_frame(448, 0));
+    assert(apply_count == 0);
+}
+
+// 遙測請求：只在下一幀帶，送出後清掉；那一路沒有送幀時留到它送的時候
+void test_dshot_telemetry_request()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    RTL8735B::RCOutput output;
+    output.init();
+    output.force_safety_off();
+    output.set_output_mode(0x0FU, AP_HAL::RCOutput::MODE_PWM_DSHOT600);
+    fake_util.soft_armed = true;
+    output.set_telem_request_mask(1U << 1);
+    write_all(output, 1100, 1100, 1100, 1100);
+    const uint16_t plain = rtl8735b_dshot_frame(248, 0);
+    const uint16_t telem = rtl8735b_dshot_frame(248, 1);
+    assert(dshot_sends.back().frames[0] == plain);
+    assert(dshot_sends.back().frames[1] == telem);
+    assert(dshot_sends.back().frames[2] == plain);
+    write_all(output, 1100, 1100, 1100, 1100);
+    assert(dshot_sends.back().frames[1] == plain);
+
+    output.set_telem_request_mask(1U << 3);
+    write_all(output, 1100, 1100, 1100, 0);
+    assert((dshot_sends.back().active & (1U << 3)) == 0);
+    write_all(output, 1100, 1100, 1100, 1100);
+    assert(dshot_sends.back().frames[3] == telem);
+    write_all(output, 1100, 1100, 1100, 1100);
+    assert(dshot_sends.back().frames[3] == plain);
+}
+
+// 安全開關：關著時不送任何幀（不是送 0）；主程式沒 push 時由計時器續送，太久才補
+void test_dshot_safety_and_keepalive()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    RTL8735B::RCOutput output;
+    output.init();
+    output.set_output_mode(0x0FU, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+    fake_util.soft_armed = true;
+    output.force_safety_on();
+    write_all(output, 1500, 1500, 1500, 1500);
+    fake_scheduler.run_timer();
+    assert(dshot_sends.empty());
+
+    output.force_safety_off();
+    now_us = 10000;
+    write_all(output, 1500, 1500, 1500, 1500);
+    assert(dshot_sends.size() == 1);
+    now_us = 11000;
+    fake_scheduler.run_timer();
+    assert(dshot_sends.size() == 1);
+    now_us = 14500;
+    fake_scheduler.run_timer();
+    assert(dshot_sends.size() == 2);
+    assert(memcmp(dshot_sends[1].frames, dshot_sends[0].frames, sizeof(dshot_sends[0].frames)) == 0);
+    assert(dshot_sends[1].active == dshot_sends[0].active);
+    now_us = 15000;
+    fake_scheduler.run_timer();
+    assert(dshot_sends.size() == 2);
+
+    // 號誌被別的執行緒拿著時，計時器不等、不送
+    std::mutex m;
+    std::condition_variable cv;
+    bool held = false, release = false;
+    std::thread holder([&] {
+        semaphore_mutex.lock();
+        {
+            std::lock_guard<std::mutex> g(m);
+            held = true;
+        }
+        cv.notify_all();
+        std::unique_lock<std::mutex> lk(m);
+        cv.wait(lk, [&] { return release; });
+        semaphore_mutex.unlock();
+    });
+    {
+        std::unique_lock<std::mutex> lk(m);
+        cv.wait(lk, [&] { return held; });
+    }
+    now_us = 30000;
+    fake_scheduler.run_timer();
+    assert(dshot_sends.size() == 2);
+    {
+        std::lock_guard<std::mutex> g(m);
+        release = true;
+    }
+    cv.notify_all();
+    holder.join();
+
+    // 安全開關關上之後，計時器也不送
+    output.force_safety_on();
+    now_us = 60000;
+    fake_scheduler.run_timer();
+    assert(dshot_sends.size() == 2);
+}
+
+// 電調型別決定位寬；速率改成別的 DShot 時所有 DShot 通道一起改；DShot 通道改回 PWM 要重開機：
+// 停送並說明，不碰 PWM
+void test_dshot_esc_type_rate_and_switching()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    RTL8735B::RCOutput output;
+    output.init();
+    output.force_safety_off();
+    output.set_output_mode(0x0FU, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+    output.set_dshot_esc_type(AP_HAL::RCOutput::DSHOT_ESC_BLHELI_S);
+    assert(output.get_dshot_esc_type() == AP_HAL::RCOutput::DSHOT_ESC_BLHELI_S);
+    output.set_dshot_rate(2, 400);
+    write_all(output, 1000, 1000, 1000, 1000);
+    assert(same_timing(dshot_sends.back().timing, timing_for(300, 1)));
+
+    output.set_output_mode(1U << 0, AP_HAL::RCOutput::MODE_PWM_DSHOT600);
+    write_all(output, 1000, 1000, 1000, 1000);
+    assert(same_timing(dshot_sends.back().timing, timing_for(600, 1)));
+    assert(dshot_sends.back().active == 0xFU);
+    uint32_t mask = 0;
+    assert(output.get_output_mode(mask) == AP_HAL::RCOutput::MODE_PWM_DSHOT600 && mask == 0x0FU);
+
+    fake_statustext().clear();
+    output.set_output_mode(1U << 2, AP_HAL::RCOutput::MODE_PWM_NORMAL);
+    write_all(output, 1000, 1000, 1500, 1000);
+    assert(dshot_sends.back().active == 0xBU);
+    assert(apply_count == 0 && !output_active[2]);
+    assert(fake_statustext().find("reboot") != std::string::npos);
+    assert(output.get_output_mode(mask) == AP_HAL::RCOutput::MODE_PWM_DSHOT600 && mask == 0x0BU);
+    // 同一路只說一次
+    fake_statustext().clear();
+    output.set_output_mode(1U << 2, AP_HAL::RCOutput::MODE_PWM_NORMAL);
+    assert(fake_statustext().empty());
+}
+
+// 接腳失敗的那一路停用並說明原因，其他路照送
+void test_dshot_attach_failure()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    dshot_fail_pin = rtl8735b_rcout_pin(2);
+    dshot_fail_code = RTL8735B_DSHOT_EGPIO;
+    RTL8735B::RCOutput output;
+    output.init();
+    output.force_safety_off();
+    output.set_output_mode(0x0FU, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+    uint32_t mask = 0;
+    assert(output.get_output_mode(mask) == AP_HAL::RCOutput::MODE_PWM_DSHOT300 && mask == 0x0BU);
+    assert(fake_statustext().find("ch3") != std::string::npos);
+    write_all(output, 1000, 1000, 1000, 1000);
+    assert(dshot_sends.size() == 1);
+    // 槽位照接上的順序：ch1、ch2、ch4
+    assert(dshot_sends[0].active == 0x7U);
+
+    // 校正失敗時那一路也不能用
+    reset_fake_outputs();
+    reset_dshot();
+    dshot_fail_pin = rtl8735b_rcout_pin(0);
+    dshot_fail_code = RTL8735B_DSHOT_ECLOCK;
+    RTL8735B::RCOutput output2;
+    output2.init();
+    output2.set_output_mode(1U << 0, AP_HAL::RCOutput::MODE_PWM_DSHOT150);
+    assert(output2.get_output_mode(mask) == AP_HAL::RCOutput::MODE_PWM_NONE && mask == 0);
+    assert(fake_statustext().find("cycle counter") != std::string::npos);
+}
+
+// 送幀回報已緊急停止：之後不再送
+void test_dshot_stopped()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    RTL8735B::RCOutput output;
+    output.init();
+    output.force_safety_off();
+    output.set_output_mode(0x0FU, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+    dshot_stopped = true;
+    write_all(output, 1000, 1000, 1000, 1000);
+    assert(dshot_sends.size() == 1);
+    write_all(output, 1000, 1000, 1000, 1000);
+    now_us += 100000;
+    fake_scheduler.run_timer();
+    assert(dshot_sends.size() == 1);
+}
+}
+
 int main()
 {
     test_board_pin_profile_and_whitelist();
@@ -853,6 +1185,12 @@ int main()
     test_brushed_to_normal_switch_holds_low_first();
     test_oneshot125_to_brushed_switch_stops_old_output();
     test_oneshot_mode_uses_normal_pwm_path();
+    test_dshot_mode_and_frames();
+    test_dshot_telemetry_request();
+    test_dshot_safety_and_keepalive();
+    test_dshot_esc_type_rate_and_switching();
+    test_dshot_attach_failure();
+    test_dshot_stopped();
     puts("IO contract host tests passed");
     return 0;
 }

@@ -7,5 +7,7 @@ public:
         SAFETY_DISARMED,
         SAFETY_ARMED,
     };
+    bool get_soft_armed() const { return soft_armed; }
+    bool soft_armed = false;
 };
 }

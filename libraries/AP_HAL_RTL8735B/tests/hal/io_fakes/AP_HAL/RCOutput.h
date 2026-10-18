@@ -28,6 +28,18 @@ public:
         MODE_PROFILED,
         MODE_NEOPIXELRGB,
     };
+    enum DshotEscType {
+        DSHOT_ESC_NONE = 0,
+        DSHOT_ESC_BLHELI = 1,
+        DSHOT_ESC_BLHELI_S = 2,
+        DSHOT_ESC_BLHELI_EDT = 3,
+        DSHOT_ESC_BLHELI_EDT_S = 4
+    };
+    const static uint32_t ALL_CHANNELS = 255;
+    virtual void set_telem_request_mask(uint32_t mask) { (void)mask; }
+    virtual void set_dshot_rate(uint8_t dshot_rate, uint16_t loop_rate_hz) { (void)dshot_rate; (void)loop_rate_hz; }
+    virtual void set_dshot_esc_type(DshotEscType esc_type) { (void)esc_type; }
+    virtual DshotEscType get_dshot_esc_type() const { return DSHOT_ESC_NONE; }
     virtual void set_output_mode(uint32_t mask, enum output_mode mode) = 0;
     virtual enum output_mode get_output_mode(uint32_t &mask) = 0;
     virtual void set_default_rate(uint16_t rate_hz) = 0;

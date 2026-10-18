@@ -7,6 +7,7 @@
 #include "AP_HAL_RTL8735B_Namespace.h"
 #include "IOConfig.h"
 #include "Semaphores.h"
+#include "dshot_frame.h"
 
 namespace RTL8735B { class RCOutput; }
 
@@ -32,6 +33,12 @@ public:
 
     AP_HAL::Util::safety_state safety_switch_state() const;
 
+    // DShot：dshot_shim.c 以 GPIO 送幀
+    void set_telem_request_mask(uint32_t mask) override;
+    void set_dshot_rate(uint8_t dshot_rate, uint16_t loop_rate_hz) override;
+    void set_dshot_esc_type(DshotEscType esc_type) override;
+    DshotEscType get_dshot_esc_type() const override;
+
 private:
     // 路數來自開發板 hwdef 的 RTL8735B_RCOUT
     static constexpr uint8_t CHANNELS = RTL8735B_RCOUT_CHANNELS;
@@ -47,6 +54,13 @@ private:
     bool _output_usable(uint8_t chan) const;
     bool _pulse_valid(uint8_t chan, uint16_t pulse_us) const;
 
+    bool _is_dshot(uint8_t chan) const;
+    void _set_dshot_mode(uint8_t chan, enum output_mode mode);
+    void _report_dshot_failure(uint8_t chan, int status);
+    void _update_dshot_timing();
+    void _dshot_send_locked();
+    void _dshot_timer_tick();
+
     uint16_t _freq_hz[CHANNELS];
     // 最後一次 set_freq 要求的頻率；切換輸出模式時依新模式重新判斷是否支援。
     uint16_t _requested_hz[CHANNELS];
@@ -60,7 +74,7 @@ private:
     bool _has_valid_write[CHANNELS];
     bool _rate_valid[CHANNELS];
     uint32_t _pending_mask;
-    // 以 set_freq 設為高於 50 Hz 或設為有刷、OneShot125 模式的通道；set_default_rate 不改動它們。
+    // 以 set_freq 設為高於 50 Hz 或設為有刷、OneShot125、DShot 模式的通道；set_default_rate 不改動它們。
     uint32_t _fast_mask;
     // 已回報「頻率不支援、寫入被拒」的通道；該通道收到支援的頻率後清除，之後再失敗會再回報。
     uint32_t _rate_reported_mask;
@@ -70,4 +84,22 @@ private:
     bool _initialized;
     AP_HAL::Util::safety_state _safety_state;
     mutable Semaphore _semaphore;
+
+    // dshot_shim 的槽位；-1 表示沒接上
+    int8_t _dshot_slot[CHANNELS];
+    // 正在送 DShot 的通道
+    uint32_t _dshot_mask;
+    // 腳已改成 GPIO 的通道：本次開機內不回 PWM
+    uint32_t _dshot_attached_mask;
+    // 已回報 DShot 無法使用或需要重開機的通道
+    uint32_t _dshot_reported_mask;
+    uint32_t _telem_request_mask;
+    enum output_mode _dshot_mode;
+    DshotEscType _dshot_esc_type;
+    rtl8735b_dshot_timing_t _dshot_timing;
+    bool _dshot_timing_valid;
+    bool _dshot_timer_registered;
+    bool _dshot_sent;
+    bool _dshot_stopped;
+    uint32_t _dshot_last_send_us;
 };

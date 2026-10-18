@@ -119,6 +119,7 @@ void rtl8735b_system_reset(void)
 int rtl8735b_watchdog_start(uint32_t) { return 0; }
 void rtl8735b_watchdog_refresh(void) {}
 void rtl8735b_pwm_emergency_stop(void) {}
+void rtl8735b_dshot_emergency_stop(void) {}
 
 // 照 SDK 的 FreeRTOS（component/os/freertos/freertos_v202012.00/Source/tasks.c）：vTaskDelay(n) 以呼叫當下的
 // tick 計數加 n 為醒來時間（prvAddCurrentTaskToDelayedList，5273、5311 行）；tick 中斷把計數加一後

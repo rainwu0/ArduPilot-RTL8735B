@@ -126,13 +126,15 @@ RC 接收機與 GPS（只有建置與主機測試，沒有接過實物）：
 | `RTL8735B_SPIDEV` | 名稱、邏輯匯流排、CS、mode、低速、高速 | `bmi160 1 PIN_F8 0 1000000 10000000` |
 | `RTL8735B_RCOUT` | 腳位；出現的順序就是輸出通道 1、2、… | `PIN_F14`、`PIN_F11`、`PIN_F12`、`PIN_F13` 各一行 |
 | `RTL8735B_GPIO` | 邏輯編號、腳位、`in` 或 `out` | `7 PIN_D17 in`、`25 PIN_E6 out`、`26 PIN_F9 out` |
-| `RTL8735B_ADC` | 邏輯編號、腳位（PF0–PF3） | `2 PIN_F0` |
+| `RTL8735B_ADC` | 邏輯編號、腳位（PF0–PF3、PA0–PA3） | `2 PIN_F0` |
 
-I²C 匯流排 1–4 條（SDK 的 I2C0–I2C3 各一條），SPI 匯流排與類比輸入各一個，SPI 裝置 1–4 個，PWM 1–12 路；寫錯會在建置時報錯。邏輯編號的範圍：匯流排 0–31、GPIO 0–255、類比輸入 0–253；I²C 的邏輯編號與 SDK 編號不能重複，SPI 裝置名稱不能重複。腳位能不能當該周邊用，由 SDK 初始化時判斷，不行就不輸出。
+I²C 匯流排 1–4 條（SDK 的 I2C0–I2C3 各一條），SPI 匯流排一條，SPI 裝置 1–4 個，PWM 1–12 路，類比輸入 1–8 支；寫錯會在建置時報錯。邏輯編號的範圍：匯流排 0–31、GPIO 0–255、類比輸入 0–253；I²C 的邏輯編號與 SDK 編號不能重複，SPI 裝置名稱不能重複。腳位能不能當該周邊用，由 SDK 初始化時判斷，不行就不輸出。
 
 - `RTL8735B_I2CBUS` 的時脈：驅動向匯流排要求的時脈必須等於這一欄，否則取不到裝置（`I2CDevice.cpp` 的 `get_device_ptr` 回傳 `nullptr`）。驅動沒有指定時，ArduPilot 要求的是 400000。
 - 多條 I²C：每條有自己的 bus task（名稱是 `APM_I2C` 加 SDK 編號）、逾時次數與封鎖，一條連續逾時被停用時，其他條照常。例如板上感測器留在匯流排 1，外接的另走 D3、D4：疊加檔加一行 `RTL8735B_I2CBUS 2 2 PIN_E4 PIN_E3 400000 external`。
 - `internal` 與 `external`：ArduPilot 只在 `external` 的匯流排上探測外接的感測器（例如外接羅盤），接頭拉到板外的匯流排要標 `external`。
+- 類比輸入：PF0–PF3 是 ADC 通道 0–3，PA0–PA3 是外接通道 4–7，每支腳各自取樣。PA2、PA3 也是 SERIAL3（UART0）的腳：要拿 PA2 當類比時，先把 SERIAL3 改成只收（下一項），或關掉 SERIAL3。
+- 只收的序列埠：`define HAL_RTL8735B_SERIALn_TX_PIN PIN_NC`（先 `undef`）。這個埠只收不送（例如電調遙測，`SERIALn_PROTOCOL` 16），寫入的資料丟掉；TX 腳空出來給別的用途。例如 SERIAL3 只用 D10（PA3）收電調遙測、D9（PA2）量電調電流：疊加檔寫 `undef HAL_RTL8735B_SERIAL3_TX_PIN`、`define HAL_RTL8735B_SERIAL3_TX_PIN PIN_NC`、`RTL8735B_ADC 9 PIN_A2`。這時 GPS 改接 SERIAL1。
 - 位址衝突：同一條匯流排上的兩個裝置不能同位址（板上的匯流排 1 已用 0x76 的 BMP280、0x0D 的 QMC5883L）；不同匯流排上可以同位址。衝突時改裝置的位址腳，或把其中一個移到另一條匯流排。
 - 舊的寫法已經移除：`HAL_RTL8735B_I2C1_*`、`HAL_RTL8735B_SPI1_*`、`HAL_RTL8735B_BMI160_CS_PIN`、`HAL_RTL8735B_RCOUT_CHANNELS`、`HAL_RTL8735B_RCOUT_PIN0`–`PIN3`、`HAL_RTL8735B_GPIO_PIN7`／`PIN25`／`PIN26`、`HAL_RTL8735B_ADC_CHANNELS`、`HAL_RTL8735B_ADC_PIN0`、`HAL_RTL8735B_ADC_LOGICAL0` 這些 `define` 不再有作用。疊加檔若還在用，建置不會報錯，設定只會悄悄失效，要改成上表的關鍵字。
 
@@ -283,14 +285,14 @@ FatFs 在 `fatfs/`：R0.14b，取自 ArduPilot 的 ChibiOS 子模組（`modules/
 | 排程與號誌 | 板上驗證（T2、T4） | Copter 主迴圈在板上執行（心跳、參數、姿態更新）；正常運作時 120 秒內 399.9 Hz、長迴圈 0.07%（T4）。主執行緒連續忙等 20 ms 時讓出一個 tick：拔掉 IMU 的 SCLK 時主迴圈與較低優先權的 task 照常，但讓出是否觸發沒有記錄；IMU 完全不送樣本時未上板（T4） |
 | SPI | 板上驗證（T2） | BMI160 |
 | I²C | 板上驗證（T2、T3） | BMP280、QMC5883L 共用匯流排 1。開機時先清匯流排：熱重開 23 次、寫入映像後的第一次開機與冷開機各 1 次，氣壓計都初始化成功，T2 記的開機偶發初始化失敗沒有再出現（T3）；T3 的映像是改成每條匯流排各自一個 task 之前的程式，之後的版本未上板。逾時處理未上板：傳輸逾時後重新初始化控制器、必要時清除匯流排，連續 3 次逾時才停用該匯流排。多條匯流排同時用（各自逾時、停用）：只建置與主機測試，未上板 |
-| UART | 待複驗 | 只支援 8N1 |
+| UART | 待複驗 | 只支援 8N1。只收的埠（TX 寫 `PIN_NC`）只建置與主機測試，未上板 |
 | Wi-Fi MAVLink（UDP） | 板上驗證（T2） | STA 模式 |
 | Wi-Fi MAVLink（TCP） | 僅建置 | 建置時選擇，與 UDP 二選一 |
 | 主控台 MAVLink（SERIAL0） | 僅建置 | LOG UART，經開發板的 USB 序列埠，115200 baud；SDK 與 HAL 的文字訊息夾在封包之間。晶片自己的 USB 不做。見〈板型〉的〈主控台 MAVLink〉 |
 | RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol），預設在 SERIAL4；支援 8N1、不反相的協定（CRSF、ELRS 等），不支援 SBUS（接法見〈板型〉）。主機測試涵蓋輪流試格式，沒有接過接收機實測。地面站的 RC override 走 MAVLink，不經過 RC 輸入；它在板上的使用待複驗 |
 | GPS | 僅建置 | 預設在 SERIAL3；接 SERIAL1 要改 `SERIAL1_PROTOCOL`（接法見〈板型〉）。主機測試涵蓋自動換鮑率，沒有接過 GPS 實測 |
 | PWM 輸出 | 待複驗 | 有刷馬達 PWM 先前驅動過馬達；電調用的一般 PWM、OneShot、OneShot125 未上板，見〈馬達輸出〉 |
-| AnalogIn | 僅建置 | 12 位元，以滿刻度 3.3 V 線性換算成電壓，精度與零點偏移未經板上量測（零點可用 `BATT_VLT_OFFSET` 等參數修正）。只有板型 hwdef 列出的類比腳能用，hub8735ultra 是 D2；腳位能承受的電壓上限不明，腳上的電壓不要超過 3.3 V。電池電壓要先經分壓，分壓比設在 `BATT_VOLT_MULT` |
+| AnalogIn | 僅建置 | 12 位元，以滿刻度 3.3 V 線性換算成電壓，精度與零點偏移未經板上量測（零點可用 `BATT_VLT_OFFSET` 等參數修正）。只有板型 hwdef 列出的類比腳能用，hub8735ultra 是 D2；hwdef 可以列多支（PF0–PF3、PA0–PA3），各自取樣，多支同時用只建置與主機測試，PA0–PA3 的換算是否和 PF0–PF3 相同未上板確認；腳位能承受的電壓上限不明，腳上的電壓不要超過 3.3 V。電池電壓要先經分壓，分壓比設在 `BATT_VOLT_MULT` |
 | 參數存在 Flash | 板上驗證（T2） | 重開機後保留；斷電後保留未驗證。換扇區後那次開機抹除期間斷電，參數會全部回預設，見〈Flash 版面〉 |
 | SD 卡 | 僅建置與主機測試、未上板 | 掛載、讀寫、MAVLink FTP、檔案系統記錄都還沒在板上跑過。主機測試以 RAM 上的假卡涵蓋掛載與重試、格式化、檔案與目錄操作、寫入出錯後重掛、拔卡；用法見〈SD 卡〉 |
 | `--upload` 燒錄 | 僅建置 | `COMn`（Windows 版工具）與 `/dev/tty*`（Linux 版工具）都未上板；手動燒錄見〈燒錄〉 |

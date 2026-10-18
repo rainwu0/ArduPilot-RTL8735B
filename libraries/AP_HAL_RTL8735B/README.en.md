@@ -224,6 +224,12 @@ define HAL_RTL8735B_WIFI_TCP_PORT 5760
 
 TCP serves one ground station at a time; the ground station connects to port 5760 on the board.
 
+How UDP sends to the ground station:
+
+- Several whole MAVLink frames are packed into one datagram (up to 1,472 bytes), which cuts the number of datagrams to a fraction. When a datagram is not full, the driver waits at most 10 ms, so each message goes out at most about 10 ms later (`WiFiCoalesce.h`). HEARTBEAT broadcasts sent before a ground station is known still go one frame per datagram; TCP is not affected.
+- When a send fails because the Wi-Fi driver is out of packet buffers (`ENOBUFS`, `ENOMEM`), that datagram is kept and sent again on the next step (about 1 ms later), for up to 500 ms from the first failure, and only then dropped; other send failures are dropped at once (`WiFiTxRetry.h`). The driver's packet buffers are shared by all sockets and run out for a while under heavy traffic such as a video stream.
+- A retry can hold the link for up to 500 ms, and commands and parameter replies queue behind it during that time; the 16 KiB send buffer holds that much MAVLink. If the datagram still cannot be sent after 500 ms, the whole datagram is dropped, which can be a dozen or more messages.
+
 Copter initializes the barometer first and only then creates the MAVLink channels on SERIALn, Wi-Fi among them (`init_ardupilot` in `ArduCopter/system.cpp`). If no barometer is found, boot stops at Config Error: Wi-Fi still joins the hotspot, but neither UDP nor TCP sends or receives any MAVLink.
 
 Security limits:
@@ -298,7 +304,7 @@ Do not unplug USB while flashing. Close other programs that open serial ports by
 | SPI | Verified on a board (T2) | BMI160 |
 | I²C | Verified on a board (T2, T3) | BMP280 and QMC5883L share bus 1. The bus is cleared at boot: over 23 warm reboots, the first boot after writing the image and a cold boot, the barometer always initialized, and the occasional failure at boot recorded in T2 did not appear again (T3); the T3 image had the code from before each bus got its own task, and later versions have not been tried on a board. Timeout handling not tried on a board: after a transfer times out, the controller is reinitialized and the bus cleared if needed; the bus is disabled only after 3 timeouts in a row. Several buses at once (each with its own timeouts and disabling): build and host tests only, not tried on a board |
 | UART | To be rechecked | 8N1 only. Receive-only ports (TX set to `PIN_NC`): build and host tests only, not tried on a board |
-| Wi-Fi MAVLink (UDP) | Verified on a board (T2) | STA mode |
+| Wi-Fi MAVLink (UDP) | Verified on a board (T2) | STA mode. The send retry and frame packing (see *Wi-Fi*) are build and host tests only, not tried on a board |
 | Wi-Fi MAVLink (TCP) | Build only | Chosen at build time, either this or UDP |
 | Console MAVLink (SERIAL0) | Build only | LOG UART through the board's USB serial port at 115200 baud; SDK and HAL text messages land between packets. The chip's own USB is not used. See *Console MAVLink* under *Board types* |
 | RC input | Build only | Serial RC (AP_RCProtocol), on SERIAL4 by default; protocols with 8N1 and no inversion (CRSF, ELRS and others) work, SBUS does not (wiring in *Board types*). Host tests cover trying the formats in turn; never tried with a receiver. RC override from a ground station goes over MAVLink, not through RC input; its use on a board is to be rechecked |

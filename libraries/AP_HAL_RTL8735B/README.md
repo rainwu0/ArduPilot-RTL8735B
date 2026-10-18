@@ -224,6 +224,12 @@ define HAL_RTL8735B_WIFI_TCP_PORT 5760
 
 TCP 同時只服務一個地面站，地面站可連到開發板的 5760 埠。
 
+UDP 送給地面站的方式：
+
+- 幾則完整的 MAVLink 湊進同一個資料包（最多 1,472 bytes）再送，資料包數降到幾分之一。湊不滿時最多等 10 ms，所以每則訊息最多晚約 10 ms 送出（`WiFiCoalesce.h`）。還沒有地面站時廣播的 HEARTBEAT 照舊一則一包；TCP 不受影響。
+- 送出遇到 Wi-Fi 驅動的封包緩衝不足（`ENOBUFS`、`ENOMEM`）時，那一個資料包留著，下一步（約 1 ms 後）再送，從第一次失敗起最多 500 ms，到了才丟掉；其他送出失敗直接丟掉（`WiFiTxRetry.h`）。驅動的封包緩衝所有 socket 共用，影像串流等流量多時會暫時用完。
+- 重試最多卡 500 ms，期間指令與參數回覆跟著排隊；送出緩衝區 16 KiB，裝得下這段時間的 MAVLink。重試滿 500 ms 仍送不出時整個資料包丟掉，裡面可能有十幾則訊息。
+
 Copter 先初始化氣壓計，之後才建立 Wi-Fi 等 SERIALn 的 MAVLink 通道（`ArduCopter/system.cpp` 的 `init_ardupilot`）。找不到氣壓計時開機停在 Config Error：Wi-Fi 仍會連上熱點，但 UDP 與 TCP 都不會送出或接收 MAVLink。
 
 安全限制：
@@ -298,7 +304,7 @@ FatFs 在 `fatfs/`：R0.14b，取自 ArduPilot 的 ChibiOS 子模組（`modules/
 | SPI | 板上驗證（T2） | BMI160 |
 | I²C | 板上驗證（T2、T3） | BMP280、QMC5883L 共用匯流排 1。開機時先清匯流排：熱重開 23 次、寫入映像後的第一次開機與冷開機各 1 次，氣壓計都初始化成功，T2 記的開機偶發初始化失敗沒有再出現（T3）；T3 的映像是改成每條匯流排各自一個 task 之前的程式，之後的版本未上板。逾時處理未上板：傳輸逾時後重新初始化控制器、必要時清除匯流排，連續 3 次逾時才停用該匯流排。多條匯流排同時用（各自逾時、停用）：只建置與主機測試，未上板 |
 | UART | 待複驗 | 只支援 8N1。只收的埠（TX 寫 `PIN_NC`）只建置與主機測試，未上板 |
-| Wi-Fi MAVLink（UDP） | 板上驗證（T2） | STA 模式 |
+| Wi-Fi MAVLink（UDP） | 板上驗證（T2） | STA 模式。送出重試與湊包（見〈Wi-Fi〉）僅建置與主機測試、未上板 |
 | Wi-Fi MAVLink（TCP） | 僅建置 | 建置時選擇，與 UDP 二選一 |
 | 主控台 MAVLink（SERIAL0） | 僅建置 | LOG UART，經開發板的 USB 序列埠，115200 baud；SDK 與 HAL 的文字訊息夾在封包之間。晶片自己的 USB 不做。見〈板型〉的〈主控台 MAVLink〉 |
 | RC 輸入 | 僅建置 | 序列 RC（AP_RCProtocol），預設在 SERIAL4；支援 8N1、不反相的協定（CRSF、ELRS 等），不支援 SBUS（接法見〈板型〉）。主機測試涵蓋輪流試格式，沒有接過接收機實測。地面站的 RC override 走 MAVLink，不經過 RC 輸入；它在板上的使用待複驗 |

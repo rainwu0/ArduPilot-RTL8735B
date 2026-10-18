@@ -5,6 +5,7 @@
 #include <AP_HAL/UARTDriver.h>
 #include <AP_HAL/utility/RingBuffer.h>
 #include <AP_HAL_RTL8735B/Semaphores.h>
+#include <AP_HAL_RTL8735B/WiFiCoalesce.h>
 #include <AP_HAL_RTL8735B/WiFiTxRetry.h>
 
 #include <FreeRTOS.h>
@@ -26,7 +27,8 @@ namespace RTL8735B {
   UDP：
   - 本機綁定 local_port；還沒有地面站時，只把 HEARTBEAT 廣播到子網路廣播位址的 gcs_port，其他訊息丟棄
     （廣播在 802.11 沒有確認與重送，且以基本速率送出，只用來讓地面站發現本機）。
-  - 收到第一個資料包後把來源位址與埠當成地面站，之後的每個 MAVLink 訊框以一個資料包單播給它；
+  - 收到第一個資料包後把來源位址與埠當成地面站，之後的 MAVLink 單播給它，幾則完整的訊框湊進同一個資料包，
+    湊不滿時最多等 WiFiCoalesce::COALESCE_MS（WiFiCoalesce.h）；
     地面站活躍期間只接受它的封包，靜默超過 PEER_TIMEOUT_MS 後回到廣播，並接受下一個送來封包的來源。
   - 送出時 Wi-Fi 驅動的封包緩衝不足，那一個資料包留著，下一步再送，最多 WiFiTxRetry::RETRY_MS；
     其他送出失敗直接丟掉（WiFiTxRetry.h）。
@@ -158,6 +160,7 @@ private:
     uint32_t _tx_incomplete_generation;   // 開始計時時的 _tx_generation；清空過緩衝區就重新計時
     bool _tx_incomplete;
     WiFiTxRetry _tx_retry;
+    WiFiCoalesce _tx_coalesce;
     uint8_t _datagram[DATAGRAM_MAX];
 
     std::atomic<bool> _gcs_known{false};

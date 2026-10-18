@@ -23,6 +23,7 @@
 #include <thread>
 #include <vector>
 
+using RTL8735B::WiFiCoalesce;
 using RTL8735B::WiFiDriver;
 using LinkState = WiFiDriver::LinkState;
 
@@ -120,6 +121,16 @@ std::vector<uint8_t> mav1(uint8_t msgid, uint8_t payload_len)
     f.push_back(0x12);
     f.push_back(0x34);
     return f;
+}
+
+// 幾則訊框依序接起來（湊進同一個資料包的內容）
+std::vector<uint8_t> cat(std::initializer_list<std::vector<uint8_t>> frames)
+{
+    std::vector<uint8_t> out;
+    for (const auto &f : frames) {
+        out.insert(out.end(), f.begin(), f.end());
+    }
+    return out;
 }
 
 void write_all(WiFiDriver &d, const std::vector<uint8_t> &data)
@@ -290,25 +301,28 @@ void test_gcs_learning_unicast_and_rx()
     assert(d.read(buf, sizeof(buf)) == (ssize_t)from_gcs.size());
     assert(memcmp(buf, from_gcs.data(), from_gcs.size()) == 0);
 
-    // 地面站已知：所有訊框逐一單播，順序不變
+    // 地面站已知：訊框依序湊進同一個資料包單播；湊不滿時從第一次看到起等 COALESCE_MS 才送
     const auto a = mav2(30, 28), b = mav2(33, 28), c = mav2(0, 9);
     write_all(d, a);
     write_all(d, b);
     write_all(d, c);
     d._link_step(110);
-    assert(fake.sent.size() == 3);
-    assert(fake.sent[0].address == kGcs && fake.sent[0].port == 14550 && fake.sent[0].data == a);
-    assert(fake.sent[1].data == b && fake.sent[2].data == c);
-    assert(d.status().tx_datagrams == 3);
+    d._link_step(110 + WiFiCoalesce::COALESCE_MS - 1);
+    assert(fake.sent.empty());
+    d._link_step(110 + WiFiCoalesce::COALESCE_MS);
+    assert(fake.sent.size() == 1);
+    assert(fake.sent[0].address == kGcs && fake.sent[0].port == 14550 && fake.sent[0].data == cat({a, b, c}));
+    assert(d.status().tx_datagrams == 1 && d.status().tx_bytes == a.size() + b.size() + c.size());
 
     // 不完整的訊框留在緩衝區，補齊後才送
     const auto big = mav2(24, 30);
     fake.sent.clear();
     assert(d.write(big.data(), 10) == 10);
-    d._link_step(120);
+    d._link_step(130);
     assert(fake.sent.empty() && d.tx_pending());
     assert(d.write(big.data() + 10, big.size() - 10) == big.size() - 10);
-    d._link_step(130);
+    d._link_step(140);
+    d._link_step(140 + WiFiCoalesce::COALESCE_MS);
     assert(fake.sent.size() == 1 && fake.sent[0].data == big);
 }
 
@@ -380,20 +394,22 @@ void test_send_failure_drops_frame_and_stalled_frame_is_resynced()
     const auto a = mav2(30, 28);
     write_all(d, a);
     d._link_step(2);
+    d._link_step(2 + WiFiCoalesce::COALESCE_MS);
     assert(!d.tx_pending());
     assert(d.status().tx_errors == 1 && d.status().tx_dropped_bytes == a.size());
     fake.send_result_override = 0;
 
     // 開頭卡著一個永遠補不齊的訊框：逾時後丟位元組重新對齊，後面的訊框仍送得出去
+    // （丟掉開頭後剩下的幾個位元組不是訊框，會先單獨送出）
     fake.sent.clear();
     const auto partial = mav2(24, 30);
     assert(d.write(partial.data(), 5) == 5);
-    d._link_step(10);
+    d._link_step(20);
     assert(fake.sent.empty());
     const auto next = mav2(0, 9);
     write_all(d, next);
-    uint32_t now = 10;
-    for (int i = 0; i < 20 && fake.sent.empty(); i++) {
+    uint32_t now = 20;
+    for (int i = 0; i < 20 && (fake.sent.empty() || fake.sent.back().data != next); i++) {
         now += WiFiDriver::TX_STALL_MS + 1;
         fake.inbound.push_back({kGcs, 14550, {1}});
         d._link_step(now);
@@ -437,6 +453,7 @@ void test_restart_restarts_incomplete_frame_wait()
     // 補齊其餘部分後，送出的就是完整的新訊框。
     assert(d.write(fresh.data() + 4, fresh.size() - 4) == fresh.size() - 4);
     d._link_step(restarted + 50);
+    d._link_step(restarted + 50 + WiFiCoalesce::COALESCE_MS);
     assert(fake.sent.size() == 1);
     assert(fake.sent[0].address == kGcs && fake.sent[0].port == kGcsPort && fake.sent[0].data == fresh);
     assert(d.status().tx_dropped_bytes == 0 && d.status().tx_errors == 0);
@@ -550,6 +567,61 @@ void test_link_loss_abandons_retry()
     step_until_send(d, now);
     assert(fake.sent.size() == 1 && fake.sent[0].data == b);
     assert(d.status().tx_retried == 0 && d.status().tx_errors == 0);
+}
+
+// 湊滿一個資料包（下一則放不下）就立刻送，不等；剩下的照同一段的計時，第一次看到後 COALESCE_MS 才送
+void test_full_datagram_is_sent_without_waiting()
+{
+    FakeNet fake;
+    reset(fake);
+    WiFiDriver d(WiFiDriver::Protocol::UDP, kLocalPort, kGcsPort);
+    bring_up(d);
+    learn_gcs(d, 100);
+    const auto imu = mav2(105, 62);   // 74 bytes，約一則 HIGHRES_IMU
+    const size_t per_datagram = WiFiDriver::DATAGRAM_MAX / imu.size();
+    assert(per_datagram == 19);
+    for (size_t i = 0; i < per_datagram + 6; i++) {
+        write_all(d, imu);
+    }
+    d._link_step(110);
+    assert(fake.sent.size() == 1 && fake.sent[0].data.size() == per_datagram * imu.size());
+    d._link_step(110 + WiFiCoalesce::COALESCE_MS - 1);
+    assert(fake.sent.size() == 1);
+    d._link_step(110 + WiFiCoalesce::COALESCE_MS);
+    assert(fake.sent.size() == 2 && fake.sent[1].data.size() == 6 * imu.size());
+    assert(!d.tx_pending() && d.status().tx_datagrams == 2);
+}
+
+// 湊好的資料包遇到緩衝不足：重送時從同一則開頭重新湊，重試中新到的訊息一起接上；
+// 重試滿 RETRY_MS 仍被拒就整包丟掉
+void test_packed_datagram_retry_grows_then_drops_whole()
+{
+    using RTL8735B::WiFiTxRetry;
+    FakeNet fake;
+    reset(fake);
+    WiFiDriver d(WiFiDriver::Protocol::UDP, kLocalPort, kGcsPort);
+    bring_up(d);
+    learn_gcs(d, 100);
+    const auto a = mav2(30, 28), b = mav2(33, 28), c = mav2(0, 9);
+    write_all(d, a);
+    write_all(d, b);
+    fake.nobufs_sends = -1;
+    d._link_step(110);
+    const uint32_t first = 110 + WiFiCoalesce::COALESCE_MS;
+    d._link_step(first);
+    assert(fake.attempts.size() == 1 && fake.attempts[0] == cat({a, b}));
+    write_all(d, c);
+    d._link_step(first + 1);
+    assert(fake.attempts.size() == 2 && fake.attempts[1] == cat({a, b, c}));
+    uint32_t now = first + 1;
+    while (now < first + WiFiTxRetry::RETRY_MS - 1) {
+        d._link_step(++now);
+    }
+    assert(d.status().tx_errors == 0 && d.tx_pending());
+    d._link_step(++now);
+    const WiFiDriver::Status s = d.status();
+    assert(s.tx_errors == 1 && s.tx_dropped_bytes == a.size() + b.size() + c.size());
+    assert(!d.tx_pending() && fake.sent.empty());
 }
 
 void test_link_loss_reconnects()
@@ -1066,6 +1138,8 @@ int main()
     test_nobufs_keeps_datagram_and_resends();
     test_nobufs_gives_up_after_retry_ms();
     test_link_loss_abandons_retry();
+    test_full_datagram_is_sent_without_waiting();
+    test_packed_datagram_retry_grows_then_drops_whole();
     test_link_loss_reconnects();
     test_end_keeps_task_and_rebegin();
     test_uart_api_does_not_block_while_sdk_join_blocks();

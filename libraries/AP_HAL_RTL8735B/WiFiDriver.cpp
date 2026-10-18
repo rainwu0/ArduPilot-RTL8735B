@@ -270,6 +270,7 @@ void WiFiDriver::_link_lost(uint32_t now_ms, const char *reason)
 {
     _close_sockets();
     _tx_retry.reset();
+    _tx_coalesce.reset();
     rtl8735b_wifi_leave();
     _gcs_known.store(false);
     _local_address.store(0);
@@ -348,6 +349,8 @@ void WiFiDriver::_service_rx(uint32_t now_ms)
 
 void WiFiDriver::_service_tx(uint32_t now_ms)
 {
+    // 有地面站時把幾則 MAVLink 湊進一個資料包（WiFiCoalesce.h）；廣播心跳照舊一則一包
+    const bool to_gcs = _gcs_active(now_ms);
     for (uint8_t i = 0; i < MAX_DATAGRAMS_PER_STEP; i++) {
         uint16_t n = 0;
         uint32_t generation;
@@ -356,6 +359,7 @@ void WiFiDriver::_service_tx(uint32_t now_ms)
             const uint32_t available = _writebuf.available();
             if (available == 0) {
                 _tx_incomplete = false;
+                _tx_coalesce.idle();
                 return;
             }
             const uint16_t limit = (uint16_t)std::min<uint32_t>(available, DATAGRAM_MAX);
@@ -365,6 +369,7 @@ void WiFiDriver::_service_tx(uint32_t now_ms)
             n = limit;
 #endif
             if (n == 0) {
+                _tx_coalesce.idle();
                 // 開頭的訊框還不完整：等寫入端補齊；太久沒補齊就丟一個位元組重新對齊。
                 // end()／begin() 清空過緩衝區（世代號變了）時，開頭已是新的訊框，重新計時。
                 if (!_tx_incomplete || _tx_incomplete_generation != _tx_generation) {
@@ -380,14 +385,27 @@ void WiFiDriver::_service_tx(uint32_t now_ms)
                 return;
             }
             _tx_incomplete = false;
+#if AP_MAVLINK_PACKETISE_ENABLED
+            if (to_gcs) {
+                _writebuf.peekbytes(_datagram, limit);
+                bool full;
+                n = WiFiCoalesce::extend(_datagram, limit, n, available > limit, DATAGRAM_MAX, &full);
+                if (!_tx_retry.active() && !_tx_coalesce.ready(now_ms, full)) {
+                    return;     // 湊不滿、還沒等滿 COALESCE_MS：下一步再看
+                }
+            } else {
+                _writebuf.peekbytes(_datagram, n);
+            }
+#else
             _writebuf.peekbytes(_datagram, n);
+#endif
             generation = _tx_generation;
         }
         _tx_retry.check_generation(generation);
 
         bool attempted = true;
         int sent = 0;
-        if (_gcs_active(now_ms)) {
+        if (to_gcs) {
             sent = rtl8735b_udp_sendto(_fd, _datagram, n, _gcs_address.load(), _gcs_port_learned.load());
         } else {
             if (_gcs_known.load()) {

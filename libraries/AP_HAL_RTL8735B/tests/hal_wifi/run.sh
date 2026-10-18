@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wi-Fi 鏈路的主機測試：帳密產生器、SDK C 包裝（替身 SDK）、UDP 送出的重試判斷、WiFiDriver 的 UDP 與 TCP
+# Wi-Fi 鏈路的主機測試：帳密產生器、SDK C 包裝（替身 SDK）、UDP 送出的重試與湊包判斷、WiFiDriver 的 UDP 與 TCP
 # （替身 shim 與 task）。
 # 不開無線電、不開序列埠。HAL 原始碼預設是本目錄上兩層的 libraries/AP_HAL_RTL8735B，可用 $1 指定。
 set -euo pipefail
@@ -16,7 +16,7 @@ cc -std=c11 -Wall -Wextra -Werror -I"$test_dir/wifi_sdk_fakes" -I"$lib_dir" \
 timeout 30 "$out/wifi-shim-test"
 
 # WiFiDriver 送出時的判斷，只有標頭，不依賴 SDK 與 FreeRTOS
-for t in wifi_tx_retry; do
+for t in wifi_tx_retry wifi_coalesce; do
     c++ -std=c++17 -Wall -Wextra -Werror -I"$lib_dir/.." "$test_dir/${t}_host_test.cpp" -o "$out/$t-test"
     timeout 30 "$out/$t-test"
 done

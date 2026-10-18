@@ -212,6 +212,18 @@ class RulesTest(unittest.TestCase):
         self.assertRejected(['undef HAL_RTL8735B_SERIAL3_ENABLED', 'define HAL_RTL8735B_SERIAL3_ENABLED 0',
                              'RTL8735B_ADC 2 PIN_A2'])
 
+    def test_rx_only_serial_frees_its_tx_pin(self):
+        # SERIAL3 只收（TX 寫 PIN_NC）：PA2 可以給類比輸入，PA3 仍屬 SERIAL3
+        header = generate(['undef HAL_RTL8735B_SERIAL3_TX_PIN', 'define HAL_RTL8735B_SERIAL3_TX_PIN PIN_NC',
+                           'RTL8735B_ADC 9 PIN_A2'])
+        self.assertEqual(table(header, 'HAL_RTL8735B_ADC_PINS'), ['{2,PIN_F0,0}', '{9,PIN_A2,6}'])
+        self.assertRejectedNaming(['undef HAL_RTL8735B_SERIAL3_TX_PIN', 'define HAL_RTL8735B_SERIAL3_TX_PIN PIN_NC',
+                                   'RTL8735B_ADC 10 PIN_A3'], 'PIN_A3', 'HAL_RTL8735B_SERIAL3_RX_PIN')
+        # 兩個埠都只收時 PIN_NC 不算重複；RX 不能不接
+        generate(['undef HAL_RTL8735B_SERIAL3_TX_PIN', 'define HAL_RTL8735B_SERIAL3_TX_PIN PIN_NC',
+                  'undef HAL_RTL8735B_SERIAL1_TX_PIN', 'define HAL_RTL8735B_SERIAL1_TX_PIN PIN_NC'])
+        self.assertRejected(['undef HAL_RTL8735B_SERIAL3_RX_PIN', 'define HAL_RTL8735B_SERIAL3_RX_PIN PIN_NC'])
+
     def test_adc_only_on_pf0_to_pf3_and_pa0_to_pa3(self):
         self.assertRejected(['undef RTL8735B_ADC', 'RTL8735B_ADC 2 PIN_A4'])
         self.assertRejected(['undef RTL8735B_ADC', 'RTL8735B_ADC 2 PIN_E4'])

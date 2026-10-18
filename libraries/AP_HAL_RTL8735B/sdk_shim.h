@@ -17,6 +17,8 @@ enum {
     RTL8735B_UART_LOG = 1,
     RTL8735B_UART_IRQ_RX = 0,
     RTL8735B_UART_IRQ_TX = 1,
+    // hwdef 的 TX 腳寫 PIN_NC（SDK rtl8735b_pin_name.h 的 0x1FF）：只收的埠
+    RTL8735B_UART_PIN_NONE = 0x1FF,
 };
 
 typedef void (*rtl8735b_uart_irq_handler)(uint32_t uart_id, uint32_t irq);

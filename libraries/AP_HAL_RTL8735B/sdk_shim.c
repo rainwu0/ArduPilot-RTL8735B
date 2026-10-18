@@ -34,6 +34,8 @@ void rtl8735b_system_reset(void)
 static serial_t uart_objects[RTL8735B_UART_COUNT];
 static uint8_t uart_initialized[RTL8735B_UART_COUNT];
 static rtl8735b_uart_irq_handler uart_irq_handlers[RTL8735B_UART_COUNT];
+// 只收的埠：寫入一律丟掉，不開 TX 中斷
+static uint8_t uart_rx_only[RTL8735B_UART_COUNT];
 
 static int _uart_id_valid(uint8_t uart_id)
 {
@@ -91,6 +93,8 @@ static void _uart_irq_set(uint8_t uart_id, uint32_t irq, uint8_t enable)
 {
     if (uart_id == RTL8735B_UART_LOG) {
         _log_irq_set(irq, enable);
+    } else if (irq == RTL8735B_UART_IRQ_TX && uart_rx_only[uart_id]) {
+        // 沒有 TX：不開 TX 中斷
     } else if (irq == RTL8735B_UART_IRQ_RX) {
         serial_irq_set(&uart_objects[uart_id], RxIrq, enable != 0);
     } else if (irq == RTL8735B_UART_IRQ_TX) {
@@ -167,16 +171,17 @@ static int _log_uart_init(uint32_t tx_pin, uint32_t rx_pin, uint32_t baud)
 
 int rtl8735b_uart_init(uint8_t uart_id, uint32_t tx_pin, uint32_t rx_pin, uint32_t baud)
 {
+    const uint8_t rx_only = tx_pin == RTL8735B_UART_PIN_NONE;
     if (!_uart_id_valid(uart_id) || baud == 0 || uart_initialized[uart_id] ||
-        tx_pin > UINT8_MAX || rx_pin > UINT8_MAX) {
+        (tx_pin > UINT8_MAX && !rx_only) || rx_pin > UINT8_MAX) {
         return -1;
     }
     if (uart_id == RTL8735B_UART_LOG) {
-        return _log_uart_init(tx_pin, rx_pin, baud);
+        return rx_only ? -1 : _log_uart_init(tx_pin, rx_pin, baud);
     }
 
-    // UART 選擇由 pinmux 決定；避免錯誤 hwdef 以 UART2 ID 配到 UART1 腳位。
-    if (hal_uart_pin_to_idx((uint8_t)tx_pin, UART_Pin_TX) != uart_id ||
+    // UART 選擇由 pinmux 決定；避免錯誤 hwdef 以 UART2 ID 配到 UART1 腳位。只收的埠只看 RX。
+    if ((!rx_only && hal_uart_pin_to_idx((uint8_t)tx_pin, UART_Pin_TX) != uart_id) ||
         hal_uart_pin_to_idx((uint8_t)rx_pin, UART_Pin_RX) != uart_id) {
         return -1;
     }
@@ -185,7 +190,10 @@ int rtl8735b_uart_init(uint8_t uart_id, uint32_t tx_pin, uint32_t rx_pin, uint32
     memset(obj, 0, sizeof(*obj));
 
     // serial_init() 會忽略此回傳值；直接呼叫 HAL 才能將失敗傳給 UARTDriver。
-    hal_status_t status = hal_uart_init(&obj->uart_adp, (uint8_t)tx_pin, (uint8_t)rx_pin, NULL);
+    // 只收的埠 TX 傳 PIN_NC：hal_uart_init 的實作只在預編譯庫裡，接受 PIN_NC、只設定 RX 腳是推論，
+    // 上板以「TX 腳另作他用、RX 照常收」確認；SDK 拒絕時開埠失敗，不會悄悄占用 TX 腳。
+    hal_status_t status = hal_uart_init(&obj->uart_adp, rx_only ? RTL8735B_UART_PIN_NONE : (uint8_t)tx_pin,
+                                        (uint8_t)rx_pin, NULL);
     if (status != HAL_OK) {
         return (int)status;
     }
@@ -207,6 +215,7 @@ int rtl8735b_uart_init(uint8_t uart_id, uint32_t tx_pin, uint32_t rx_pin, uint32
     // 最低門檻可在第一個位元組到達時觸發，縮短 MAVLink/GPS 接收延遲。
     serial_rx_fifo_level(obj, FifoLv1Byte);
     // trampoline 只在 uart_initialized 為真時碰 serial 物件，所以先標記再掛 callback。
+    uart_rx_only[uart_id] = rx_only;
     uart_initialized[uart_id] = 1;
     serial_irq_handler(obj, _uart_irq_trampoline, uart_id);
     return (int)HAL_OK;
@@ -240,6 +249,7 @@ void rtl8735b_uart_free(uint8_t uart_id)
     serial_irq_set(&uart_objects[uart_id], TxIrq, 0);
     // 先撤銷標記：之後才進來的已鎖存中斷不再碰即將清零的 serial 物件。
     uart_initialized[uart_id] = 0;
+    uart_rx_only[uart_id] = 0;
     uart_irq_handlers[uart_id] = NULL;
     serial_irq_handler(&uart_objects[uart_id], NULL, 0);
     hal_uart_deinit(&uart_objects[uart_id].uart_adp);
@@ -287,6 +297,9 @@ uint8_t rtl8735b_uart_writable(uint8_t uart_id)
     if (uart_id == RTL8735B_UART_LOG) {
         return hal_uart_writeable(log_adapter) ? 1 : 0;
     }
+    if (uart_rx_only[uart_id]) {
+        return 1;
+    }
     return serial_writable(&uart_objects[uart_id]) ? 1 : 0;
 }
 
@@ -302,6 +315,10 @@ uint8_t rtl8735b_uart_write_byte(uint8_t uart_id, uint8_t value)
         if (log_tx_irq_enabled) {
             log_adapter->base_addr->ier_b.etbei = 1;
         }
+        return 1;
+    }
+    if (uart_rx_only[uart_id]) {
+        // 沒有 TX：丟掉，回報已送出，上層的送出緩衝照常清空
         return 1;
     }
     serial_putc(&uart_objects[uart_id], value);

@@ -221,11 +221,16 @@ class RTL8735BHWDef(hwdef.HWDef):
             uses.append((pin, '%s %s' % (k, logical)))
         self.write_table(f, 'ADC pins', 'HAL_RTL8735B_ADC_PINS', 'HAL_RTL8735B_ADC_COUNT', rows)
 
-        # 啟用中的序列埠腳位（停用的序列埠不占腳位）
+        # 啟用中的序列埠腳位（停用的序列埠不占腳位）。TX 寫 PIN_NC 是只收的埠，不占 TX 腳；RX 一定要接
         for line in self.alllines:
-            m = re.match(r'define\s+(HAL_RTL8735B_SERIAL(\d)_(?:TX|RX)_PIN)\s+(PIN_\w+)', line)
-            if m and self.intdefines.get('HAL_RTL8735B_SERIAL%s_ENABLED' % m.group(2), 0) == 1:
-                uses.append((m.group(3), m.group(1)))
+            m = re.match(r'define\s+(HAL_RTL8735B_SERIAL(\d)_(TX|RX)_PIN)\s+(PIN_\w+)', line)
+            if not m or self.intdefines.get('HAL_RTL8735B_SERIAL%s_ENABLED' % m.group(2), 0) != 1:
+                continue
+            if m.group(4) == 'PIN_NC':
+                if m.group(3) == 'RX':
+                    self.error('%s 不能是 PIN_NC：序列埠只能省略 TX' % m.group(1))
+                continue
+            uses.append((m.group(4), m.group(1)))
         owner = {}
         for pin, source in uses:
             if pin in owner:

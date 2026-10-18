@@ -27,6 +27,8 @@ static struct {
     int etbei_when_hooked;
     int count_when_hooked;
     int storm;
+    uint32_t init_tx_pin;
+    int tx_bytes;
 } uart;
 
 static int received;
@@ -106,7 +108,9 @@ hal_status_t hal_uart_init(hal_uart_adapter_t *adapter, uint32_t tx, uint32_t rx
 {
     // LOG UART 不得重新初始化：SDK 的 printf 仍在用同一組設定
     assert(adapter != &log_adp);
-    assert(tx == TEST_TX_PIN && rx == TEST_RX_PIN && config == NULL);
+    // 只收的埠：TX 傳 SDK 的 PIN_NC（rtl8735b_pin_name.h 是 0x1FF）
+    assert((tx == TEST_TX_PIN || tx == 0x1FFu) && rx == TEST_RX_PIN && config == NULL);
+    uart.init_tx_pin = tx;
     adapter->uart_idx = TEST_UART;
     uart.erbi = uart.rom_leaves_erbi;
     uart.etbei = uart.rom_leaves_erbi;
@@ -251,6 +255,7 @@ void serial_putc(serial_t *serial, int byte)
 {
     check(serial);
     (void)byte;
+    uart.tx_bytes++;
 }
 
 void serial_clear_rx(serial_t *serial)
@@ -427,8 +432,42 @@ static void test_log_uart_rejects_unusable_adapter(void)
     puts("PASS log-uart-rejects-unusable-adapter");
 }
 
+// 只收的埠（hwdef 的 TX 寫 PIN_NC，例如電調遙測）：只檢查 RX 腳屬於這個 UART，TX 傳 PIN_NC 給 SDK；
+// 寫入一律丟掉、回報成功，不碰 TX 中斷，讓上層的送出緩衝照常清空。
+static void test_rx_only_port(void)
+{
+    reset_fake();
+    assert(rtl8735b_uart_init(TEST_UART, RTL8735B_UART_PIN_NONE, TEST_RX_PIN, 115200) == 0);
+    assert(uart.init_tx_pin == 0x1FFu);
+    rtl8735b_uart_set_irq_handler(TEST_UART, consumer);
+    rtl8735b_uart_set_irq(TEST_UART, RTL8735B_UART_IRQ_TX, 1);
+    rtl8735b_uart_set_irq(TEST_UART, RTL8735B_UART_IRQ_RX, 1);
+    assert(uart.etbei == 0 && uart.erbi == 1);
+    assert(rtl8735b_uart_writable(TEST_UART));
+    assert(rtl8735b_uart_write_byte(TEST_UART, 0x55) == 1);
+    assert(uart.tx_bytes == 0 && uart.etbei == 0);
+    push_rx(4);
+    deliver_rx_level_irq();
+    assert(!uart.storm && received == 4);
+    rtl8735b_uart_free(TEST_UART);
+
+    // 釋放後再開成一般的埠：TX 照常
+    reset_fake();
+    assert(rtl8735b_uart_init(TEST_UART, TEST_TX_PIN, TEST_RX_PIN, 115200) == 0);
+    rtl8735b_uart_set_irq(TEST_UART, RTL8735B_UART_IRQ_TX, 1);
+    assert(rtl8735b_uart_write_byte(TEST_UART, 0x55) == 1 && uart.tx_bytes == 1);
+    rtl8735b_uart_free(TEST_UART);
+
+    // RX 不能不接；LOG UART 不能只收
+    reset_fake();
+    assert(rtl8735b_uart_init(TEST_UART, TEST_TX_PIN, RTL8735B_UART_PIN_NONE, 115200) == -1);
+    assert(rtl8735b_uart_init(LOG_UART, RTL8735B_UART_PIN_NONE, LOG_RX_PIN, 115200) == -1);
+    puts("PASS rx-only-port");
+}
+
 int main(void)
 {
+    test_rx_only_port();
     test_log_uart_reuses_console_adapter();
     test_log_uart_rejects_unusable_adapter();
     test_init_masks_and_drains_before_hooking();

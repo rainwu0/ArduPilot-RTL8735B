@@ -53,6 +53,8 @@ private:
     volatile Backend _backend = Backend::None;
     uint32_t _last_empty_ms = 0;
     uint32_t _last_re_init_ms = 0;
+    // storage task 抹除 Flash 期間為真，healthy() 讀（只由 storage task 寫，不加鎖）
+    volatile bool _erasing = false;
 
     AP_FlashStorage _flash{_buffer,
                            RTL8735B_STORAGE_FLASH_SECTOR_SIZE,

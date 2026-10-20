@@ -25,6 +25,9 @@ struct StorageFlashFake {
     uint32_t min_touched = UINT32_MAX;
     uint32_t max_touched = 0;
     int lock_depth = 0;
+    // 每次 4 KiB 抹除開始時呼叫（測試用來看抹除當下的狀態）
+    void (*on_erase)(void *ctx) = nullptr;
+    void *on_erase_ctx = nullptr;
 
     void reset() { *this = StorageFlashFake(); }
     void power_restore() { powered = true; program_budget = -1; }

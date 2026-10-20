@@ -62,6 +62,9 @@ void flash_erase_sector(flash_t *, uint32_t address)
 {
     note_op();
     f.erase_calls++;
+    if (f.on_erase != nullptr) {
+        f.on_erase(f.on_erase_ctx);
+    }
     const uint32_t base = address & ~0xFFFu;
     touch(base, 0x1000);
     assert(base + 0x1000 <= f.size);

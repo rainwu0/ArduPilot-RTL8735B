@@ -207,6 +207,7 @@ FLASH_LAYOUT sdk-d1b6426
 - The layout is read at `./waf configure`: after changing `FLASH_LAYOUT` in hwdef or an overlay, configure again.
 - Parameters are stored at 0xF80000–0xFA0000, the same in all three layouts. The NOR file system area (0xF64000–0x1000000) of the Arduino package (93d6351) and the newer SDK (eb5c090) covers this range; it only conflicts when the Flash file system is enabled, and this port does not enable it.
 - Parameters are stored with ArduPilot's `AP_FlashStorage`, alternating between two 64 KiB sectors. Losing power in the middle of a write loses only that last write. One exception: after one sector fills and storage moves to the other, the next boot erases the full sector (16 erases of 4 KiB; the time has not been measured). Losing power or pressing reset during that time brings all parameters back to their defaults on the next boot; the pre-arm checks show the missing calibration. Sector changes are infrequent, but keep saving parameters to a file with the ground station as usual, and load them back when needed.
+- An erase can also happen while running (a second sector change in the same boot, or rebuilding storage after a write failure), and it only starts while disarmed. While it runs, the pre-arm checks report `Param storage failed` and a normal arm is refused; this clears when the erase finishes. A forced arm skips this check.
 
 ## Motor outputs
 

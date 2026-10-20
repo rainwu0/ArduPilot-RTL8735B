@@ -161,22 +161,27 @@ bool Storage::_flash_erase_sector(uint8_t sector)
     if (sector >= RTL8735B_STORAGE_FLASH_SECTOR_COUNT) {
         return false;
     }
-    return rtl8735b_storage_flash_erase(sector * RTL8735B_STORAGE_FLASH_SECTOR_SIZE,
-                                         RTL8735B_STORAGE_FLASH_SECTOR_SIZE) == RTL8735B_STORAGE_FLASH_OK;
+    _erasing = true;
+    const bool ok = rtl8735b_storage_flash_erase(sector * RTL8735B_STORAGE_FLASH_SECTOR_SIZE,
+                                                 RTL8735B_STORAGE_FLASH_SECTOR_SIZE) == RTL8735B_STORAGE_FLASH_OK;
+    _erasing = false;
+    return ok;
 }
 
-// 抹除 64 KiB 需要多次 NOR 扇區抹除，只在上鎖（disarmed）時允許
+// 抹除 64 KiB 需要多次 NOR 扇區抹除，只在上鎖（disarmed）時開始
 bool Storage::_flash_erase_ok(void)
 {
     return !hal.util->get_soft_armed();
 }
 
 /*
-  最近 2 秒內曾經沒有待寫資料才算健康；Flash 無法使用時一律不健康
+  最近 2 秒內曾經沒有待寫資料才算健康；Flash 無法使用時一律不健康。
+  抹除期間也不健康：抹除只在上鎖時開始，但一般解鎖要等 AP_Arming 的系統檢查（Param storage failed），
+  這樣抹除進行中不會解鎖，解鎖後也不會遇到抹除。強制解鎖不經這項檢查。
  */
 bool Storage::healthy(void)
 {
-    return _backend == Backend::Flash && AP_HAL::millis() - _last_empty_ms < 2000U;
+    return _backend == Backend::Flash && !_erasing && AP_HAL::millis() - _last_empty_ms < 2000U;
 }
 
 /*

@@ -236,6 +236,45 @@ static void sector_rotation_and_arming()
     check_region_only();
 }
 
+// 執行中的抹除（上鎖時換扇區）期間 healthy() 為 false：一般解鎖的系統檢查（AP_Arming 的
+// "Param storage failed"）因此擋下，不會在抹除進行中解鎖。抹除完、待寫清空後恢復健康
+struct EraseProbe {
+    RTL8735B::Storage *storage;
+    unsigned erases;
+    unsigned healthy_during_erase;
+};
+
+static void probe_erase(void *ctx)
+{
+    EraseProbe &p = *static_cast<EraseProbe *>(ctx);
+    p.erases++;
+    if (p.storage->healthy()) {
+        p.healthy_during_erase++;
+    }
+}
+
+static void unhealthy_while_erasing()
+{
+    flash.reset();
+    now_ms = 1;
+    std::mt19937 rng(99);
+    std::vector<uint8_t> shadow(HAL_STORAGE_SIZE, 0);
+    StoragePtr s = boot();
+    EraseProbe probe{s.get(), 0, 0};
+    flash.on_erase = probe_erase;
+    flash.on_erase_ctx = &probe;
+    for (unsigned n = 0; n < 30000 && probe.erases == 0; n++) {
+        write_random(*s, shadow, rng);
+        run_ticks(*s, 4);
+    }
+    assert(probe.erases > 0);
+    flush(*s);
+    flash.on_erase = nullptr;
+    assert(probe.healthy_during_erase == 0);
+    assert(s->healthy());
+    assert(read_all(*s) == shadow);
+}
+
 // 在一連串寫入的任意位元組處斷電：重開機後，已寫出的資料不變，斷電當下那筆寫入的每一行是舊值或新值
 static void power_loss_sweep()
 {
@@ -536,6 +575,7 @@ int main()
     bounds();
     write_fault_recovery();
     sector_rotation_and_arming();
+    unhealthy_while_erasing();
     power_loss_sweep();
     erase_window_never_restores_old_values();
     puts("PASS: flash storage shim guard/verify, persist across reboot, health, armed no-erase, "

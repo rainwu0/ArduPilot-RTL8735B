@@ -7,6 +7,7 @@
 #include <AP_HAL/AP_HAL.h>
 #include <GCS_MAVLink/GCS.h>
 
+#include <algorithm>
 #include <assert.h>
 #include <condition_variable>
 #include <mutex>
@@ -44,6 +45,7 @@ struct DshotSend {
     uint16_t frames[RTL8735B_DSHOT_MAX_SLOTS];
     uint32_t active;
     rtl8735b_dshot_timing_t timing;
+    uint32_t at_us;   // 送出時的 AP_HAL::micros()
 };
 std::vector<uint32_t> dshot_pins;
 std::vector<DshotSend> dshot_sends;
@@ -159,6 +161,7 @@ extern "C" int rtl8735b_dshot_send(const uint16_t frames[RTL8735B_DSHOT_MAX_SLOT
     memcpy(send.frames, frames, sizeof(send.frames));
     send.active = active;
     send.timing = *timing;
+    send.at_us = now_us;
     dshot_sends.push_back(send);
     return dshot_stopped ? RTL8735B_DSHOT_ESTOPPED : dshot_send_result;
 }
@@ -1020,6 +1023,78 @@ void test_dshot_telemetry_request()
     assert(dshot_sends.back().frames[3] == plain);
 }
 
+// 遙測請求是取代，不是累加（同 ChibiOS）：送出前又設了別的通道，只請求最後設的那幾路，免得多顆電調同時回、
+// 在同一條 TLM 線上撞在一起
+void test_dshot_telemetry_request_replaces()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    RTL8735B::RCOutput output;
+    output.init();
+    output.force_safety_off();
+    output.set_output_mode(0x0FU, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+    fake_util.soft_armed = true;
+    output.set_telem_request_mask(1U << 1);
+    output.set_telem_request_mask(1U << 3);
+    write_all(output, 1100, 1100, 1100, 1100);
+    assert(dshot_sends.back().frames[1] == rtl8735b_dshot_frame(248, 0));
+    assert(dshot_sends.back().frames[3] == rtl8735b_dshot_frame(248, 1));
+}
+
+// 3D（SERVO_BLH_3DMASK → set_reversible_mask）不支援：該路不照油門送（上層把中點設成 1500，照送會是一半的
+// 正轉油門），固定送 0，說明一次；其他通道照常
+void test_dshot_reversible_mask_refused()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    RTL8735B::RCOutput output;
+    output.init();
+    output.force_safety_off();
+    output.set_output_mode(0x0FU, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+    fake_util.soft_armed = true;
+    fake_statustext().clear();
+    output.set_reversible_mask(1U << 1);
+    write_all(output, 1500, 1500, 1500, 1500);
+    const uint16_t run = rtl8735b_dshot_frame(rtl8735b_dshot_throttle_value(1500, 1), 0);
+    assert(dshot_sends.back().frames[1] == rtl8735b_dshot_frame(0, 0));
+    assert(dshot_sends.back().frames[0] == run && dshot_sends.back().frames[2] == run);
+    assert(fake_statustext().find("3D") != std::string::npos);
+    fake_statustext().clear();
+    write_all(output, 1500, 1500, 1500, 1500);
+    assert(dshot_sends.back().frames[1] == rtl8735b_dshot_frame(0, 0));
+    assert(fake_statustext().empty());
+}
+
+// 送幀頻率至少 800 Hz（ChibiOS 的下限；BLHeli_32 在約 732 Hz 以下有問題）：主程式每 2.5 ms push 一次、
+// 計時器每 1 ms 跑一次時，相鄰兩幀最多隔 1.25 ms
+void test_dshot_minimum_frame_rate()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    RTL8735B::RCOutput output;
+    output.init();
+    output.force_safety_off();
+    output.set_output_mode(0x0FU, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+    fake_util.soft_armed = true;
+    now_us = 100000;
+    const size_t first = dshot_sends.size();
+    for (uint32_t us = 0; us < 20000; us += 100) {
+        now_us = 100000 + us;
+        if (us % 2500 == 700) {
+            write_all(output, 1200, 1200, 1200, 1200);
+        }
+        if (us % 1000 == 0) {
+            fake_scheduler.run_timer();
+        }
+    }
+    assert(dshot_sends.size() > first + 10);
+    uint32_t max_gap = 0;
+    for (size_t i = first + 1; i < dshot_sends.size(); i++) {
+        max_gap = std::max<uint32_t>(max_gap, dshot_sends[i].at_us - dshot_sends[i - 1].at_us);
+    }
+    assert(max_gap <= 1250);
+}
+
 // 安全開關：關著時不送任何幀（不是送 0）；主程式沒 push 時由計時器續送，太久才補
 void test_dshot_safety_and_keepalive()
 {
@@ -1038,15 +1113,15 @@ void test_dshot_safety_and_keepalive()
     now_us = 10000;
     write_all(output, 1500, 1500, 1500, 1500);
     assert(dshot_sends.size() == 1);
-    now_us = 11000;
+    now_us = 10200;
     fake_scheduler.run_timer();
     assert(dshot_sends.size() == 1);
-    now_us = 14500;
+    now_us = 11000;
     fake_scheduler.run_timer();
     assert(dshot_sends.size() == 2);
     assert(memcmp(dshot_sends[1].frames, dshot_sends[0].frames, sizeof(dshot_sends[0].frames)) == 0);
     assert(dshot_sends[1].active == dshot_sends[0].active);
-    now_us = 15000;
+    now_us = 11100;
     fake_scheduler.run_timer();
     assert(dshot_sends.size() == 2);
 
@@ -1500,9 +1575,11 @@ void test_dshot_commands()
     }
     assert(dshot_sends.size() == start + 29);
     assert(dshot_sends.back().frames[3] == rtl8735b_dshot_frame(4, 1));
+    // 命令送完：下一次補送回到油門幀（未解鎖是 0）
     now_us += 1000;
     fake_scheduler.run_timer();
-    assert(dshot_sends.size() == start + 29);
+    assert(dshot_sends.size() == start + 30);
+    assert(dshot_sends.back().frames[3] == zero);
     write_all(output, 1000, 1000, 1000, 1000);
     assert(dshot_sends.back().frames[3] == zero);
 
@@ -1589,6 +1666,9 @@ int main()
     test_oneshot_mode_uses_normal_pwm_path();
     test_dshot_mode_and_frames();
     test_dshot_telemetry_request();
+    test_dshot_telemetry_request_replaces();
+    test_dshot_reversible_mask_refused();
+    test_dshot_minimum_frame_rate();
     test_dshot_safety_and_keepalive();
     test_dshot_keepalive_stops_motors_when_main_loop_stalls();
     test_pwm_stops_when_main_loop_stalls();

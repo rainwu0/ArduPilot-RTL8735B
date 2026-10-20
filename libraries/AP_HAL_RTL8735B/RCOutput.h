@@ -35,6 +35,7 @@ public:
 
     // DShot：dshot_shim.c 以 GPIO 送幀
     void set_telem_request_mask(uint32_t mask) override;
+    void set_reversible_mask(uint32_t chanmask) override;
     void set_dshot_rate(uint8_t dshot_rate, uint16_t loop_rate_hz) override;
     void set_dshot_esc_type(DshotEscType esc_type) override;
     DshotEscType get_dshot_esc_type() const override;
@@ -100,6 +101,8 @@ private:
     // 已回報 DShot 無法使用或需要重開機的通道
     uint32_t _dshot_reported_mask;
     uint32_t _telem_request_mask;
+    // 3D（SERVO_BLH_3DMASK）的通道：不支援，固定送 0
+    uint32_t _reversible_mask;
     enum output_mode _dshot_mode;
     DshotEscType _dshot_esc_type;
     rtl8735b_dshot_timing_t _dshot_timing;

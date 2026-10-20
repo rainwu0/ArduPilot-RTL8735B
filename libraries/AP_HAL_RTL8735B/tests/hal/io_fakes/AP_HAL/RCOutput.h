@@ -39,6 +39,7 @@ public:
     };
     const static uint32_t ALL_CHANNELS = 255;
     virtual void set_telem_request_mask(uint32_t mask) { (void)mask; }
+    virtual void set_reversible_mask(uint32_t chanmask) { (void)chanmask; }
     virtual void set_dshot_rate(uint8_t dshot_rate, uint16_t loop_rate_hz) { (void)dshot_rate; (void)loop_rate_hz; }
     virtual void set_dshot_esc_type(DshotEscType esc_type) { (void)esc_type; }
     virtual DshotEscType get_dshot_esc_type() const { return DSHOT_ESC_NONE; }

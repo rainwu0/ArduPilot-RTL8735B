@@ -42,6 +42,7 @@ RCOutput::RCOutput() :
     _dshot_attached_mask(0),
     _dshot_reported_mask(0),
     _telem_request_mask(0),
+    _reversible_mask(0),
     _dshot_mode(MODE_PWM_NONE),
     _dshot_esc_type(DSHOT_ESC_NONE),
     _dshot_timing{},
@@ -99,9 +100,9 @@ uint16_t dshot_rate_khz(AP_HAL::RCOutput::output_mode mode)
     }
 }
 
-// 主程式每次 push 送一幀；主迴圈太久沒 push 時，計時器在上一幀之後這麼久補送同樣的幀，
-// 讓電調不因收不到訊號而停機（最低約 250 Hz）
-constexpr uint32_t DSHOT_KEEPALIVE_US = 4000;
+// 主程式每次 push 送一幀；計時器每 1 ms 跑一次，距上一幀已經這麼久就補送同樣的幀，所以相鄰兩幀最多隔
+// 1 ms＋250 µs，至少 800 Hz（同 ChibiOS 的下限；BLHeli_32 在約 732 Hz 以下有問題）
+constexpr uint32_t DSHOT_KEEPALIVE_US = 250;
 // 主迴圈已經超過這麼久沒跑完一圈（rtl8735b_ardupilot_ms_since_main_loop）就當成停住：DShot 補送的油門幀改送 0，
 // 解鎖中的 PWM 全部停止，馬達不會照停住前的油門一直轉。400 Hz 的主迴圈每 2.5 ms 跑完一圈，100 ms 是 40 圈
 constexpr uint32_t MAIN_LOOP_STALE_MS = 100;
@@ -733,7 +734,8 @@ void RCOutput::_dshot_send_locked(bool resend)
                 continue;
             }
             const uint8_t telem = (_telem_request_mask & (1UL << chan)) != 0;
-            const uint16_t value = stale ? 0 : rtl8735b_dshot_throttle_value(_value_us[chan], armed);
+            const bool hold_zero = stale || (_reversible_mask & (1UL << chan)) != 0;
+            const uint16_t value = hold_zero ? 0 : rtl8735b_dshot_throttle_value(_value_us[chan], armed);
             frames[slot] = rtl8735b_dshot_frame(value, telem);
             sent |= 1UL << chan;
         }
@@ -847,13 +849,27 @@ bool RCOutput::get_output_mode_banner(char banner_msg[], uint8_t banner_msg_len)
     return true;
 }
 
+// 取代，不累加（同 ChibiOS 的 RCOutput）：沒送出的舊請求不留著，免得多顆電調同時在同一條 TLM 線上回
 void RCOutput::set_telem_request_mask(uint32_t mask)
 {
     RCLock lock(_semaphore);
-    _telem_request_mask |= mask;
+    _telem_request_mask = mask;
 }
 
-// 幀在每次 push 時送出（主迴圈的頻率），沒有 push 時由計時器補送；ArduPilot 以迴圈頻率倍數排的送幀頻率不用。
+// 3D（SERVO_BLH_3DMASK，AP_BLHeli 呼叫）不支援：DShot 的 3D 要把油門換成正反兩段，這裡沒做。上層把這些通道的中點
+// 設成 1500，照一般油門送會變成約一半的正轉，所以這些通道固定送 0，並說明一次。
+void RCOutput::set_reversible_mask(uint32_t chanmask)
+{
+    RCLock lock(_semaphore);
+    _reversible_mask = chanmask;
+    if (chanmask != 0) {
+        RTL8735B::report_warning("RTL8735B: DShot 3D (reversible mask 0x%lx) not supported; those outputs held at 0",
+                                 (unsigned long)chanmask);
+    }
+}
+
+// 幀在每次 push 時送出，計時器補送讓相鄰兩幀最多隔約 1.25 ms（DSHOT_KEEPALIVE_US）；
+// ArduPilot 以迴圈頻率倍數排的送幀頻率不用。
 void RCOutput::set_dshot_rate(uint8_t dshot_rate, uint16_t loop_rate_hz)
 {
     (void)dshot_rate;

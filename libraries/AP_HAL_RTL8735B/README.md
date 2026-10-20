@@ -224,14 +224,15 @@ FLASH_LAYOUT sdk-d1b6426
 - 不支援：DShot1200（7），以及 LED 輸出（NeoPixel、ProfiLED）。
 - DShot：HUB 8735 ultra 的四路輸出 PF11–PF14 是 PWM5–PWM8（`component/mbed/targets/hal/rtl8735b/pwmout_api.c:77-78` 的腳位表），而 SDK d1b6426 只有 PWM0–PWM3 的 GDMA handshake（`component/soc/8735b/fwlib/rtl8735b/include/rtl8735b_gdma.h:69-72`），PWM 硬體沒辦法逐位元換脈寬。所以 DShot 改由 CPU 直接寫 GPIO 埠的設定與清除暫存器送幀，各路同時送（`dshot_shim.c`）。
   - 每送一幀關一次中斷：DShot150 約 107 µs、DShot300 約 53 µs、DShot600 約 27 µs。建議用 DShot300。
-  - 主程式每次輸出送一幀；主迴圈超過 4 ms 沒有輸出時，由計時器補送上一幀。主迴圈超過 100 ms 沒跑完一圈時（例如卡住），補送的油門改成 0，馬達停轉，不會照停住前的油門一直轉；停住前排隊的 DShot 命令也不再送。主迴圈恢復後，只有主程式重新寫入的通道以新值送出。
+  - 送幀至少 800 Hz（相鄰兩幀最多隔約 1.25 ms；ChibiOS 也以 800 Hz 為下限，BLHeli_32 在約 732 Hz 以下有問題）：主程式每次輸出送一幀，計時器每 1 ms 檢查一次，距上一幀超過 250 µs 就補送上一幀。Copter 主迴圈 400 Hz 時約每秒 1,300 幀，關中斷的時間推算約佔 DShot150 14%、DShot300 7%、DShot600 3.5%；對 Wi-Fi 與主迴圈的影響要上板量。`SERVO_DSHOT_RATE` 不用。
+  - 主迴圈超過 100 ms 沒跑完一圈時（例如卡住），補送的油門改成 0，馬達停轉，不會照停住前的油門一直轉；停住前排隊的 DShot 命令也不再送。主迴圈恢復後，只有主程式重新寫入的通道以新值送出。
   - 第一次切到 DShot 時以 CPU 的週期計數器量 CPU 頻率；量不到或不是 500 MHz 就不送 DShot，並在主控台印出原因。
-  - 一幀送到一半，週期計數器停住、倒退，或跳得太遠（例如被關不掉的中斷拖住），會讓位元的寬度出錯：這時腳全部拉低、這一幀作廢，下一次輸出照常送。第一次發生時在主控台與地面站提示一次。
+  - 一幀送到一半，週期計數器停住、倒退，或跳得太遠（例如被關不掉的中斷拖住），會讓位元的寬度出錯：這時腳全部拉低、這一幀作廢，下一次輸出照常送。第一次發生時在主控台與地面站提示一次。0 位元的下降邊緣只容許晚 50 ns：電調的 0／1 分界只比 0 位元長一點（Bluejay、BLHeli_S 由原始碼推算約 60 ns），晚太多就可能把 0 讀成 1；這個分界是推論，要用邏輯分析儀實測。
   - 所有 DShot 輸出要在同一個 GPIO 埠；排針上的 PWM 腳都在埠 F。
   - 一路切到 DShot 之後，本次開機內那支腳維持 GPIO。改 `MOT_PWM_TYPE` 要重開機。
   - 開機訊息的 `RCOut:` 那一行顯示各路的輸出模式，例如 `RCOut: DS300:1-4`。
   - 支援經 `send_dshot_command` 送的 DShot 命令（例如由電調發出的嗶聲），以及 BLHeli_S 的位寬（`SERVO_DSHOT_ESC`）。
-  - 不支援：雙向 DShot（轉速回讀）、3D 與反轉的通道設定（`SERVO_BLH_3DMASK`、`SERVO_BLH_RVMASK`）、經飛控刷電調韌體（BLHeli passthrough）。
+  - 不支援：雙向 DShot（轉速回讀）、3D 與反轉的通道設定（`SERVO_BLH_3DMASK`、`SERVO_BLH_RVMASK`）、經飛控刷電調韌體（BLHeli passthrough）。設了 `SERVO_BLH_3DMASK` 的通道固定送 0（不轉）並說明一次：照一般油門送會是約一半的正轉。
 - 電調遙測（TLM 線）：BLHeli_32、AM32 等電調的遙測線接到一個序列埠的 RX（只要接 RX），該埠設 `SERIALn_PROTOCOL` 16，鮑率自動用 115200；`MOT_PWM_TYPE` 要是 DShot，馬達極數設在 `SERVO_BLH_POLES`。電調的電流與電壓可以用 `BATTn_MONITOR` 9 當成電池監測，也記在 `ESC` 記錄與 MAVLink 的 `ESC_TELEMETRY` 訊息。不需要的自訂板，在疊加檔加一行 `undef HAL_SUPPORT_RCOUT_SERIAL`。
 - DShot 與電調遙測尚未上板。上板前未確認的事：週期計數器存在且 CPU 是 500 MHz；邊緣的抖動在電調接受的範圍內；每幀關中斷不影響 Wi-Fi 與主迴圈。
 - OneShot、OneShot125 未上板。OneShot125 上板前未確認的事：

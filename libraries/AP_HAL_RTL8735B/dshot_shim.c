@@ -14,7 +14,10 @@
  *
  * 計數器出錯時放棄這一幀：每次等待最多讀 bit_cycles + DSHOT_LEAD_CYCLES 次計數器（每讀一次至少花一個週期，
  * 正常的等待不會超過這個次數），計數器停住或倒退時在這個次數內放棄；等到時已經晚了 (t1h − t0h) / 2 以上
- * （計數器往前跳、或被安全世界的中斷拖住）也放棄，因為晚這麼多，電調可能把這個位元的 0 讀成 1、或 1 讀成 0。
+ * （計數器往前跳、或被安全世界的中斷拖住）也放棄，因為晚這麼多，電調可能把這個位元的 1 讀成 0。
+ * 0 位元的下降邊緣另用緊的上限 DSHOT_ZERO_FALL_LATE_CYCLES：這個邊緣晚了，0 的高電位就變長，而電調的 0／1 分界
+ * 只比 0 位元的高電位長一點（Bluejay、BLHeli_S 由原始碼推算約 60 ns，AM32 約 350 ns；推論，待邏輯分析儀實測）。
+ * 那一位元沒有通道送 0 時，這個邊緣不改變任何腳，照用一般的上限。
  * 空跑只用讀取次數的上限、不看遲到：空跑本來就是要吃下快取未命中，晚到是預期的，也不碰真的腳。
  * 放棄時把腳全部拉低、恢復中斷，回傳 RTL8735B_DSHOT_ETIMING 並計數；下一幀照常送。
  */
@@ -43,6 +46,8 @@
 #define DSHOT_CALIB_TOLERANCE_PCT 3u
 // 從決定起點到第一個邊緣的準備時間（CPU 週期）
 #define DSHOT_LEAD_CYCLES 64u
+// 0 位元下降邊緣的遲到上限：500 MHz 下 50 ns，比電調推算的 0／1 分界餘裕（約 60 ns）小
+#define DSHOT_ZERO_FALL_LATE_CYCLES 25u
 
 enum {
     DSHOT_CALIB_NOT_YET = 0,
@@ -169,12 +174,13 @@ static inline __attribute__((always_inline)) int _wait_until(uint32_t target, ui
 }
 
 // 每個位元：起點全部拉高，0 的高電位時間到時拉低送 0 的腳，1 的高電位時間到時拉低其餘的腳。
-// 計數器出錯時（見檔頭）拉低所有的腳、回傳 -1。late_limit 是遲到上限，空跑給 UINT32_MAX（不看遲到）。
+// 計數器出錯時（見檔頭）拉低所有的腳、回傳 -1。late_limit 是一般邊緣的遲到上限，zero_late_limit 是有通道送 0
+// 的位元裡 0 的下降邊緣的上限；空跑兩個都給 UINT32_MAX（不看遲到）。
 // 不內嵌、不特化：空跑與真的送幀要跑同一份程式碼，空跑才能把它載入快取（韌體的編譯器在 -Os 會把兩處呼叫
 // 各內嵌一份；只禁止內嵌時，gcc 仍可能依兩處不同的常數參數各做一份特化）
 static __attribute__((noinline, noclone)) int _send_bits(volatile uint32_t *low, volatile uint32_t *high, uint32_t all,
                        const uint32_t zeros[RTL8735B_DSHOT_FRAME_BITS], uint32_t bits,
-                       const rtl8735b_dshot_timing_t *timing, uint32_t late_limit)
+                       const rtl8735b_dshot_timing_t *timing, uint32_t late_limit, uint32_t zero_late_limit)
 {
     const uint32_t budget = timing->bit_cycles + DSHOT_LEAD_CYCLES;
     uint32_t start = RTL8735B_DSHOT_CYCLES() + DSHOT_LEAD_CYCLES;
@@ -183,7 +189,8 @@ static __attribute__((noinline, noclone)) int _send_bits(volatile uint32_t *low,
             goto lost;
         }
         RTL8735B_DSHOT_REG_WRITE(high, all);
-        if (_wait_until(start + timing->t0h_cycles, budget, late_limit) != 0) {
+        if (_wait_until(start + timing->t0h_cycles, budget,
+                        zeros[bit] != 0 ? zero_late_limit : late_limit) != 0) {
             goto lost;
         }
         RTL8735B_DSHOT_REG_WRITE(low, zeros[bit]);
@@ -231,10 +238,10 @@ int rtl8735b_dshot_send(const uint16_t frames[RTL8735B_DSHOT_MAX_SLOTS], uint32_
     }
     const uint32_t primask = __get_PRIMASK();
     __disable_irq();
-    int lost = _send_bits(&dshot_dummy_reg, &dshot_dummy_reg, all, zeros, 1, timing, UINT32_MAX);
+    int lost = _send_bits(&dshot_dummy_reg, &dshot_dummy_reg, all, zeros, 1, timing, UINT32_MAX, UINT32_MAX);
     if (lost == 0) {
         lost = _send_bits(dshot_low, dshot_high, all, zeros, RTL8735B_DSHOT_FRAME_BITS, timing,
-                          (timing->t1h_cycles - timing->t0h_cycles) / 2u);
+                          (timing->t1h_cycles - timing->t0h_cycles) / 2u, DSHOT_ZERO_FALL_LATE_CYCLES);
     }
     __set_PRIMASK(primask);
     dshot_last_end_us = hal_read_curtime_us();

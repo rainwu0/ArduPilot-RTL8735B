@@ -281,10 +281,11 @@ void test_timing_loss()
     assert(primask == 0);
     assert(rtl8735b_dshot_dropped_frames() == 2);
 
-    // 小幅延遲（上限的一半）：照送完整的一幀
+    // 1 位元的下降邊緣晚上限的一半（第 17 個寫入＝第 5 位元拉低 0 之後跳）：照送完整的一幀
     writes.clear();
     real_write_count = 0;
-    jump_by = t.t0h_cycles + late_limit / 2;
+    jump_after = 17;
+    jump_by = (t.t1h_cycles - t.t0h_cycles) + late_limit / 2;
     assert(rtl8735b_dshot_send(frames, 0xFu, &t) == RTL8735B_DSHOT_OK);
     assert(real_writes().size() == 48);
     assert(rtl8735b_dshot_dropped_frames() == 2);
@@ -332,6 +333,28 @@ void test_timing_loss()
     assert(rtl8735b_dshot_send(frames, 0xFu, &t) == RTL8735B_DSHOT_ETIMING);
     assert(primask == 1);
     assert(rtl8735b_dshot_dropped_frames() == 5);
+    primask = 0;
+    counting = true;
+    stall_after = 0;
+
+    // 0 位元的下降邊緣晚 40 週期（80 ns）：遠小於 (T1H−T0H)/2，但電調的 0／1 分界只比 0 位元多約 60 ns，
+    // 有通道送 0 的位元就放棄
+    writes.clear();
+    real_write_count = 0;
+    jump_after = 16;
+    jump_by = t.t0h_cycles + 40;
+    assert(rtl8735b_dshot_send(frames, 0xFu, &t) == RTL8735B_DSHOT_ETIMING);
+    w = real_writes();
+    assert(w.size() == 17);
+    assert(w.back().reg == low && w.back().value == 0x7800u);
+    assert(rtl8735b_dshot_dropped_frames() == 6);
+    // 同樣的延遲落在沒有通道送 0 的位元（只送全 1 的那一路）：那個邊緣不改變任何腳，照送
+    writes.clear();
+    real_write_count = 0;
+    assert(rtl8735b_dshot_send(frames, 0x1u, &t) == RTL8735B_DSHOT_OK);
+    assert(real_writes().size() == 48);
+    assert(rtl8735b_dshot_dropped_frames() == 6);
+    jump_after = 0;
 }
 
 void test_calibration_failure()

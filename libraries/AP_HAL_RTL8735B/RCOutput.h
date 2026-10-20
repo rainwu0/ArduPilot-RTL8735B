@@ -48,7 +48,7 @@ private:
     void _stop_channel(uint8_t chan);
     bool _brushed_hold_low(uint8_t chan);
     void _apply_channel(uint8_t chan);
-    void _apply_all_channels();
+    void _forget_outputs();
     void _commit_write(uint8_t chan, uint16_t pulse_us);
     void _refresh_rate(uint8_t chan);
     void _report_rate(uint8_t chan);
@@ -104,8 +104,8 @@ private:
     DshotEscType _dshot_esc_type;
     rtl8735b_dshot_timing_t _dshot_timing;
     bool _dshot_timing_valid;
-    // 主迴圈停住時計時器已停掉 PWM，等主迴圈恢復後的第一次 push 恢復
-    bool _pwm_stalled;
+    // 主迴圈停住、計時器已忘掉舊值並停掉 PWM；主迴圈時鐘回到上限內才清掉
+    bool _stall_latched;
     bool _dshot_sent;
     bool _dshot_stopped;
     // 已提示過作廢的幀（rtl8735b_dshot_send 回 ETIMING），本次開機只提示一次

@@ -46,7 +46,7 @@ RCOutput::RCOutput() :
     _dshot_esc_type(DSHOT_ESC_NONE),
     _dshot_timing{},
     _dshot_timing_valid(false),
-    _pwm_stalled(false),
+    _stall_latched(false),
     _dshot_sent(false),
     _dshot_stopped(false),
     _dshot_dropped_reported(false),
@@ -263,11 +263,17 @@ void RCOutput::_apply_channel(uint8_t chan)
     }
 }
 
-// 每個通道照目前記住的值重新輸出；不能輸出的照 _apply_channel 停止
-void RCOutput::_apply_all_channels()
+// 主迴圈停住：所有通道忘掉停住前的值，包括 cork 住還沒 push 的值與排隊中的 DShot 命令，PWM 停止輸出。
+// 之後只有主程式重新寫入的通道才會再輸出，空的 push 或心跳不會讓舊值復活
+void RCOutput::_forget_outputs()
 {
+    _pending_mask = 0;
+    _dshot_command_count = 0;
     for (uint8_t chan = 0; chan < CHANNELS; chan++) {
-        _apply_channel(chan);
+        _pending_us[chan] = 0;
+        _value_us[chan] = 0;
+        _has_valid_write[chan] = false;
+        _stop_channel(chan);   // DShot 的腳在 _stop_channel 裡跳過，由補送送 0
     }
 }
 
@@ -476,13 +482,7 @@ void RCOutput::cork()
 void RCOutput::push()
 {
     RCLock lock(_semaphore);
-    // 主迴圈停住時計時器停掉了 PWM（_timer_tick）：主迴圈恢復後的第一次 push 把所有通道照最後的值恢復
-    const bool resume = _pwm_stalled;
-    _pwm_stalled = false;
     if (!_corked) {
-        if (resume) {
-            _apply_all_channels();
-        }
         // 不經 cork 的 write() 也可能被延後，這裡同樣補寫。
         rtl8735b_pwm_flush();
         _dshot_send_locked();
@@ -509,9 +509,6 @@ void RCOutput::push()
             }
         }
         _pending_us[chan] = 0;
-    }
-    if (resume) {
-        _apply_all_channels();
     }
     // 補寫上一次 push 時硬體還沒套用、因而延後的一般 PWM 值。
     rtl8735b_pwm_flush();
@@ -731,7 +728,8 @@ void RCOutput::_dshot_send_locked(bool resend)
             const bool target = (command->chan_mask & (1UL << chan)) != 0;
             frames[slot] = rtl8735b_dshot_frame(target ? command->command : 0, target ? 1 : 0);
         } else {
-            if (_value_us[chan] == 0) {
+            // 停住時每一路都送 0（_forget_outputs 已把值清成 0）；平常脈寬 0 的通道不送
+            if (_value_us[chan] == 0 && !stale) {
                 continue;
             }
             const uint8_t telem = (_telem_request_mask & (1UL << chan)) != 0;
@@ -768,8 +766,9 @@ void RCOutput::_dshot_send_locked(bool resend)
 }
 
 // 計時器執行緒（較主執行緒優先），每 1 ms：
-// - 解鎖中主迴圈停住超過 MAIN_LOOP_STALE_MS：所有 PWM 通道停止輸出（一般 PWM 停用、有刷以 duty 0 拉低），
-//   只做一次；主迴圈恢復後第一次 push 再恢復（push 的 _pwm_stalled）。
+// - 解鎖中主迴圈停住超過 MAIN_LOOP_STALE_MS：所有通道忘掉停住前的值、PWM 停止輸出（一般 PWM 停用、有刷以
+//   duty 0 拉低），只做一次（_stall_latched）。恢復後只有主程式重新寫入的新值才輸出。主迴圈時鐘回到上限內
+//   才重新偵測：主迴圈恢復的那一圈已寫入新值、但還沒跑完，時鐘仍超過上限，不能把新值又停掉。
 // - DShot：主程式太久沒 push 時補送；有命令在排隊時每毫秒補一幀，讓命令照次數送完；主迴圈停住太久時補送的
 //   油門幀是 0。
 // 這裡不提示：主迴圈可能正卡在拿著別的鎖的地方。號誌被拿著就跳過，不等。
@@ -778,12 +777,11 @@ void RCOutput::_timer_tick()
     if (!_semaphore.take_nonblocking()) {
         return;
     }
-    if (!_pwm_stalled && hal.util->get_soft_armed() &&
-        rtl8735b_ardupilot_ms_since_main_loop() > MAIN_LOOP_STALE_MS) {
-        _pwm_stalled = true;
-        for (uint8_t chan = 0; chan < CHANNELS; chan++) {
-            _stop_channel(chan);   // DShot 的腳在 _stop_channel 裡跳過，由下面的補送處理
-        }
+    if (rtl8735b_ardupilot_ms_since_main_loop() <= MAIN_LOOP_STALE_MS) {
+        _stall_latched = false;
+    } else if (!_stall_latched && hal.util->get_soft_armed()) {
+        _stall_latched = true;
+        _forget_outputs();
     }
     const uint32_t interval_us = _dshot_command_count != 0 ? DSHOT_COMMAND_INTERVAL_US : DSHOT_KEEPALIVE_US;
     if ((_dshot_sent || _dshot_command_count != 0) &&

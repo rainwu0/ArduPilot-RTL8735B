@@ -1179,14 +1179,21 @@ void test_pwm_stops_when_main_loop_stalls()
         const unsigned stops = stop_count;
         fake_scheduler.run_timer();
         assert(stop_count == stops);
-        // 主迴圈恢復：第一次 push 恢復全部通道，包括這次沒寫到的
+        // 主迴圈恢復：只有心跳或空的 push 不恢復；只寫第 0 路時只有第 0 路以新值恢復，
+        // 其他通道不沿用停住前的 1500
         main_loop_ms_ago = 0;
+        output.push();
+        output.cork();
+        output.push();
+        for (uint8_t chan = 0; chan < 4; chan++) {
+            assert(!output_active[chan]);
+        }
         output.cork();
         output.write(0, 1600);
         output.push();
         assert(output_active[0] && output_pulse[0] == 1600);
         for (uint8_t chan = 1; chan < 4; chan++) {
-            assert(output_active[chan] && output_pulse[chan] == 1500);
+            assert(!output_active[chan]);
         }
         // 未解鎖時主迴圈停住：不動（未解鎖的輸出由 AP_Motors 自己壓到最低）
         fake_util.soft_armed = false;
@@ -1213,6 +1220,101 @@ void test_pwm_stops_when_main_loop_stalls()
     fake_scheduler.run_timer();
     for (uint8_t chan = 0; chan < 4; chan++) {
         assert(output_low_driven[chan] && output_duty_ticks[chan] == 0);
+    }
+}
+
+// 主迴圈停住的反例：100／101 ms 的邊界；停住前 cork 住、還沒 push 的值不在恢復後送出；主迴圈恢復那一圈
+// （時鐘還沒更新）計時器不能把新值又停掉；主迴圈回到上限內之後再停住會再停一次
+void test_pwm_stall_edges()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    RTL8735B::RCOutput output;
+    output.init();
+    output.force_safety_off();
+    for (uint8_t chan = 0; chan < 4; chan++) {
+        output.enable_ch(chan);
+    }
+    fake_util.soft_armed = true;
+    write_all(output, 1500, 1500, 1500, 1500);
+    // 剛好 100 ms 不算停住，101 ms 才算
+    main_loop_ms_ago = 100;
+    fake_scheduler.run_timer();
+    assert(output_active[0]);
+    // 停住前主程式 cork 住寫了一半就卡住：這些值是停住前算的，恢復後不能送出
+    output.cork();
+    output.write(1, 1700);
+    main_loop_ms_ago = 101;
+    fake_scheduler.run_timer();
+    for (uint8_t chan = 0; chan < 4; chan++) {
+        assert(!output_active[chan]);
+    }
+    output.push();
+    for (uint8_t chan = 0; chan < 4; chan++) {
+        assert(!output_active[chan]);
+    }
+    // 主迴圈恢復的那一圈：寫入新值並 push，但這圈還沒跑完，時鐘仍是 150 ms；計時器不能再把它停掉
+    main_loop_ms_ago = 150;
+    write_all(output, 1400, 1400, 1400, 1400);
+    fake_scheduler.run_timer();
+    for (uint8_t chan = 0; chan < 4; chan++) {
+        assert(output_active[chan] && output_pulse[chan] == 1400);
+    }
+    // 跑完一圈之後再停住：再停一次
+    main_loop_ms_ago = 0;
+    fake_scheduler.run_timer();
+    main_loop_ms_ago = 300;
+    fake_scheduler.run_timer();
+    for (uint8_t chan = 0; chan < 4; chan++) {
+        assert(!output_active[chan]);
+    }
+}
+
+// DShot 的反例：100／101 ms 的邊界與 micros 繞回；停住後只有心跳或空的 push 不送非 0 油門，部分通道只恢復
+// 寫到的那幾路；停住前排隊的命令不再送，停住後才排的命令照送
+void test_dshot_stall_edges()
+{
+    reset_fake_outputs();
+    reset_dshot();
+    RTL8735B::RCOutput output;
+    output.init();
+    output.force_safety_off();
+    output.set_output_mode(0x0FU, AP_HAL::RCOutput::MODE_PWM_DSHOT300);
+    fake_util.soft_armed = true;
+    const uint16_t run = rtl8735b_dshot_frame(rtl8735b_dshot_throttle_value(1500, 1), 0);
+    const uint16_t stop = rtl8735b_dshot_frame(0, 0);
+    now_us = 0xFFFFF000u;   // 補送的間隔跨過 micros 繞回
+    write_all(output, 1500, 1500, 1500, 1500);
+    main_loop_ms_ago = 100;
+    now_us += 5000;
+    fake_scheduler.run_timer();
+    assert(dshot_sends.back().frames[0] == run);
+    // 停住前排隊、還沒送完的命令：停住時丟掉，補送是 0
+    output.send_dshot_command(5, 1, 0, 10, true);
+    main_loop_ms_ago = 101;
+    now_us += 5000;
+    fake_scheduler.run_timer();
+    for (uint8_t ch = 0; ch < 4; ch++) {
+        assert(dshot_sends.back().frames[ch] == stop);
+    }
+    // 只有心跳或空的 push：不送非 0 油門
+    main_loop_ms_ago = 0;
+    const size_t before = dshot_sends.size();
+    output.push();
+    output.cork();
+    output.push();
+    for (size_t i = before; i < dshot_sends.size(); i++) {
+        for (uint8_t ch = 0; ch < 4; ch++) {
+            assert(dshot_sends[i].frames[ch] == stop || (dshot_sends[i].active & (1U << ch)) == 0);
+        }
+    }
+    // 只寫第 2 路：只有第 2 路以新值送出，其他通道不沿用停住前的 1500
+    output.cork();
+    output.write(2, 1200);
+    output.push();
+    assert(dshot_sends.back().frames[2] == rtl8735b_dshot_frame(rtl8735b_dshot_throttle_value(1200, 1), 0));
+    for (uint8_t ch : {0, 1, 3}) {
+        assert(dshot_sends.back().frames[ch] != run);
     }
 }
 
@@ -1490,6 +1592,8 @@ int main()
     test_dshot_safety_and_keepalive();
     test_dshot_keepalive_stops_motors_when_main_loop_stalls();
     test_pwm_stops_when_main_loop_stalls();
+    test_pwm_stall_edges();
+    test_dshot_stall_edges();
     test_dshot_esc_type_rate_and_switching();
     test_dshot_attach_failure();
     test_dshot_stopped();

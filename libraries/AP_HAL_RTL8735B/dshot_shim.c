@@ -17,6 +17,8 @@
  * （計數器往前跳、或被安全世界的中斷拖住）也放棄，因為晚這麼多，電調可能把這個位元的 1 讀成 0。
  * 0 位元的下降邊緣另用緊的上限 DSHOT_ZERO_FALL_LATE_CYCLES：這個邊緣晚了，0 的高電位就變長，而電調的 0／1 分界
  * 只比 0 位元的高電位長一點（Bluejay、BLHeli_S 由原始碼推算約 60 ns，AM32 約 350 ns；推論，待邏輯分析儀實測）。
+ * 推算所用的原始碼：Bluejay（bird-sanctuary/bluejay 0368d114）、BLHeli_S Rev16.7（bitdump/BLHeli 80ac909b 的
+ * `BLHeli_S SiLabs/BLHeli_S.asm`）、AM32 2.21（am32-firmware/AM32 a47e94c2）。
  * 那一位元沒有通道送 0 時，這個邊緣不改變任何腳，照用一般的上限。
  * 空跑只用讀取次數的上限、不看遲到：空跑本來就是要吃下快取未命中，晚到是預期的，也不碰真的腳。
  * 放棄時把腳全部拉低、恢復中斷，回傳 RTL8735B_DSHOT_ETIMING 並計數；下一幀照常送。

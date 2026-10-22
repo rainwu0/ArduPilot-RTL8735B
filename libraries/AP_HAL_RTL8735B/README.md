@@ -95,16 +95,19 @@ RC 接收機與 GPS（只有建置與主機測試，沒有接過實物）：
 - 三個模組都接 3.3 V 與 GND：RTL8735B 的 I/O 是 3.3 V，訊號電位要一致。3.3 V 與 GND 照開發板排針旁絲印標的接；不確定的話，對照板商公開的原理圖（ideashatch/HUB-8735 `870a7e08de7a` 的 `HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf`）。
 - 模組上的腳名依廠商不同，以手上模組的絲印為準。
 
+這個接法的疊加檔在範例庫：[`examples/bmi160-bmp280-qmc5883l/overlay.dat`](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/blob/v0.1.0/examples/bmi160-bmp280-qmc5883l/overlay.dat)（rainwu0/ArduPilot-Hub8735Ultra `v0.1.0`）。範例的 README 有接線圖、參數與檢查方法。每塊板專用的疊加檔與參數都放範例庫，本儲存庫只放板型。
+
 ```bash
-./waf configure --board hub8735ultra --extra-hwdef libraries/AP_HAL_RTL8735B/hwdef/hub8735ultra/sensors-example.dat
+git clone --branch v0.1.0 https://github.com/rainwu0/ArduPilot-Hub8735Ultra.git ~/ArduPilot-Hub8735Ultra
+./waf configure --board hub8735ultra --extra-hwdef ~/ArduPilot-Hub8735Ultra/examples/bmi160-bmp280-qmc5883l/overlay.dat
 ./waf copter
 ```
 
-疊加檔是 `hwdef/hub8735ultra/sensors-example.dat`，它不是板型，`./waf list_boards` 不會多出板型。換成別的感測器時，改 `IMU`、`BARO`、`COMPASS` 三行就好，寫法和 ArduPilot 其他平台的 hwdef 相同，例如 ArduPilot `9f648ccabc` 的 `libraries/AP_HAL_ESP32/hwdef/esp32diy/hwdef.dat`。
+疊加檔不是板型，`./waf list_boards` 不會多出板型。換成別的感測器時，複製一份改 `IMU`、`BARO`、`COMPASS` 三行就好，寫法和 ArduPilot 其他平台的 hwdef 相同，例如 ArduPilot `9f648ccabc` 的 `libraries/AP_HAL_ESP32/hwdef/esp32diy/hwdef.dat`。
 
 安裝方向：
 
-- IMU 的 `ROTATION_*` 要實測，不能只看模組的絲印。實測上，元件面朝上的 GY-BMI160 配 `ROTATION_NONE` 時，水平放著的開發板被當成上下顛倒。疊加檔裡的值是範例開發板實測的結果：元件面朝上，前方是 USB 接頭的另一端。
+- IMU 的 `ROTATION_*` 要實測，不能只看模組的絲印。實測上，元件面朝上的 GY-BMI160 配 `ROTATION_NONE` 時，水平放著的開發板被當成上下顛倒。範例疊加檔裡的值是範例開發板實測的結果：元件面朝上，前方是 USB 接頭的另一端。
 - 換了擺法要重測：開發板前端抬起時 pitch 要變正，水平放著時 roll、pitch 接近 0。
 - 整片開發板在機身上轉了方向時，不改疊加檔，改參數 `AHRS_ORIENTATION`。外接羅盤的方向用參數 `COMPASS_ORIENT`。
 

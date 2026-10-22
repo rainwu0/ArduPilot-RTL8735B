@@ -37,6 +37,12 @@ git clone https://github.com/rainwu0/ArduPilot-RTL8735B.git
 cd ArduPilot-RTL8735B
 ```
 
+The sensor settings (the overlay) are in the [example repository](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/tree/v0.1.0/examples/bmi160-bmp280-qmc5883l). Clone it into your home directory too; the build uses it:
+
+```bash
+git clone --branch v0.1.0 https://github.com/rainwu0/ArduPilot-Hub8735Ultra.git ~/ArduPilot-Hub8735Ultra
+```
+
 - Do not clone under `/mnt/c`, and do not use Windows Git: the first makes the build very slow, and the second changes the line endings and breaks the scripts.
 - Do not add `--recurse-submodules`: ArduPilot has many submodules you do not need. The next step installs only three; the build downloads two more by itself, `gtest` and `littlefs`, so you also need a network connection while building.
 
@@ -96,7 +102,7 @@ If you leave out the last line, the image you build has no Wi-Fi.
 ## 5. Build
 
 ```bash
-./waf configure --board hub8735ultra --extra-hwdef libraries/AP_HAL_RTL8735B/hwdef/hub8735ultra/sensors-example.dat
+./waf configure --board hub8735ultra --extra-hwdef ~/ArduPilot-Hub8735Ultra/examples/bmi160-bmp280-qmc5883l/overlay.dat
 ./waf copter
 ```
 

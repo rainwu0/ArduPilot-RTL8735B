@@ -95,16 +95,19 @@ The board type itself has no sensors, and without a barometer boot stops at Conf
 - Connect all three modules to 3.3 V and GND: the RTL8735B's I/O is 3.3 V, and the signal levels must match. Use the 3.3 V and GND marked on the silkscreen next to the board's header pins; if unsure, check the schematic the vendor published (`HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf` in ideashatch/HUB-8735 `870a7e08de7a`).
 - Pin names on the modules vary by maker; go by the silkscreen on the module you have.
 
+The overlay for this wiring is in the example repository: [`examples/bmi160-bmp280-qmc5883l/overlay.dat`](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/blob/v0.1.0/examples/bmi160-bmp280-qmc5883l/overlay.dat) (rainwu0/ArduPilot-Hub8735Ultra `v0.1.0`). The example's README has the wiring diagram, parameters and checks. Overlays and parameters for a particular board live in the example repository; this repository has only the board types.
+
 ```bash
-./waf configure --board hub8735ultra --extra-hwdef libraries/AP_HAL_RTL8735B/hwdef/hub8735ultra/sensors-example.dat
+git clone --branch v0.1.0 https://github.com/rainwu0/ArduPilot-Hub8735Ultra.git ~/ArduPilot-Hub8735Ultra
+./waf configure --board hub8735ultra --extra-hwdef ~/ArduPilot-Hub8735Ultra/examples/bmi160-bmp280-qmc5883l/overlay.dat
 ./waf copter
 ```
 
-The overlay is `hwdef/hub8735ultra/sensors-example.dat`. It is not a board type, so `./waf list_boards` shows no new board. To use other sensors, change only the three lines `IMU`, `BARO` and `COMPASS`; the syntax is the same as hwdef on other ArduPilot platforms, for example `libraries/AP_HAL_ESP32/hwdef/esp32diy/hwdef.dat` in ArduPilot `9f648ccabc`.
+An overlay is not a board type, so `./waf list_boards` shows no new board. To use other sensors, copy it and change only the three lines `IMU`, `BARO` and `COMPASS`; the syntax is the same as hwdef on other ArduPilot platforms, for example `libraries/AP_HAL_ESP32/hwdef/esp32diy/hwdef.dat` in ArduPilot `9f648ccabc`.
 
 Mounting orientation:
 
-- The IMU's `ROTATION_*` has to be tested; the silkscreen on the module is not enough. In our tests, a GY-BMI160 with the component side up and `ROTATION_NONE` made a level board read as upside down. The value in the overlay is what we measured on the example board: component side up, and the front is the end opposite the USB connectors.
+- The IMU's `ROTATION_*` has to be tested; the silkscreen on the module is not enough. In our tests, a GY-BMI160 with the component side up and `ROTATION_NONE` made a level board read as upside down. The value in the example overlay is what we measured on the example board: component side up, and the front is the end opposite the USB connectors.
 - If you mount it differently, test again: lifting the front of the board must make pitch positive, and with the board level, roll and pitch must be close to 0.
 - If the whole board is turned on the frame, leave the overlay alone and change the parameter `AHRS_ORIENTATION`. For the orientation of an external compass, use the parameter `COMPASS_ORIENT`.
 

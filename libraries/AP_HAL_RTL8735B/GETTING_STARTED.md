@@ -37,6 +37,12 @@ git clone https://github.com/rainwu0/ArduPilot-RTL8735B.git
 cd ArduPilot-RTL8735B
 ```
 
+感測器的設定（疊加檔）放在[範例庫](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/tree/v0.1.0/examples/bmi160-bmp280-qmc5883l)，也 clone 到家目錄，建置時會用到：
+
+```bash
+git clone --branch v0.1.0 https://github.com/rainwu0/ArduPilot-Hub8735Ultra.git ~/ArduPilot-Hub8735Ultra
+```
+
 - 不要 clone 到 `/mnt/c` 底下，也不要用 Windows 的 Git：前者建置會很慢，後者會把換行改掉，腳本會壞。
 - 不要加 `--recurse-submodules`：ArduPilot 的子模組很多，用不到。下一步只裝三個，建置時會再自己下載 `gtest`、`littlefs` 兩個，所以建置時也要連網。
 
@@ -96,7 +102,7 @@ export RTL8735B_WIFI_CONFIG=~/wifi.txt
 ## 5. 建置
 
 ```bash
-./waf configure --board hub8735ultra --extra-hwdef libraries/AP_HAL_RTL8735B/hwdef/hub8735ultra/sensors-example.dat
+./waf configure --board hub8735ultra --extra-hwdef ~/ArduPilot-Hub8735Ultra/examples/bmi160-bmp280-qmc5883l/overlay.dat
 ./waf copter
 ```
 

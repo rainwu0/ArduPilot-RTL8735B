@@ -10,12 +10,13 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Englis
 
 ## 現在有什麼
 
-- 目前的版本是 **v0.1.1**（2026-10-19），和 v0.1.0 相容。
+- 目前的版本是 **v0.2.0**（2026-10-22）。和 v0.1.1 有兩處不相容，見〈最近的變動〉。
 - ArduPilot master `9f648ccabc`（2026-09-25）加上 RTL8735B 的 HAL，保留 ArduPilot 的完整歷史。
 - 板型：`hub8735ultra`（HUB 8735 ultra，板商 ideasHatch，[板商資料](https://github.com/ideashatch/HUB-8735)），開發都在這塊上做；`amb82-mini` 只建置過。
-- **HUB 8735 ultra 照範例接上 BMI160、BMP280、GY-271（QMC5883L）就能用：** 開機、經 Wi-Fi（UDP）連上地面站、參數在重開機後保留、抬起開發板時姿態方向正確。接法和疊加檔見[〈接上感測器〉][sensors]，上板紀錄見 [BOARD_TESTS.md][tests-board] 的 T2。
+- **HUB 8735 ultra 照範例接上 BMI160、BMP280、GY-271（QMC5883L）就能用：** 開機、經 Wi-Fi（UDP）連上地面站、參數在重開機後保留、抬起開發板時姿態方向正確。接法、疊加檔與參數在[範例庫][examples]的第一個範例 `bmi160-bmp280-qmc5883l`，上板紀錄見 [BOARD_TESTS.md][tests-board] 的 T2。
 - 開機時會先清 I²C 匯流排：v0.1.0 開機偶爾出現的氣壓計初始化失敗，在板上反覆熱重開與冷開機時沒有再出現（[BOARD_TESTS.md][tests-board] 的 T3；測的是改成每條匯流排各自一個 task 之前的建置）。
 - Copter 主迴圈在板上正常運作時約 400 Hz（120 秒平均 399.9 Hz，[BOARD_TESTS.md][tests-board] 的 T4）。
+- v0.2.0 加了主控台 MAVLink（經開發板的 USB 序列埠連地面站）、類比電壓、microSD 卡、DShot 與電調遙測、只收的序列埠：都只經建置與主機測試，還沒上板。
 - 板型本身不含感測器。什麼都沒接時開機停在氣壓計的 Config Error，Wi-Fi 會連上熱點，但不會有 MAVLink。
 - 不用開發板、不用 SDK 就能跑的主機測試：`Tools/scripts/rtl8735b_test.sh`，說明在 [tests/README.md][tests]。主機測試通過不代表在開發板上能用。
 
@@ -28,6 +29,9 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Englis
 - 替自己的 RTL8735B 開發板寫 hwdef 疊加檔（腳位、匯流排、感測器）：[〈自訂板〉][custom]。最多可以設四條 I²C 匯流排，例如外接的感測器另走一條（還沒上板）。
 - 接 RC 接收機（CRSF、ELRS 等）或 GPS：接法和預設序列埠在[〈板型〉][boards]（還沒接過實物）。
 - 把自己的 SDK 端 C 程式和韌體編在一起：[〈開發板的應用程式〉][app]。
+- 照現成的範例接線、建置與載入參數：[範例庫][examples]。目前有兩個範例：三片感測器模組，以及一塊手焊的擴充板（另有電池電壓、馬達、電調、GPS、遙控接收機與第二條 I²C 的排針）。
+- 沒有 Wi-Fi 時，經開發板的 USB 序列埠（燒錄用的那個）連地面站：見[〈板型〉][boards]的主控台 MAVLink（還沒上板）。
+- 量電池電壓、把記錄寫進 microSD 卡、用 DShot 電調與電調遙測：[〈自訂板〉][custom]、[〈SD 卡〉][sd]、[〈馬達輸出〉][motors]（都還沒上板）。
 
 ## 還缺什麼
 
@@ -37,9 +41,10 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Englis
   - roll 的正負：由 pitch 的結果推得，沒有直接測；
   - 斷電後參數是否保留：只測了重開機；
   - 多條 I²C 匯流排同時用；
-  - UART、PWM 輸出、Wi-Fi TCP、RC 輸入、GPS、`--upload`、AMB82-mini。
-- 範例疊加檔的 IMU 方向，是在範例板的擺法下實測的。換了擺法要重測，方法寫在〈接上感測器〉。
-- 沒有做：電壓換算（所以不能用類比電池監測）、DShot、USB MAVLink、SD 卡。
+  - UART、PWM 輸出、Wi-Fi TCP、RC 輸入、GPS、`--upload`、AMB82-mini；
+  - v0.2.0 新加的全部：主控台 MAVLink、類比電壓、SD 卡、DShot 與電調遙測、只收的序列埠、Wi-Fi 湊包與重試、主迴圈停住時停送輸出、抹除參數區時擋解鎖、開發板應用程式的新介面。
+- 範例庫第一個範例的 IMU 方向，是在範例板的擺法下實測的。換了擺法要重測，方法寫在那個範例的 README。
+- 沒有做：雙向 DShot、DShot1200、DShot 的 3D；晶片自己的 USB（開發板另一個 USB-C）不做 MAVLink。
 - 參數換扇區後的那次開機，如果抹除期間斷電或重置，參數會全部回到預設。請用地面站存一份參數檔，見[〈Flash 版面〉][layout]。
 
 ## 想參與
@@ -49,17 +54,21 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Englis
 
 ## 最近的變動
 
-### v0.1.1（2026-10-19）：開機更穩，可以接第二條 I²C
+### v0.2.0（2026-10-22）：USB 序列埠的 MAVLink、電壓、SD 卡、DShot（都還沒上板）
 
-和 v0.1.0 相容：原本的疊加檔、指令與參數照舊能用。兩個修正都要重新建置、燒錄才會生效。標籤是 `v0.1.1`（`git checkout v0.1.1`），只標提交，不附韌體。
+和 v0.1.1 有兩處不相容，原本的其他疊加檔、指令與參數照舊能用。新功能要重新建置、燒錄才有，都只經建置與主機測試，還沒上板。標籤是 `v0.2.0`（`git checkout v0.2.0`），只標提交，不附韌體。
 
-- 修正：開機時先清 I²C 匯流排再初始化控制器，重新初始化時遮罩中斷。v0.1.0 開機偶爾出現的 `Config Error: Baro`，在板上反覆熱重開與冷開機時沒有再出現（BOARD_TESTS 的 T3；測的是改成每條匯流排各自一個 task 之前的建置，v0.1.1 這一版的程式還沒上板）。
-- 修正：IMU 停止送樣本時（例如線鬆脫），主執行緒不再一直忙等，Wi-Fi、UART 等優先權較低的工作還能執行。地面站的 MAVLink 由主迴圈產生，主迴圈卡住時一樣收不到。只經主機測試驗證，還沒上板。
-- 新增：一個 hwdef 最多四條 I²C 匯流排，各自計逾時與停用，見[〈自訂板〉][custom]。只經建置與主機測試，還沒上板。
-- 新增說明：RC 接收機（CRSF、ELRS 等，不支援 SBUS）與 GPS 的接法和預設序列埠，見[〈板型〉][boards]。附主機測試，還沒接過實物。
-- 新增說明：參數換扇區後那次開機的抹除窗口，見上面〈還缺什麼〉的最後一條。
+- **不相容：範例疊加檔 `hwdef/hub8735ultra/sensors-example.dat` 移到[範例庫][examples]。** 建置時改用範例庫的 `examples/bmi160-bmp280-qmc5883l/overlay.dat`，感測器設定相同。
+- **不相容：SERIAL0（LOG UART，PF3、PF4）預設打開，跑 MAVLink2。** 疊加檔把這兩支腳拿去當別的用途時，要先關掉 SERIAL0，寫法見 [CHANGELOG][changelog]。
+- 新增：主控台 MAVLink。地面站接開發板的 USB 序列埠、115200 baud 就能連線，不需要 Wi-Fi；燒錄前先讓地面站斷開這個埠。見[〈板型〉][boards]。
+- 新增：類比輸入換算成電壓，可以用類比電池監測；hwdef 可以列多支類比腳。見[〈自訂板〉][custom]。
+- 新增：DShot150、DShot300、DShot600 與電調遙測（TLM 線），見[〈馬達輸出〉][motors]。
+- 新增：microSD 卡（FatFs），地面站的 MAVLink FTP 看得到卡上的檔案，記錄可以寫進卡；見[〈SD 卡〉][sd]。
+- 新增：只收的序列埠；開發板應用程式的新呼叫點與查詢，見[〈開發板的應用程式〉][app]。
+- 變更（安全）：解鎖中主迴圈超過 100 ms 沒跑完一圈時，PWM 停送、DShot 改送油門 0；執行中抹除參數區時，一般解鎖被擋。
+- 變更：Wi-Fi UDP 把幾則 MAVLink 湊成一個資料包再送（每則最多晚約 10 ms），驅動緩衝不足時重試；執行中的警告也送到地面站。
 
-上一版 v0.1.0（2026-10-18）是第一個版本：照範例接上感測器，就能在 HUB 8735 ultra 上開機、連上地面站。每一版的完整變更見 [CHANGELOG][changelog]。
+上一版 v0.1.1（2026-10-19）：開機時先清 I²C 匯流排，板上反覆開機沒有再出現氣壓計初始化失敗；一個 hwdef 可以設四條 I²C 匯流排。每一版的完整變更見 [CHANGELOG][changelog]。
 
 ## 授權
 
@@ -78,4 +87,6 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Englis
 [tests]: /libraries/AP_HAL_RTL8735B/tests/README.md
 [tests-board]: /libraries/AP_HAL_RTL8735B/BOARD_TESTS.md
 [start]: /libraries/AP_HAL_RTL8735B/GETTING_STARTED.md
-[sensors]: /libraries/AP_HAL_RTL8735B/README.md#接上感測器
+[sd]: /libraries/AP_HAL_RTL8735B/README.md#sd-卡
+[motors]: /libraries/AP_HAL_RTL8735B/README.md#馬達輸出
+[examples]: https://github.com/rainwu0/ArduPilot-Hub8735Ultra

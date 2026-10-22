@@ -8,6 +8,38 @@ The status of each feature in a given version (verified on a board, build only a
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-22
+
+Two changes are incompatible with v0.1.1: the example overlay moves to the examples repository, and PF3 and PF4 now belong to SERIAL0 by default (the first two items below). Other overlays, commands and parameters keep working; the new features in this version need a new build and flash, and all of them are build and host tests only, not yet tried on a board.
+
+### Removed
+
+- **The example overlay `hwdef/hub8735ultra/sensors-example.dat` moves to the examples repository.** A build that names this file, as in the v0.1.1 README or Getting started, no longer finds it; use `examples/bmi160-bmp280-qmc5883l/overlay.dat` in the examples repository [rainwu0/ArduPilot-Hub8735Ultra](https://github.com/rainwu0/ArduPilot-Hub8735Ultra) instead, which has the same sensor settings. Settings for one particular board belong in the examples repository; the HAL repository keeps only the board types.
+
+### Changed
+
+- **SERIAL0 (LOG UART, PF3 and PF4) is on by default, running MAVLink2 at 115200 baud.** An overlay that uses PF3 or PF4 for something else (a GPIO, for example) now fails to build; turn SERIAL0 off first (`undef HAL_RTL8735B_SERIAL0_ENABLED`, then `define HAL_RTL8735B_SERIAL0_ENABLED 0`). Once ArduPilot uses this port, the SDK console no longer takes commands.
+- When the main loop has not completed a cycle for more than 100 ms while armed, all PWM outputs stop (ESCs see no signal and stop) and DShot sends zero throttle; when the main loop resumes, only the channels the main code writes again go out, with the new values. Host tests only.
+- While the parameter area is erased at run time (a second sector change in the same boot, or a rebuild after a write failure), the arming check reports `Param storage failed` and a normal arm is refused until the erase finishes; a forced arm skips this check. Host tests only.
+- Wi-Fi UDP to the ground station packs several MAVLink messages into one datagram, so each message can go out up to about 10 ms later; when the driver is out of packet buffers, the datagram is retried for up to 500 ms. Host tests only.
+- Runtime warnings (output mode, PWM clock, Wi-Fi link loss and others) are printed on the console as before and also sent to the ground station as STATUSTEXT. Host tests only.
+- The build no longer compiles the SDK's `ethernet_api.c` (GPL-2.0-only; this port does not use Ethernet, and the linker already discarded it).
+
+### Added
+
+- Console MAVLink: a ground station connects through the board's USB serial port (the one used for flashing) at 115200 baud, with no Wi-Fi needed. SDK and HAL text messages land between packets; disconnect the ground station from this port before flashing. The chip's own USB does not carry MAVLink. Not yet tried on a board.
+- Analog inputs are converted to volts (12-bit, 3.3 V full scale), so analog battery monitoring can be used (with the divider ratio in `BATT_VOLT_MULT`); a hwdef can list several analog pins (PF0–PF3, PA0–PA3), each sampled on its own. Accuracy and zero offset not yet measured on a board.
+- Receive-only serial ports: set the TX pin to `PIN_NC`, for example for ESC telemetry, which uses RX only, freeing the TX pin as an analog input.
+- DShot150, DShot300 and DShot600 (`MOT_PWM_TYPE` 4–6): the CPU sends the frames by writing GPIO, all channels at once, at 800 Hz or more; DShot commands and the BLHeli_S bit widths are supported. Bidirectional DShot, DShot1200 and 3D are not. Never tried with an ESC.
+- ESC telemetry: the ESC's TLM wire goes to the RX of a serial port (`SERIALn_PROTOCOL` 16); current and voltage can serve as a battery monitor (`BATTn_MONITOR` 9) and are logged in `ESC` records. Never tried with an ESC.
+- microSD card: read and written through FatFs (R0.14b), with the files on the card visible through MAVLink FTP in the ground station; with `LOG_BACKEND_TYPE` 1 logs go to the card (off by default). On by default in board type `rtl8735b-empty` and the board types that include it; a custom board without a card slot turns it off in its overlay. Host tests use a fake card in RAM; never tried with a real card.
+- Board application interface (`app/rtl8735b_app.h`): calls after `setup()` finishes and before the firmware reboots, queries for the armed state and the main-loop time, and a way to make the outputs safe; applications also get the addresses of the flash layout. A board without sensors can run applications with the example `examples/AppHost`.
+- README: DShot and ESC telemetry, console MAVLink, the SD card, several analog pins and receive-only serial ports, and how Wi-Fi sends.
+
+### Fixed
+
+- The description of `Tools/scripts/rtl8735b_get_sdk.sh`: the SDK location is given as the first argument; `AMEBAPRO2_SDK` is what waf reads.
+
 ## [0.1.1] - 2026-10-19
 
 Compatible with v0.1.0: existing overlays, commands and parameters keep working.
@@ -50,6 +82,7 @@ Compared with the public commits before this version number:
 
 - The old `HAL_RTL8735B_*` pin and bus `define`s (`HAL_RTL8735B_I2C1_*`, `HAL_RTL8735B_SPI1_*`, `HAL_RTL8735B_RCOUT_*` and others); use the keywords above. Overlays that still use them build without errors, but the settings have no effect.
 
-[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/tree/v0.1.0

@@ -8,6 +8,38 @@ English: [CHANGELOG.en.md](CHANGELOG.en.md)
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-22
+
+和 v0.1.1 有兩處不相容：範例疊加檔移到範例庫，以及 PF3、PF4 預設給 SERIAL0（見下面第一、二條）。其他疊加檔、指令與參數照舊能用；這一版的新功能都要重新建置、燒錄才有，而且都只經建置與主機測試，還沒上板。
+
+### 移除（Removed）
+
+- **範例疊加檔 `hwdef/hub8735ultra/sensors-example.dat` 移到範例庫。** 照 v0.1.1 的 README 或〈從零開始〉指定這個檔的建置會找不到檔；改用範例庫 [rainwu0/ArduPilot-Hub8735Ultra](https://github.com/rainwu0/ArduPilot-Hub8735Ultra) 的 `examples/bmi160-bmp280-qmc5883l/overlay.dat`，感測器設定相同。每塊板專用的設定放範例庫，HAL 庫只留板型。
+
+### 變更（Changed）
+
+- **SERIAL0（LOG UART，PF3、PF4）預設打開，跑 MAVLink2、115200 baud。** 疊加檔把 PF3 或 PF4 拿去當別的用途（例如 GPIO）時建置會報錯，要先關 SERIAL0（`undef HAL_RTL8735B_SERIAL0_ENABLED` 再 `define HAL_RTL8735B_SERIAL0_ENABLED 0`）。ArduPilot 開始用這個埠之後，SDK 主控台不再收指令。
+- 解鎖中主迴圈超過 100 ms 沒跑完一圈時，所有 PWM 輸出停止（電調收不到訊號而停機），DShot 改送油門 0；主迴圈恢復後，只有主程式重新寫入的通道以新值輸出。只經主機測試。
+- 執行中抹除參數區時（同一次開機第二次換扇區，或寫入失敗後重建），解鎖前檢查報 `Param storage failed`，一般解鎖被擋，抹完自動恢復；強制解鎖不經這項檢查。只經主機測試。
+- Wi-Fi UDP 送給地面站時，幾則 MAVLink 湊成一個資料包再送，每則最多晚約 10 ms；驅動的封包緩衝不足時，那個資料包最多重試 500 ms。只經主機測試。
+- 執行中的警告（輸出模式、PWM 時脈、Wi-Fi 斷線等）除了印在主控台，也以 STATUSTEXT 送到地面站。只經主機測試。
+- 建置不再編譯 SDK 的 `ethernet_api.c`（GPL-2.0-only；本移植不用乙太網路，原本連結時就丟掉）。
+
+### 新增（Added）
+
+- 主控台 MAVLink：地面站接開發板的 USB 序列埠（燒錄用的那個埠）、115200 baud 就能連線，不需要 Wi-Fi。SDK 與 HAL 的文字訊息夾在封包之間；燒錄前先讓地面站斷開這個埠。晶片自己的 USB 不做 MAVLink。還沒上板。
+- 類比輸入換算成電壓（12 位元，滿刻度 3.3 V），可以用類比電池監測（分壓比設在 `BATT_VOLT_MULT`）；hwdef 可以列多支類比腳（PF0–PF3、PA0–PA3），各自取樣。精度與零點還沒在板上量。
+- 只收的序列埠：TX 腳寫 `PIN_NC`，例如電調遙測只用 RX，TX 腳空出來當類比輸入。
+- DShot150、DShot300、DShot600（`MOT_PWM_TYPE` 4–6）：由 CPU 寫 GPIO 送幀，各路同時，至少 800 Hz；支援 DShot 命令與 BLHeli_S 的位寬。不支援雙向 DShot、DShot1200、3D。還沒接過電調。
+- 電調遙測：電調的 TLM 線接一個序列埠的 RX（`SERIALn_PROTOCOL` 16），電流與電壓可以當電池監測（`BATTn_MONITOR` 9），也記在 `ESC` 記錄。還沒接過電調。
+- microSD 卡：經 FatFs（R0.14b）讀寫，地面站的 MAVLink FTP 看得到卡上的檔案；`LOG_BACKEND_TYPE` 設 1 時記錄寫進卡（預設不寫）。板型 `rtl8735b-empty` 與 include 它的板型預設打開，沒有卡座的自訂板在疊加檔關掉。主機測試用 RAM 上的假卡，還沒接過真的卡。
+- 開發板的應用程式介面（`app/rtl8735b_app.h`）：`setup()` 完成後與韌體重開機前的呼叫點，查詢解鎖狀態、主迴圈時刻，讓輸出安全；應用程式也拿得到 Flash 版面的位址。沒有感測器的開發板可以用範例 `examples/AppHost` 執行應用程式。
+- README：DShot 與電調遙測、主控台 MAVLink、SD 卡、多支類比腳與只收的序列埠、Wi-Fi 送出方式的說明。
+
+### 修正（Fixed）
+
+- `Tools/scripts/rtl8735b_get_sdk.sh` 的說明：SDK 的位置由第一個參數指定，`AMEBAPRO2_SDK` 是 waf 讀的。
+
 ## [0.1.1] - 2026-10-19
 
 和 v0.1.0 相容：原本的疊加檔、指令與參數照舊能用。
@@ -50,6 +82,7 @@ English: [CHANGELOG.en.md](CHANGELOG.en.md)
 
 - 舊的 `HAL_RTL8735B_*` 腳位與匯流排 `define`（`HAL_RTL8735B_I2C1_*`、`HAL_RTL8735B_SPI1_*`、`HAL_RTL8735B_RCOUT_*` 等），改用上面的關鍵字。還在用的疊加檔建置不會報錯，設定只會失效。
 
-[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/tree/v0.1.0

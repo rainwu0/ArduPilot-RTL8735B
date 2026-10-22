@@ -324,6 +324,7 @@ FatFs 在 `fatfs/`：R0.14b，取自 ArduPilot 的 ChibiOS 子模組（`modules/
 
 - `ArduCopter/takeoff_check.cpp`：沒有 ESC 遙測的建置（`HAL_WITH_ESC_TELEM` 為 0，例如疊加檔 `undef HAL_SUPPORT_RCOUT_SERIAL` 的自訂板），原本的起飛前檢查整段不編譯，解鎖後馬達會停在地面怠速。改為沒有 ESC 遙測時只略過馬達轉速檢查，CPU 負載檢查照常（本 HAL 尚未提供系統負載，所以目前不會擋）；有 ESC 遙測的建置（板型的預設）不受影響，照上游原本的檢查。本庫直接採用上游 PR 34070（https://github.com/ArduPilot/ardupilot/pull/34070，作者 yuiseki）的提交；到 2026-10-07 這個 PR 尚未被上游合併。
 - `libraries/AP_HAL/AP_HAL_Boards.h`：`HAL_BOARD_RTL8735B` 為 100，避開上游依序分配的平台編號。
+- `libraries/AP_HAL/board/rtl8735b.h`（新檔）：本平台的預設值，例如板名、記憶體等級、參數區大小、SD 卡與記錄目錄的開關、程式大小上限與號誌型別，和其他平台的 `libraries/AP_HAL/board/*.h` 放在同一處；只在本平台引入，不改變其他平台的行為。
 - `Tools/ardupilotwaf/boards.py`（waf 的板型登記）與 `libraries/AP_Filesystem/AP_Filesystem.h`（本平台的 newlib 沒有 `dirent.h`，在此補上定義）：加入本平台，不改變其他平台的行為。
 - `libraries/AP_Filesystem/AP_Filesystem.cpp`、`AP_Filesystem_config.h`：加入本平台的 SD 卡後端 `AP_Filesystem_RTL8735B`（新檔），不改變其他平台的行為。
 

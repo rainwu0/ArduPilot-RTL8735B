@@ -41,6 +41,11 @@ struct FakePort {
     // 下一次遮罩 RX 中斷「生效前」抵達的位元組，用來重現旗標與遮罩之間的中斷。
     std::vector<uint8_t> arrive_before_rx_mask;
     bool rx_irq_storm = false;
+    // 資料格式（開埠時 shim 設成 8N1）；改格式時 RX 中斷要先遮罩
+    uint8_t parity = 0;
+    uint8_t stop_bits = 1;
+    uint32_t format_count = 0;
+    bool rx_irq_when_formatted = false;
 };
 
 FakePort ports[5];
@@ -253,9 +258,10 @@ void test_end_and_reinitialize()
 }
 
 // 序列 RC：ArduPilot 在 RC 輸入的埠上輪流試幾種設定（AP_RCProtocol::SerialConfig::apply_to_uart：
-// 先設同位與停止位元、開或關 RX 反相，再 begin(baud, 128, 128)）。本 HAL 只支援 8N1、不反相：
-// 要求反相時回報不支援、照 8N1 開著；8E2（SBUS）時埠關閉；輪到 8N1 的設定（例如 CRSF 的 416666）時
-// 埠重新開啟，收得到資料。接收機用 8N1 不反相的協定（CRSF、ELRS 等）就能接上就用。
+// 先設同位與停止位元、開或關 RX 反相，再 begin(baud, 128, 128)）。本 HAL 支援無／奇／偶同位元與
+// 1、2 個停止位元，不支援硬體反相：要求反相時回報不支援、照不反相開著。SBUS（100000、8E2、要求反相）
+// 時埠照 8E2 開著，外接反相器後收得到 SBUS 的位元組；輪到 8N1 的設定（例如 CRSF 的 416666）時改回 8N1。
+// 改格式不重新初始化埠。
 void test_serial_rc_probe_cycle()
 {
     constexpr uint16_t kOptionRxInv = 1U << 0;  // AP_HAL::UARTDriver::OPTION_RXINV
@@ -276,13 +282,23 @@ void test_serial_rc_probe_cycle()
     // 反相不支援：回報失敗，埠照 8N1 不反相開著
     assert(!apply(115200, 0, 1, true));
     assert(driver.is_initialized());
-    // SBUS（100000、8E2、反相）：埠關閉，不會用錯的格式收資料
-    (void)apply(100000, 2, 2, true);
-    assert(!driver.is_initialized());
-    // CRSF（416666、8N1）：重新開啟
+    // SBUS（100000、8E2、反相）：反相回報不支援，埠以 8E2 開著，收得到外接反相器轉回的位元組
+    assert(!apply(100000, 2, 2, true));
+    assert(driver.is_initialized() && driver.get_baud_rate() == 100000);
+    assert(ports[kActiveUart].baud == 100000);
+    assert(ports[kActiveUart].parity == 2 && ports[kActiveUart].stop_bits == 2);
+    assert(!ports[kActiveUart].rx_irq_when_formatted && ports[kActiveUart].rx_irq);
+    ports[kActiveUart].rx_fifo = {0x0F, 0x00, 0x04};
+    irq(kActiveUart, kRxIrq);
+    uint8_t sbus[3]{};
+    assert(driver.read(sbus, sizeof(sbus)) == 3);
+    assert(sbus[0] == 0x0F && sbus[2] == 0x04);
+    // CRSF（416666、8N1）：改回 8N1
     assert(apply(416666, 0, 1, false));
     assert(driver.is_initialized() && driver.get_baud_rate() == 416666);
     assert(ports[kActiveUart].baud == 416666);
+    assert(ports[kActiveUart].parity == 0 && ports[kActiveUart].stop_bits == 1);
+    assert(ports[kActiveUart].init_count == 1);
 
     ports[kActiveUart].rx_fifo = {0xC8, 0x18, 0x16};
     irq(kActiveUart, kRxIrq);
@@ -293,6 +309,40 @@ void test_serial_rc_probe_cycle()
     // CRSFv3 協商的高速率
     assert(apply(2000000, 0, 1, false));
     assert(driver.is_initialized() && ports[kActiveUart].baud == 2000000);
+}
+
+// 格式在開埠前設定時，開埠後套用；埠開著時改格式立即生效、不重開埠。SDK 不支援的格式
+// （固定同位元 3、4，或 1、2 以外的停止位元）關掉埠，改回支援的格式後 begin 重新開啟。
+void test_parity_and_stop_bits()
+{
+    reset_ports();
+    FakePort &p = ports[kActiveUart];
+    RTL8735B::UARTDriver driver(3, kActiveUart, 41, 42, true);
+    driver.configure_parity(1);
+    driver.set_stop_bits(2);
+    driver.begin(9600);
+    assert(driver.is_initialized());
+    assert(p.parity == 1 && p.stop_bits == 2);
+    assert(!p.rx_irq_when_formatted && p.rx_irq && p.tx_irq);
+
+    driver.configure_parity(2);
+    assert(driver.is_initialized() && p.parity == 2 && p.stop_bits == 2);
+    assert(!p.rx_irq_when_formatted && p.rx_irq && p.tx_irq);
+    driver.set_stop_bits(1);
+    assert(driver.is_initialized() && p.parity == 2 && p.stop_bits == 1);
+    assert(p.init_count == 1);
+
+    driver.configure_parity(3);
+    assert(!driver.is_initialized() && p.free_count == 1);
+    driver.begin(9600);
+    assert(!driver.is_initialized());
+    driver.configure_parity(0);
+    driver.set_stop_bits(3);
+    driver.begin(9600);
+    assert(!driver.is_initialized());
+    driver.set_stop_bits(1);
+    driver.begin(9600);
+    assert(driver.is_initialized() && p.parity == 0 && p.stop_bits == 1);
 }
 
 // GPS：AP_GPS 自動找鮑率時輪流以各種速率 begin（AP_GPS::_baudrates）；埠開著時只換鮑率、不重新初始化，
@@ -519,7 +569,22 @@ extern "C" int rtl8735b_uart_init(uint8_t id, uint32_t tx_pin, uint32_t rx_pin, 
     p.rx_pin = rx_pin;
     p.baud = baud;
     p.initialized = p.init_result == 0;
+    p.parity = 0;
+    p.stop_bits = 1;
     return p.init_result;
+}
+
+extern "C" int rtl8735b_uart_set_format(uint8_t id, uint8_t parity, uint8_t stop_bits)
+{
+    FakePort &p = port(id);
+    if (!p.initialized || parity > 2 || stop_bits < 1 || stop_bits > 2) {
+        return -1;
+    }
+    p.parity = parity;
+    p.stop_bits = stop_bits;
+    p.format_count++;
+    p.rx_irq_when_formatted = p.rx_irq;
+    return 0;
 }
 
 extern "C" int rtl8735b_uart_set_baud(uint8_t id, uint32_t baud)
@@ -631,6 +696,7 @@ int main()
     test_end_rx_irq_before_mask_is_serviced();
     test_rx_irq_while_not_accepting_masks_rx();
     test_serial_rc_probe_cycle();
+    test_parity_and_stop_bits();
     test_gps_autobaud_cycle();
     puts("UART host tests passed");
     return 0;

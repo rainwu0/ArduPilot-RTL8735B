@@ -61,6 +61,7 @@ private:
     void _handle_irq(uint32_t irq);
     void _service_tx();
     bool _set_buffers(uint32_t rx_space, uint32_t tx_space);
+    void _apply_format();
 
     const uint8_t _logical_port;
     const uint8_t _uart_id;

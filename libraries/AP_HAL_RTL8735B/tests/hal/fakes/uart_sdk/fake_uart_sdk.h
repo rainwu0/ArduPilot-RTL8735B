@@ -39,7 +39,8 @@ typedef struct {
     stdio_port_t *pstdio_port;
 } hal_misc_func_stubs_t;
 
-enum { HAL_OK = 0, UART_Pin_TX = 0, UART_Pin_RX = 1, ParityNone = 0, FifoLv1Byte = 0 };
+// ParityNone／Odd／Even 的值同 SDK component/mbed/hal/serial_api.h 的 SerialParity
+enum { HAL_OK = 0, UART_Pin_TX = 0, UART_Pin_RX = 1, ParityNone = 0, ParityOdd = 1, ParityEven = 2, FifoLv1Byte = 0 };
 
 uint64_t hal_read_systime_us(void);
 void hal_delay_us(uint32_t us);

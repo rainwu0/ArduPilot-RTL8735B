@@ -232,6 +232,18 @@ int rtl8735b_uart_set_baud(uint8_t uart_id, uint32_t baud)
     return (int)hal_uart_set_baudrate(&uart_objects[uart_id].uart_adp, baud);
 }
 
+int rtl8735b_uart_set_format(uint8_t uart_id, uint8_t parity, uint8_t stop_bits)
+{
+    // SDK hal_uart.h 的 hal_uart_set_format：同位元 0 無、1 奇、2 偶（3、4 是固定 1、0，ArduPilot 不用），
+    // 停止位元 1 或 2
+    if (!_uart_id_valid(uart_id) || !uart_initialized[uart_id] || parity > ParityEven ||
+        stop_bits < 1 || stop_bits > 2) {
+        return -1;
+    }
+    hal_uart_adapter_t *adapter = uart_id == RTL8735B_UART_LOG ? log_adapter : &uart_objects[uart_id].uart_adp;
+    return (int)hal_uart_set_format(adapter, 8, parity, stop_bits);
+}
+
 void rtl8735b_uart_free(uint8_t uart_id)
 {
     if (!_uart_id_valid(uart_id) || !uart_initialized[uart_id]) {

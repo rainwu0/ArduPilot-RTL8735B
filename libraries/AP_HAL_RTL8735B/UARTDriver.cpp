@@ -75,13 +75,20 @@ bool UARTDriver::set_options(uint16_t options)
     return true;
 }
 
+// SDK 的 hal_uart_set_format 支援的格式：同位元 0 無、1 奇、2 偶，停止位元 1 或 2（資料位元固定 8）
+static bool format_supported(uint8_t parity, int stop_bits)
+{
+    return parity <= 2 && (stop_bits == 1 || stop_bits == 2);
+}
+
+// 同 ChibiOS：改格式立即生效。埠開著時遮罩中斷改格式，不重開埠；不支援的格式關掉埠，不用錯的格式收資料。
 void UARTDriver::configure_parity(uint8_t value)
 {
     WITH_SEMAPHORE(_read_mutex);
     WITH_SEMAPHORE(_write_mutex);
     parity = value;
-    if (_initialized && parity != 0) {
-        _end();
+    if (_initialized) {
+        _apply_format();
     }
 }
 
@@ -90,9 +97,25 @@ void UARTDriver::set_stop_bits(int count)
     WITH_SEMAPHORE(_read_mutex);
     WITH_SEMAPHORE(_write_mutex);
     _stop_bits = count;
-    if (_initialized && _stop_bits != 1) {
-        _end();
+    if (_initialized) {
+        _apply_format();
     }
+}
+
+void UARTDriver::_apply_format()
+{
+    if (!format_supported(parity, _stop_bits)) {
+        _end();
+        return;
+    }
+    rtl8735b_uart_set_irq(_uart_id, RTL8735B_UART_IRQ_RX, 0);
+    rtl8735b_uart_set_irq(_uart_id, RTL8735B_UART_IRQ_TX, 0);
+    if (rtl8735b_uart_set_format(_uart_id, parity, (uint8_t)_stop_bits) != 0) {
+        _end();
+        return;
+    }
+    rtl8735b_uart_set_irq(_uart_id, RTL8735B_UART_IRQ_TX, 1);
+    rtl8735b_uart_set_irq(_uart_id, RTL8735B_UART_IRQ_RX, 1);
 }
 
 bool UARTDriver::_set_buffers(uint32_t rx_space, uint32_t tx_space)
@@ -128,7 +151,7 @@ void UARTDriver::_begin(uint32_t baud, uint16_t rx_space, uint16_t tx_space)
     const uint32_t requested_baud = baud == 0 ? _baudrate.load() : baud;
 
     if (!_enabled || !_registered || _uart_id >= UART_INSTANCE_COUNT ||
-        parity != 0 || _stop_bits != 1) {
+        !format_supported(parity, _stop_bits)) {
         if (_initialized.load()) {
             _end();
         }
@@ -166,7 +189,14 @@ void UARTDriver::_begin(uint32_t baud, uint16_t rx_space, uint16_t tx_space)
         return;
     }
 
-    const int status = rtl8735b_uart_init(_uart_id, _tx_pin, _rx_pin, requested_baud);
+    int status = rtl8735b_uart_init(_uart_id, _tx_pin, _rx_pin, requested_baud);
+    if (status == 0 && (parity != 0 || _stop_bits != 1)) {
+        // shim 開埠時是 8N1；中斷在下面掛上 handler 後才開
+        status = rtl8735b_uart_set_format(_uart_id, parity, (uint8_t)_stop_bits);
+        if (status != 0) {
+            rtl8735b_uart_free(_uart_id);
+        }
+    }
     if (status != 0) {
         _readbuf.set_size(0);
         _writebuf.set_size(0);

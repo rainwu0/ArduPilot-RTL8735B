@@ -61,8 +61,16 @@ static struct {
 
 static int log_tx_events;
 
+// 最近一次 hal_uart_set_format 的同位元與停止位元（兩個 adapter 共用，測試一次只看一個埠）
+static int format_calls;
+static uint32_t format_parity;
+static uint32_t format_stop;
+
 static void reset_fake(void)
 {
+    format_calls = 0;
+    format_parity = 0;
+    format_stop = 0;
     memset(&uart, 0, sizeof(uart));
     received = 0;
     memset(&logu, 0, sizeof(logu));
@@ -132,7 +140,10 @@ hal_status_t hal_uart_set_baudrate(hal_uart_adapter_t *adapter, uint32_t baud)
 hal_status_t hal_uart_set_format(hal_uart_adapter_t *adapter, uint32_t bits, uint32_t parity, uint32_t stop)
 {
     assert(adapter == &log_adp || adapter->uart_idx == TEST_UART);
-    assert(bits == 8 && parity == ParityNone && stop == 1);
+    assert(bits == 8 && parity <= ParityEven && (stop == 1 || stop == 2));
+    format_calls++;
+    format_parity = parity;
+    format_stop = stop;
     return HAL_OK;
 }
 
@@ -465,8 +476,37 @@ static void test_rx_only_port(void)
     puts("PASS rx-only-port");
 }
 
+// 同位元與停止位元：開埠時是 8N1；之後可改成無、奇、偶同位元與 1、2 個停止位元（SDK hal_uart_set_format 的
+// 0／1／2 與 ArduPilot configure_parity 相同）。其他值與沒開的埠回 -1，不碰 SDK。LOG UART 用主控台的 adapter。
+static void test_set_format(void)
+{
+    reset_fake();
+    assert(rtl8735b_uart_set_format(TEST_UART, 2, 2) == -1);
+    assert(format_calls == 0);
+    assert(rtl8735b_uart_init(TEST_UART, TEST_TX_PIN, TEST_RX_PIN, 100000) == 0);
+    assert(format_calls == 1 && format_parity == ParityNone && format_stop == 1);
+    assert(rtl8735b_uart_set_format(TEST_UART, 2, 2) == 0);
+    assert(format_calls == 2 && format_parity == ParityEven && format_stop == 2);
+    assert(rtl8735b_uart_set_format(TEST_UART, 1, 1) == 0);
+    assert(format_parity == ParityOdd && format_stop == 1);
+    assert(rtl8735b_uart_set_format(TEST_UART, 3, 1) == -1);
+    assert(rtl8735b_uart_set_format(TEST_UART, 0, 0) == -1);
+    assert(rtl8735b_uart_set_format(TEST_UART, 0, 3) == -1);
+    assert(rtl8735b_uart_set_format(RTL8735B_UART_COUNT, 0, 1) == -1);
+    assert(format_calls == 3);
+    rtl8735b_uart_free(TEST_UART);
+    assert(rtl8735b_uart_set_format(TEST_UART, 0, 1) == -1);
+
+    assert(rtl8735b_uart_init(LOG_UART, LOG_TX_PIN, LOG_RX_PIN, 115200) == 0);
+    assert(rtl8735b_uart_set_format(LOG_UART, 2, 1) == 0);
+    assert(format_parity == ParityEven && format_stop == 1);
+    rtl8735b_uart_free(LOG_UART);
+    puts("PASS set-format");
+}
+
 int main(void)
 {
+    test_set_format();
     test_rx_only_port();
     test_log_uart_reuses_console_adapter();
     test_log_uart_rejects_unusable_adapter();

@@ -39,6 +39,9 @@ void rtl8735b_system_reset(void);
 // SDK 的 serial_init() 不回傳 hal_uart_init() 錯誤，因此在 C shim 直接保留狀態碼。
 int rtl8735b_uart_init(uint8_t uart_id, uint32_t tx_pin, uint32_t rx_pin, uint32_t baud);
 int rtl8735b_uart_set_baud(uint8_t uart_id, uint32_t baud);
+// hal_uart_set_format()：8 個資料位元；parity 0 無、1 奇、2 偶（同 ArduPilot configure_parity），stop_bits 1 或 2。
+// 開埠時是 8N1；其他值或沒開的埠回 -1。
+int rtl8735b_uart_set_format(uint8_t uart_id, uint8_t parity, uint8_t stop_bits);
 void rtl8735b_uart_free(uint8_t uart_id);
 void rtl8735b_uart_set_irq_handler(uint8_t uart_id, rtl8735b_uart_irq_handler handler);
 void rtl8735b_uart_set_irq(uint8_t uart_id, uint32_t irq, uint8_t enable);

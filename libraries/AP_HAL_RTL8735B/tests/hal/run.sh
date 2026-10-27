@@ -91,6 +91,7 @@ run_io() {
         -o "$out/io-shim-contract-test"
     timeout 30 "$out/io-shim-contract-test"
     timeout 30 "$out/io-shim-contract-test" oneshot125
+    timeout 30 "$out/io-shim-contract-test" adc_cali
 
     # 非預設的表（io_fakes/hwdef.h 的 IO_ALT_BOARD）：GPIO 編號、類比通道與 PWM 數量都跟著表走
     cc "${CFLAGS[@]}" -DIO_ALT_BOARD -I"$test_dir/io_fakes" -I"$lib_dir" \

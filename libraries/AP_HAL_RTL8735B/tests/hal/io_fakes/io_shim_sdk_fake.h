@@ -13,6 +13,14 @@ extern unsigned io_fake_adc_init_calls;
 extern uint32_t io_fake_adc_pin_en;
 extern uint8_t io_fake_adc_cvlist_channel;
 extern uint8_t io_fake_adc_read_channel;
+// ADC 出廠校正參數區（位址 0x4A8–0x4B1，未燒錄是 0xFF）、hal_adc_init 時 adapter 的 use_cali、
+// hal_adc_calc_cali_val 的呼叫次數與收到的參數
+extern uint8_t io_fake_adc_cali_otp[10];
+extern uint8_t io_fake_adc_init_use_cali;
+extern unsigned io_fake_adc_cali_calls;
+extern hal_adc_cali_para_t io_fake_adc_cali_seen;
+// 寫入出廠校正參數（小端序，和 SDK 讀出的順序相同）
+void io_fake_adc_program_cali(int16_t gain_deno, int16_t gain_mole, int16_t offset_deno, int32_t offset_mole);
 extern unsigned io_fake_gpio_init_calls;
 extern unsigned io_fake_pwm_init_calls;
 extern unsigned io_fake_pwm_start_calls;

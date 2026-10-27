@@ -43,7 +43,21 @@ typedef struct {
 } pwmout_t;
 
 typedef struct {
+    uint8_t use_cali;
     struct { struct { uint32_t w; } pin_en; } plft_dat;
 } hal_adc_adapter_t;
+
+typedef struct {
+    int16_t gain_deno;
+    int16_t gain_mole;
+    int16_t offset_deno;
+    int32_t offset_mole;
+    int16_t internal_r;
+    int16_t batt_gain_deno;
+    int16_t batt_gain_mole;
+    int32_t batt_offset_deno;
+    int16_t batt_offset_mole;
+    int16_t rsvd;
+} hal_adc_cali_para_t;
 
 typedef int hal_status_t;

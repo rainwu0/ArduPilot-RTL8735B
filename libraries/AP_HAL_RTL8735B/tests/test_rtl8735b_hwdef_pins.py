@@ -125,6 +125,14 @@ class DefaultBoardTest(unittest.TestCase):
         self.assertEqual(table(self.header, 'HAL_RTL8735B_ADC_PINS'), ['{2,PIN_F0,0}'])
         self.assertEqual(count(self.header, 'HAL_RTL8735B_ADC_COUNT'), 1)
 
+    def test_sensor_probing_defaults(self):
+        # 外接 I²C 氣壓計搜尋與空速計用 ArduPilot 的預設（編進韌體，由參數 BARO_PROBE_EXT、ARSPD_TYPE 啟用），
+        # 空速計預設不啟用；羅盤自動搜尋不開，免得蓋掉疊加檔 COMPASS 列寫的方向
+        for name in ('AP_BARO_PROBE_EXTERNAL_I2C_BUSES', 'AP_AIRSPEED_ENABLED', 'AP_COMPASS_PROBING_ENABLED'):
+            with self.subTest(name=name):
+                self.assertIsNone(re.search(r'^#define %s\b' % name, self.header, re.M))
+        self.assertEqual(count(self.header, 'HAL_AIRSPEED_TYPE_DEFAULT'), 0)
+
     def test_old_macros_are_gone(self):
         # 不留舊名稱的相容別名：每個值只有一個來源
         for old in (r'HAL_RTL8735B_I2C1_\w+', r'HAL_RTL8735B_SPI1_\w+', 'HAL_RTL8735B_BMI160_CS_PIN',

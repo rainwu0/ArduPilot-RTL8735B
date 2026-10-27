@@ -8,6 +8,11 @@ The status of each feature in a given version (verified on a board, build only a
 
 ## [Unreleased]
 
+### Added
+
+- Serial ports support no/odd/even parity and 1 or 2 stop bits (only 8N1 before), and a format change takes effect at once. SBUS (8E2) works as RC input through an external inverter; the chip's UART has no inversion in normal mode and no half duplex. Host tests only.
+- The generic board builds in external I²C barometer probing and airspeed support: they work once `BARO_PROBE_EXT` or `ARSPD_TYPE` is set, both default to off, and boot behaviour is unchanged. Automatic probing for external compasses is not turned on by default (it would override the orientation in an overlay's `COMPASS` lines). Build only.
+
 ## [0.2.0] - 2026-10-22
 
 Two changes are incompatible with v0.1.1: the example overlay moves to the examples repository, and PF3 and PF4 now belong to SERIAL0 by default (the first two items below). Other overlays, commands and parameters keep working; the new features in this version need a new build and flash, and all of them are build and host tests only, not yet tried on a board.

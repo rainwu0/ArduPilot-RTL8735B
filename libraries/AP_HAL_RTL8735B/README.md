@@ -71,7 +71,8 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 RC 接收機與 GPS（只有建置與主機測試，沒有接過實物）：
 
 - RC 接收機接 SERIAL4：接收機的 TX 接 D5（RX），RX 接 D6（TX）。`SERIAL4_PROTOCOL` 預設就是 23（RC 輸入），不用改參數。
-- 支援 8N1、不反相的序列 RC 協定，例如 CRSF／ELRS（416666 baud）與 115200 baud 的協定。SBUS 要 8E2 與反相，本 HAL 的序列埠只做 8N1、不反相，所以不支援；ArduPilot 輪流試各種格式時，試到不支援的格式就先關閉序列埠，再試下一種。
+- 支援不反相的序列 RC 協定，例如 CRSF／ELRS（416666 baud，8N1）與 115200 baud 的協定。序列埠支援 8 個資料位元、無／奇／偶同位元、1 或 2 個停止位元（8N1、8E2 等，SDK `d1b6426` 的 `hal_uart_set_format`）；ArduPilot 輪流試各種格式時，埠開著就直接換格式。
+- SBUS（100000 baud、8E2）的訊號是反相的，而晶片的 UART 沒有一般模式的反相功能（UART 暫存器只有 IrDA 用的反相位元，見〈功能狀態〉的 UART 列），所以 SBUS 要經外接反相器，或用接收機上不反相的 SBUS 輸出，接到 RC 的 RX。ArduPilot 試 SBUS 時要求反相，HAL 回報不支援，但照 8E2 開著，收到的就是反相器轉回來的資料。
 - GPS 接 SERIAL3：GPS 的 TX 接 D10（RX），RX 接 D9（TX）。`SERIAL3_PROTOCOL` 預設就是 5（GPS），鮑率由 ArduPilot 自動找。接在 SERIAL1（D8 TX、D15 RX）時，要把 `SERIAL1_PROTOCOL` 改成 5，它的預設是 MAVLink2。
 - 準位：RTL8735B 的 I/O 是 3.3 V，腳能不能承受 5 V 不知道。5 V 準位的接收機或 GPS 要加準位轉換。
 - 主機測試涵蓋 ArduPilot 輪流試 RC 格式、GPS 自動換鮑率時序列埠的行為（`tests/hal/uart_driver_host_test.cpp`）。
@@ -135,7 +136,9 @@ I²C 匯流排 1–4 條（SDK 的 I2C0–I2C3 各一條），SPI 匯流排一�
 
 - `RTL8735B_I2CBUS` 的時脈：驅動向匯流排要求的時脈必須等於這一欄，否則取不到裝置（`I2CDevice.cpp` 的 `get_device_ptr` 回傳 `nullptr`）。驅動沒有指定時，ArduPilot 要求的是 400000。
 - 多條 I²C：每條有自己的 bus task（名稱是 `APM_I2C` 加 SDK 編號）、逾時次數與封鎖，一條連續逾時被停用時，其他條照常。例如板上感測器留在匯流排 1，外接的另走 D3、D4：疊加檔加一行 `RTL8735B_I2CBUS 2 2 PIN_E4 PIN_E3 400000 external`。
-- `internal` 與 `external`：ArduPilot 只在 `external` 的匯流排上探測外接的感測器（例如外接羅盤），接頭拉到板外的匯流排要標 `external`。
+- `internal` 與 `external`：ArduPilot 只在 `external` 的匯流排上探測外接的感測器（例如外接氣壓計），接頭拉到板外的匯流排要標 `external`。
+- 不改疊加檔就能用的外接感測器：I²C 氣壓計設參數 `BARO_PROBE_EXT`（要找的型號，各位元見 ArduPilot 的參數說明）後重開機，在 `external` 匯流排上找；空速計設 `ARSPD_TYPE`（預設 0，不啟用；Plane 也是）。兩者只建置，未上板。
+- 外接羅盤要在疊加檔寫 `COMPASS` 列。沒有 `COMPASS` 列的疊加檔，可加 `define AP_COMPASS_PROBING_ENABLED 1`，開機時在 `external` 匯流排找所有編進來的型號，方向用驅動的預設值（例如 QMC5883L 是 `ROTATION_ROLL_180`），再以參數 `COMPASS_ORIENT` 調整。板型不預設打開：自動搜尋在 `COMPASS` 列之前執行，會以驅動的預設方向先登錄同位址的羅盤，疊加檔寫的方向就不生效（ArduPilot `libraries/AP_Compass/AP_Compass.cpp` 的 `_detect_backends`）。
 - 類比輸入：PF0–PF3 是 ADC 通道 0–3，PA0–PA3 是外接通道 4–7，每支腳各自取樣。PA2、PA3 也是 SERIAL3（UART0）的腳：要拿 PA2 當類比時，先把 SERIAL3 改成只收（下一項），或關掉 SERIAL3。
 - 只收的序列埠：`define HAL_RTL8735B_SERIALn_TX_PIN PIN_NC`（先 `undef`）。這個埠只收不送（例如電調遙測，`SERIALn_PROTOCOL` 16），寫入的資料丟掉；TX 腳空出來給別的用途。例如 SERIAL3 只用 D10（PA3）收電調遙測、D9（PA2）量電調電流：疊加檔寫 `undef HAL_RTL8735B_SERIAL3_TX_PIN`、`define HAL_RTL8735B_SERIAL3_TX_PIN PIN_NC`、`RTL8735B_ADC 9 PIN_A2`。這時 GPS 改接 SERIAL1。
 - 位址衝突：同一條匯流排上的兩個裝置不能同位址（板上的匯流排 1 已用 0x76 的 BMP280、0x0D 的 QMC5883L）；不同匯流排上可以同位址。衝突時改裝置的位址腳，或把其中一個移到另一條匯流排。
@@ -338,12 +341,13 @@ FatFs 在 `fatfs/`：R0.14b，取自 ArduPilot 的 ChibiOS 子模組（`modules/
 | 排程與號誌 | 板上驗證（T2、T4） | Copter 主迴圈在板上執行（心跳、參數、姿態更新）；正常運作時 120 秒內 399.9 Hz、長迴圈 0.07%（T4）。主執行緒連續忙等 20 ms 時讓出一個 tick：拔掉 IMU 的 SCLK 時主迴圈與較低優先權的 task 照常，但讓出是否觸發沒有記錄；IMU 完全不送樣本時未上板（T4） |
 | SPI | 板上驗證（T2） | BMI160 |
 | I²C | 板上驗證（T2、T3） | BMP280、QMC5883L 共用匯流排 1。開機時先清匯流排：熱重開 23 次、寫入映像後的第一次開機與冷開機各 1 次，氣壓計都初始化成功，T2 記的開機偶發初始化失敗沒有再出現（T3）；T3 的映像是改成每條匯流排各自一個 task 之前的程式，之後的版本未上板。逾時處理未上板：傳輸逾時後重新初始化控制器、必要時清除匯流排，連續 3 次逾時才停用該匯流排。多條匯流排同時用（各自逾時、停用）：只建置與主機測試，未上板 |
-| UART | 待複驗 | 只支援 8N1。只收的埠（TX 寫 `PIN_NC`）只建置與主機測試，未上板 |
+| UART | 待複驗 | 8N1 待複驗。其他格式（無／奇／偶同位元、1 或 2 個停止位元）只建置與主機測試，未上板。不支援硬體反相與半雙工：SDK `d1b6426` 的 UART 暫存器只有 IrDA 脈波用的反相位元（`rtl8735b_uart_type.h` 的 `irda_tx_inv`、`irda_rx_inv`），沒有單線模式；一般模式下設這兩個位元能不能反相是推論為不能，上板收得到反相的 8N1 資料就能推翻。只收的埠（TX 寫 `PIN_NC`）只建置與主機測試，未上板 |
 | Wi-Fi MAVLink（UDP） | 板上驗證（T2） | STA 模式。送出重試與湊包（見〈Wi-Fi〉）：已設計並實作；只經主機測試驗證，還沒接實物測試 |
 | Wi-Fi MAVLink（TCP） | 僅建置 | 已設計並實作；只經主機測試驗證，還沒接實物測試。建置時選擇，與 UDP 二選一 |
 | 主控台 MAVLink（SERIAL0） | 僅建置 | 已設計並實作；只經主機測試驗證，還沒接實物測試。LOG UART，經開發板的 USB 序列埠，115200 baud；SDK 與 HAL 的文字訊息夾在封包之間。晶片自己的 USB 不做。見〈板型〉的〈主控台 MAVLink〉 |
-| RC 輸入 | 僅建置 | 已設計並實作；只經主機測試驗證，還沒接實物測試。序列 RC（AP_RCProtocol），預設在 SERIAL4；支援 8N1、不反相的協定（CRSF、ELRS 等），不支援 SBUS（接法見〈板型〉）。主機測試涵蓋輪流試格式。地面站的 RC override 走 MAVLink，不經過 RC 輸入；它在板上的使用待複驗 |
+| RC 輸入 | 僅建置 | 已設計並實作；只經主機測試驗證，還沒接實物測試。序列 RC（AP_RCProtocol），預設在 SERIAL4；支援不反相的協定（CRSF、ELRS 等）；SBUS 要外接反相器（接法見〈板型〉）。主機測試涵蓋輪流試格式。地面站的 RC override 走 MAVLink，不經過 RC 輸入；它在板上的使用待複驗 |
 | GPS | 僅建置 | 已設計並實作；只經主機測試驗證，還沒接實物測試。預設在 SERIAL3；接 SERIAL1 要改 `SERIAL1_PROTOCOL`（接法見〈板型〉）。主機測試涵蓋自動換鮑率 |
+| 外接氣壓計與空速計 | 僅建置 | 已設計並實作；只經主機測試驗證，還沒接實物測試。ArduPilot 的外接 I²C 氣壓計搜尋與空速計編進板型，設 `BARO_PROBE_EXT`、`ARSPD_TYPE` 就能用；外接羅盤要寫 `COMPASS` 列（見〈自訂板〉）。主機測試只檢查板型的設定 |
 | PWM 輸出 | 待複驗 | 有刷馬達 PWM 先前驅動過馬達；電調用的一般 PWM、OneShot、OneShot125 未上板，見〈馬達輸出〉。解鎖中主迴圈停住時停送、恢復後只輸出重新寫入的值：只經主機測試，未上板 |
 | DShot 與電調遙測 | 僅建置 | 已設計並實作；只經主機測試驗證，還沒接實物測試。主機測試涵蓋 DShot150／300／600 的幀與時序、送幀時的 GPIO 寫入、遙測請求位元、DShot 命令、主迴圈停住時改送油門 0；電調的 TLM 線遙測只建置。見〈馬達輸出〉 |
 | AnalogIn | 僅建置 | 已設計並實作；只經主機測試驗證，還沒接實物測試。12 位元。晶片有 ADC 出廠校正參數時，讀值先經 SDK 的 `hal_adc_calc_cali_val` 校正（沒有參數時用原始值），再以滿刻度 3.3 V 線性換算成電壓；校正後的值仍是 12 位元轉換值是推論，精度與零點偏移未經板上量測（零點可用 `BATT_VLT_OFFSET` 等參數修正）。只有板型 hwdef 列出的類比腳能用，hub8735ultra 是 D2；hwdef 可以列多支（PF0–PF3、PA0–PA3），各自取樣，多支同時用只建置與主機測試，PA0–PA3 的換算是否和 PF0–PF3 相同未上板確認；腳位能承受的電壓上限不明，腳上的電壓不要超過 3.3 V。電池電壓要先經分壓，分壓比設在 `BATT_VOLT_MULT` |

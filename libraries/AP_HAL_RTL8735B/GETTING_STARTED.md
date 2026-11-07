@@ -74,7 +74,7 @@ password=你的熱點密碼
 ```
 
 - 等號後面的內容會原樣使用。**不要加引號，等號前後和行尾也不要多打空白**，不然引號和空白會變成名稱或密碼的一部分。名稱中間的空白沒關係。
-- 打錯引號或空白時，建置**不會**有任何警告。要到第 7 步看開機訊息的 `SSID length N` 才發現得了：N 是熱點名稱的位元組數，英數字一個算 1，中文一個字算 3。
+- 打錯引號或空白時，建置**不會**有任何警告。要到第 7 步看地面站訊息裡的 `SSID length N` 才發現得了：N 是熱點名稱的位元組數，英數字一個算 1，中文一個字算 3。
 - 密碼要 8–63 個字元，或 64 個十六進位字元，而且只能用可列印的 ASCII（英數字、符號與空白），不能有中文等其他字元；開放網路就把 `password=` 後面留空。長度或字元不對時，建置會失敗並說明原因。
 - 這個檔案不要放進任何 git 儲存庫，可以 `chmod 600 ~/wifi.txt`。
 
@@ -146,34 +146,32 @@ cp "../ambpro2_sdk/tools/Pro2_PG_tool _v1.3.0.zip" /mnt/c/Users/<你>/Downloads/
 
 燒錄期間不要拔 USB。
 
-## 7. 看開機訊息
+## 7. 確認開機與 Wi-Fi
 
-1. 用任一個序列終端機程式（例如 PuTTY、Tera Term）開**同一個 COM 埠**，設定 115200、8N1。
-2. **先開好終端機，再按 reset**，不然會漏掉開機訊息。
+開發板開機時，HAL 很早就把這個 COM 埠交給 MAVLink（SERIAL0）：序列終端機只看得到最早的幾行開機訊息，接著就是二進位資料。開機的情形改從地面站的訊息看。
 
-成功時大約會依序看到：
+1. 地面站接開發板的 COM 埠，115200 baud。Mission Planner：右上角選 `COMx` 與 `115200`，按 Connect。
+2. 連上之後按一下 reset。開發板重開，地面站的訊息（Mission Planner 的 Messages 分頁）依序出現：
 
 ```
-== RAM Start ==
-Storage: flash id ..., using 0xf80000-0xfa0000
-WIFI initialized
 WiFi: joining (SSID length N)
 WiFi: up, local 192.168.x.x:14555
 ```
 
 - `SSID length N` 的 N 要等於你的熱點名稱的位元組數（英數字一個算 1，中文一個字算 3）。對不上，就是設定檔裡多了引號或空白。
-- `WiFi: up` 大約在開機後 5 秒出現。它後面的 IP 就是開發板的位址，記下來。
-- 有接羅盤的話，約 17 秒時會多一行 `QMC5883L found on bus 1 ...`；沒接羅盤就不會出現。
-- **回報問題要貼開機訊息時，先遮掉 `set ssid [...]` 那一行**：SDK 會在那裡印出你的熱點名稱。
+- `WiFi: up` 後面的 IP 就是開發板的位址，記下來。
+- 這幾行只送給當時已經連上的地面站：地面站要在按 reset 之前接好，錯過了就再按一次 reset。也可以在熱點的裝置清單看開發板的 IP，例如 Windows 的行動熱點會列出連上的裝置。
 
 不對的時候：
-- **每 5 秒重印一次 `Config Error: Baro: unable to initialise driver`**：找不到氣壓計。檢查氣壓計的接線和 3.3 V，再按 reset 重開。v0.1.0 開機偶爾會無故出現這則錯誤，v0.1.1 已修正；用 v0.1.0 時先按 reset 重開一次試試。
-- **出現 `WiFi: no STA credentials`**：映像裡沒有 Wi-Fi 帳密，回第 5 步確認有 `帳密取自`。
-- **一直沒有 `WiFi: up`**：檢查熱點名稱和密碼；熱點最好是 2.4 GHz。
+- **每 5 秒出現一次 `Config Error: Baro: unable to initialise driver`**：找不到氣壓計。檢查氣壓計的接線和 3.3 V，再按 reset 重開。
+- **出現 `WiFi: no STA credentials in this image; WiFi MAVLink port disabled`**：映像裡沒有 Wi-Fi 帳密，回第 5 步確認有 `帳密取自`。
+- **出現 `WiFi: join failed (…)`**：開發板連不上熱點，之後會自動重試。檢查熱點名稱和密碼；熱點最好是 2.4 GHz。
+
+這一步照程式寫成，還沒在板上照著做過。
 
 ## 8. 連地面站
 
-1. 電腦連上同一個熱點。序列埠的終端機可以繼續開著，不影響 Wi-Fi。
+1. 電腦連上同一個熱點。地面站如果還接著 COM 埠，先斷開（Mission Planner 按 Disconnect）。
 2. 開發板還沒找到地面站時，會把心跳廣播到 UDP 14550，地面站軟體聽這個埠就收得到：
    - **QGroundControl**：預設就會聽 UDP 14550，打開等它自己連上。
    - **Mission Planner**：右上角的連線方式選 UDP，按 Connect，埠填 14550。
@@ -183,7 +181,6 @@ WiFi: up, local 192.168.x.x:14555
 
 成功時：
 
-- 序列埠多出一行 `WiFi: ground station <電腦的 IP>:14550`；
 - 地面站下載參數，約 900 多筆；
 - 開發板放平時 roll、pitch 接近 0；把前端（USB 接頭的另一端）抬起約 45°，pitch 變成約 +40°。
 

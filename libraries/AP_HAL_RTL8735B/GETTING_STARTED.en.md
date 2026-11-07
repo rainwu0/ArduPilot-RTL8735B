@@ -74,7 +74,7 @@ password=your-hotspot-password
 ```
 
 - Everything after the equals sign is used exactly as written. **Do not add quotes, and do not leave extra spaces around the equals sign or at the end of a line**, or the quotes and spaces become part of the name or password. Spaces inside the name are fine.
-- A stray quote or space gives **no** warning at build time. You only find out in step 7, from `SSID length N` in the boot messages: N is the number of bytes in the hotspot name, 1 for each letter or digit and 3 for each Chinese character.
+- A stray quote or space gives **no** warning at build time. You only find out in step 7, from `SSID length N` in the ground station's messages: N is the number of bytes in the hotspot name, 1 for each letter or digit and 3 for each Chinese character.
 - The password must be 8–63 characters, or 64 hexadecimal characters, and only printable ASCII (letters, digits, symbols and spaces), with no Chinese or other characters; for an open network, leave `password=` empty. If the length or the characters are wrong, the build fails and says why.
 - Keep this file out of every git repository; you can `chmod 600 ~/wifi.txt`.
 
@@ -146,34 +146,32 @@ If it fails:
 
 Do not unplug USB while flashing.
 
-## 7. Watch the boot messages
+## 7. Check the boot and Wi-Fi
 
-1. Open **the same COM port** in any serial terminal program (for example PuTTY or Tera Term), set to 115200, 8N1.
-2. **Open the terminal first, then press reset**, or you will miss the boot messages.
+When the board boots, the HAL hands this COM port to MAVLink (SERIAL0) early on: a serial terminal shows only the first few boot lines, followed by binary data. Watch the boot from the ground station's messages instead.
 
-When it works, you see roughly this, in order:
+1. Connect a ground station to the board's COM port at 115200 baud. In Mission Planner, choose `COMx` and `115200` at the top right and press Connect.
+2. Once it is connected, press reset. The board restarts, and the ground station's messages (the Messages tab in Mission Planner) show, in order:
 
 ```
-== RAM Start ==
-Storage: flash id ..., using 0xf80000-0xfa0000
-WIFI initialized
 WiFi: joining (SSID length N)
 WiFi: up, local 192.168.x.x:14555
 ```
 
 - N in `SSID length N` must equal the number of bytes in your hotspot name (1 for each letter or digit, 3 for each Chinese character). If it does not, the settings file has an extra quote or space.
-- `WiFi: up` appears about 5 seconds after boot. The IP after it is the board's address; note it down.
-- With a compass connected, an extra line `QMC5883L found on bus 1 ...` appears at about 17 seconds; without a compass it does not.
-- **If you paste boot messages into a report, mask the `set ssid [...]` line first**: the SDK prints your hotspot name there.
+- The IP after `WiFi: up` is the board's address; note it down.
+- These lines go only to a ground station that is already connected: connect it before pressing reset, and if you missed them, press reset again. You can also find the board's IP in the hotspot's list of devices; the Windows mobile hotspot, for example, lists the connected devices.
 
 If something is wrong:
-- **`Config Error: Baro: unable to initialise driver` repeats every 5 seconds**: the barometer was not found. Check the barometer's wiring and 3.3 V, then press reset. v0.1.0 occasionally showed this error at boot for no reason, which v0.1.1 fixes; with v0.1.0, try pressing reset once first.
-- **`WiFi: no STA credentials` appears**: the image has no Wi-Fi credentials; go back to step 5 and check for `帳密取自`.
-- **`WiFi: up` never appears**: check the hotspot name and password; a 2.4 GHz hotspot is best.
+- **`Config Error: Baro: unable to initialise driver` appears every 5 seconds**: the barometer was not found. Check the barometer's wiring and 3.3 V, then press reset.
+- **`WiFi: no STA credentials in this image; WiFi MAVLink port disabled` appears**: the image has no Wi-Fi credentials; go back to step 5 and check for `帳密取自`.
+- **`WiFi: join failed (…)` appears**: the board cannot join the hotspot and will retry by itself. Check the hotspot name and password; a 2.4 GHz hotspot is best.
+
+This step is written from the code and has not yet been followed on a board.
 
 ## 8. Connect a ground station
 
-1. Connect the computer to the same hotspot. The serial terminal can stay open; it does not affect Wi-Fi.
+1. Connect the computer to the same hotspot. If the ground station is still connected to the COM port, disconnect it first (Disconnect in Mission Planner).
 2. Until the board finds a ground station, it broadcasts heartbeats to UDP 14550, so ground station software listening on that port picks them up:
    - **QGroundControl**: listens on UDP 14550 by default; open it and wait for it to connect.
    - **Mission Planner**: choose UDP as the connection type at the top right, press Connect, and enter 14550 as the port.
@@ -183,7 +181,6 @@ If something is wrong:
 
 When it works:
 
-- the serial port shows an extra line, `WiFi: ground station <computer's IP>:14550`;
 - the ground station downloads the parameters, a little over 900 of them;
 - with the board level, roll and pitch are close to 0; lift the front (the end opposite the USB connectors) by about 45° and pitch becomes about +40°.
 

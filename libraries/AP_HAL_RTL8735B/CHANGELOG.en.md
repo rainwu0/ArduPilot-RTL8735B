@@ -8,10 +8,25 @@ The status of each feature in a given version (verified on a board, build only a
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-08
+
+Compatible with v0.2.0: existing overlays, commands and parameters keep working; the changes need a new build and flash. All changes in this version are build and host tests only, not yet tried on a board.
+
+### Changed
+
+- **SERIAL0 (LOG UART) is taken over during HAL initialization, and after that, text that the SDK and the HAL print with printf is no longer sent**, so it does not land between MAVLink packets; a serial terminal shows only the first few boot lines. The HAL's runtime messages go to the ground station as STATUSTEXT, and so do the Wi-Fi connection messages: `WiFi: joining (SSID length N)`, `WiFi: up, local <IP>:<port>`, `WiFi: join failed (…)`, `WiFi: no STA credentials in this image; WiFi MAVLink port disabled`. The board's IP is now read from a ground station on the COM port, and steps 7 and 8 of Getting started change with it. To see crash dumps, turn SERIAL0 off in an overlay.
+- Analog inputs apply the chip's ADC factory calibration: when the chip has calibration parameters, a reading is corrected before it is converted to volts; without them it is used as before.
+
 ### Added
 
 - Serial ports support no/odd/even parity and 1 or 2 stop bits (only 8N1 before), and a format change takes effect at once. SBUS (8E2) works as RC input through an external inverter; the chip's UART has no inversion in normal mode and no half duplex. Host tests only.
 - The generic board builds in external I²C barometer probing and airspeed support: they work once `BARO_PROBE_EXT` or `ARSPD_TYPE` is set, both default to off, and boot behaviour is unchanged. Automatic probing for external compasses is not turned on by default (it would override the orientation in an overlay's `COMPASS` lines). Build only.
+
+### Fixed
+
+- Analog inputs return 0, not NaN, before their first sample. The first battery voltage and current read at boot used to be NaN, which was recorded as the internal error `constraining_nan` and blocked arming until a reboot.
+- The IO and Storage threads start before `setup()`. Every parameter save in `setup()` used to wait for its 2-second timeout (`setup()` took about 55 seconds on a board without motors), and saves made in a `setup()` that never finished were not written to flash.
+- README: the changes to ArduPilot shared code list `libraries/AP_HAL/board/rtl8735b.h`.
 
 ## [0.2.0] - 2026-10-22
 
@@ -87,7 +102,8 @@ Compared with the public commits before this version number:
 
 - The old `HAL_RTL8735B_*` pin and bus `define`s (`HAL_RTL8735B_I2C1_*`, `HAL_RTL8735B_SPI1_*`, `HAL_RTL8735B_RCOUT_*` and others); use the keywords above. Overlays that still use them build without errors, but the settings have no effect.
 
-[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/tree/v0.1.0

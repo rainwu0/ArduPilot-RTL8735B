@@ -8,10 +8,25 @@ English: [CHANGELOG.en.md](CHANGELOG.en.md)
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-08
+
+和 v0.2.0 相容：原本的疊加檔、指令與參數照舊能用；改動要重新建置、燒錄才有。這一版的改動都只經建置與主機測試，還沒上板。
+
+### 變更（Changed）
+
+- **SERIAL0（LOG UART）在 HAL 初始化時就接手，之後 SDK 與 HAL 以 printf 印的文字不再送出**，不插進 MAVLink 封包之間；序列終端機只看得到最早的幾行開機訊息。HAL 的執行期訊息以 STATUSTEXT 送到地面站，Wi-Fi 的連線訊息也是：`WiFi: joining (SSID length N)`、`WiFi: up, local <IP>:<埠>`、`WiFi: join failed (…)`、`WiFi: no STA credentials in this image; WiFi MAVLink port disabled`。開發板的 IP 改從接 COM 埠的地面站看，〈從零開始〉第 7、8 步跟著改。要看當機傾印時，在疊加檔關掉 SERIAL0。
+- 類比輸入套用晶片的 ADC 出廠校正：晶片有校正參數時，讀值先校正再換算成電壓；沒有參數時照舊。
+
 ### 新增（Added）
 
 - 序列埠支援無／奇／偶同位元與 1、2 個停止位元（原本只有 8N1），改格式立即生效。SBUS（8E2）經外接反相器就能當 RC 輸入；晶片的 UART 沒有一般模式的反相，也沒有半雙工。只經主機測試。
 - 通用板編進外接 I²C 氣壓計的搜尋與空速計：設 `BARO_PROBE_EXT`、`ARSPD_TYPE` 就能用，預設都不啟用，開機行為不變。外接羅盤的自動搜尋不預設打開（會蓋掉疊加檔 `COMPASS` 列的方向）。只經建置。
+
+### 修正（Fixed）
+
+- 類比輸入在第一次取樣前回 0，不再回 NaN。原本開機時第一次讀電池的電壓與電流得到 NaN，記成內部錯誤 `constraining_nan`，要重開機才能解鎖。
+- IO 與 Storage 執行緒在 `setup()` 之前就開始。原本 `setup()` 裡每次存參數都等到 2 秒逾時（在沒接馬達的板上 `setup()` 約 55 秒），`setup()` 沒做完時存的參數也不會寫進 Flash。
+- README：〈對 ArduPilot 共用程式的修改〉列出 `libraries/AP_HAL/board/rtl8735b.h`。
 
 ## [0.2.0] - 2026-10-22
 
@@ -87,7 +102,8 @@ English: [CHANGELOG.en.md](CHANGELOG.en.md)
 
 - 舊的 `HAL_RTL8735B_*` 腳位與匯流排 `define`（`HAL_RTL8735B_I2C1_*`、`HAL_RTL8735B_SPI1_*`、`HAL_RTL8735B_RCOUT_*` 等），改用上面的關鍵字。還在用的疊加檔建置不會報錯，設定只會失效。
 
-[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/tree/v0.1.0

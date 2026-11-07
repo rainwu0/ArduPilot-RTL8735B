@@ -10,7 +10,7 @@ This page gives the overall picture; the details of each feature are in the [HAL
 
 ## What works now
 
-- The current version is **v0.2.0** (2026-10-22). Two changes are incompatible with v0.1.1; see "Recent changes".
+- The current version is **v0.2.1** (2026-11-08), compatible with v0.2.0.
 - ArduPilot master `9f648ccabc` (2026-09-25) plus a HAL for the RTL8735B, with ArduPilot's full history kept.
 - Board types: `hub8735ultra` (HUB 8735 ultra, vendor ideasHatch, [vendor resources](https://github.com/ideashatch/HUB-8735)), where all development happens; `amb82-mini` has only been built.
 - **With a BMI160, BMP280 and GY-271 (QMC5883L) connected as in the example, the HUB 8735 ultra works:** it boots, connects to a ground station over Wi-Fi (UDP), keeps parameters across reboots, and the attitude moves the right way when you lift the board. The wiring, overlay and parameters are in the first example, `bmi160-bmp280-qmc5883l`, in the [examples repository][examples], and the board test record is T2 in [BOARD_TESTS.md][tests-board] (in Chinese).
@@ -42,7 +42,8 @@ For the status of each item, see [Feature status][status].
   - whether parameters survive power loss: only reboots were tested;
   - several I²C buses in use at once;
   - UART, PWM output, Wi-Fi TCP, RC input, GPS, `--upload`, AMB82-mini;
-  - everything new in v0.2.0: console MAVLink, analog volts, the SD card, DShot and ESC telemetry, receive-only serial ports, Wi-Fi packing and retries, stopping outputs when the main loop stalls, the arming block during a parameter erase, and the new board application interface.
+  - everything new in v0.2.0: console MAVLink, analog volts, the SD card, DShot and ESC telemetry, receive-only serial ports, Wi-Fi packing and retries, stopping outputs when the main loop stalls, the arming block during a parameter erase, and the new board application interface;
+  - the fixes in v0.2.1: ADC factory calibration, analog inputs returning 0 before their first sample, the IO and Storage threads starting early, and text kept off SERIAL0 with the Wi-Fi messages sent as STATUSTEXT.
 - The IMU orientation in the first example of the examples repository was measured with the example board's mounting. If you mount it differently, test again; how is described in that example's README.
 - Not done: bidirectional DShot, DShot1200, 3D with DShot; the chip's own USB (the board's other USB-C) does not carry MAVLink.
 - On the first boot after the parameters move to the other sector, losing power or resetting during the erase returns all parameters to their defaults. Keep a parameter file from the ground station; see [Flash layout][layout].
@@ -54,21 +55,17 @@ For the status of each item, see [Feature status][status].
 
 ## Recent changes
 
-### v0.2.0 (2026-10-22): MAVLink over the USB serial port, volts, SD card, DShot (none yet on a board)
+### v0.2.1 (2026-11-08): analog input and boot fixes, no text on SERIAL0
 
-Two changes are incompatible with v0.1.1; other existing overlays, commands and parameters keep working. The new features need a new build and flash, and all of them are build and host tests only, not yet tried on a board. The tag is `v0.2.0` (`git checkout v0.2.0`); it only marks a commit, and no firmware is attached.
+Compatible with v0.2.0: existing overlays, commands and parameters keep working. The changes take effect only after you build and flash again, and all of them are build and host tests only, not yet tried on a board. The tag is `v0.2.1` (`git checkout v0.2.1`); it only marks a commit, and no firmware is attached.
 
-- **Incompatible: the example overlay `hwdef/hub8735ultra/sensors-example.dat` moves to the [examples repository][examples].** Build with `examples/bmi160-bmp280-qmc5883l/overlay.dat` from the examples repository instead, which has the same sensor settings.
-- **Incompatible: SERIAL0 (LOG UART, PF3 and PF4) is on by default, running MAVLink2.** An overlay that uses these two pins for something else has to turn SERIAL0 off first; how is in the [CHANGELOG][changelog].
-- Added: console MAVLink. A ground station connects through the board's USB serial port at 115200 baud, with no Wi-Fi needed; disconnect it from this port before flashing. See [Board types][boards].
-- Added: analog inputs are converted to volts, so analog battery monitoring can be used; a hwdef can list several analog pins. See [Custom boards][custom].
-- Added: DShot150, DShot300 and DShot600, and ESC telemetry (TLM wire); see [Motor outputs][motors].
-- Added: the microSD card (FatFs), with the files on it visible through MAVLink FTP in the ground station and logs that can go to the card; see [SD card][sd].
-- Added: receive-only serial ports; new calls and queries for board applications, see [Board applications][app].
-- Changed (safety): when the main loop has not completed a cycle for more than 100 ms while armed, PWM stops and DShot sends zero throttle; while the parameter area is erased at run time, a normal arm is refused.
-- Changed: Wi-Fi UDP packs several MAVLink messages into one datagram (each up to about 10 ms later) and retries when the driver is out of buffers; runtime warnings also go to the ground station.
+- **Changed: SERIAL0 (LOG UART) is taken over during HAL initialization, and text after that is no longer sent.** A serial terminal shows only the first few boot lines; the Wi-Fi connection messages (with the board's IP) go to the ground station as STATUSTEXT, so read them on a ground station connected to the COM port, see step 7 of [Getting started][start].
+- Changed: analog inputs apply the chip's ADC factory calibration.
+- Fixed: analog inputs return 0, not NaN, before their first sample; that used to be recorded as an internal error that blocked arming.
+- Fixed: the IO and Storage threads start before `setup()`; every parameter save in `setup()` used to wait 2 seconds.
+- Added: serial ports support parity and two stop bits (SBUS works through an external inverter); the generic board builds in external I²C barometer probing and airspeed, enabled by parameters.
 
-The previous version, v0.1.1 (2026-10-19): the I²C bus is cleared at boot, and the barometer initialization failure did not come back over repeated boots on a board; a hwdef can set up four I²C buses. The full changes of every version are in the [CHANGELOG][changelog].
+The previous version, v0.2.0 (2026-10-22), added console MAVLink, analog volts, the microSD card, DShot and ESC telemetry, with two incompatible changes: the example overlay moved to the examples repository, and SERIAL0 takes PF3/PF4 by default. The full changes of every version are in the [CHANGELOG][changelog].
 
 ## License
 

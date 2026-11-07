@@ -10,7 +10,7 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Englis
 
 ## 現在有什麼
 
-- 目前的版本是 **v0.2.0**（2026-10-22）。和 v0.1.1 有兩處不相容，見〈最近的變動〉。
+- 目前的版本是 **v0.2.1**（2026-11-08），和 v0.2.0 相容。
 - ArduPilot master `9f648ccabc`（2026-09-25）加上 RTL8735B 的 HAL，保留 ArduPilot 的完整歷史。
 - 板型：`hub8735ultra`（HUB 8735 ultra，板商 ideasHatch，[板商資料](https://github.com/ideashatch/HUB-8735)），開發都在這塊上做；`amb82-mini` 只建置過。
 - **HUB 8735 ultra 照範例接上 BMI160、BMP280、GY-271（QMC5883L）就能用：** 開機、經 Wi-Fi（UDP）連上地面站、參數在重開機後保留、抬起開發板時姿態方向正確。接法、疊加檔與參數在[範例庫][examples]的第一個範例 `bmi160-bmp280-qmc5883l`，上板紀錄見 [BOARD_TESTS.md][tests-board] 的 T2。
@@ -42,7 +42,8 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Englis
   - 斷電後參數是否保留：只測了重開機；
   - 多條 I²C 匯流排同時用；
   - UART、PWM 輸出、Wi-Fi TCP、RC 輸入、GPS、`--upload`、AMB82-mini；
-  - v0.2.0 新加的全部：主控台 MAVLink、類比電壓、SD 卡、DShot 與電調遙測、只收的序列埠、Wi-Fi 湊包與重試、主迴圈停住時停送輸出、抹除參數區時擋解鎖、開發板應用程式的新介面。
+  - v0.2.0 新加的全部：主控台 MAVLink、類比電壓、SD 卡、DShot 與電調遙測、只收的序列埠、Wi-Fi 湊包與重試、主迴圈停住時停送輸出、抹除參數區時擋解鎖、開發板應用程式的新介面；
+  - v0.2.1 的修正：ADC 出廠校正、類比輸入首次取樣前回 0、IO 與 Storage 執行緒提早開始、SERIAL0 接手後文字不送與 Wi-Fi 訊息走 STATUSTEXT。
 - 範例庫第一個範例的 IMU 方向，是在範例板的擺法下實測的。換了擺法要重測，方法寫在那個範例的 README。
 - 沒有做：雙向 DShot、DShot1200、DShot 的 3D；晶片自己的 USB（開發板另一個 USB-C）不做 MAVLink。
 - 參數換扇區後的那次開機，如果抹除期間斷電或重置，參數會全部回到預設。請用地面站存一份參數檔，見[〈Flash 版面〉][layout]。
@@ -54,21 +55,17 @@ Unofficial ArduPilot port to the Realtek RTL8735B SoC. Not flight-tested. Englis
 
 ## 最近的變動
 
-### v0.2.0（2026-10-22）：USB 序列埠的 MAVLink、電壓、SD 卡、DShot（都還沒上板）
+### v0.2.1（2026-11-08）：類比輸入與開機的修正，SERIAL0 不再夾文字
 
-和 v0.1.1 有兩處不相容，原本的其他疊加檔、指令與參數照舊能用。新功能要重新建置、燒錄才有，都只經建置與主機測試，還沒上板。標籤是 `v0.2.0`（`git checkout v0.2.0`），只標提交，不附韌體。
+和 v0.2.0 相容：原本的疊加檔、指令與參數照舊能用。改動要重新建置、燒錄才會生效，都只經建置與主機測試，還沒上板。標籤是 `v0.2.1`（`git checkout v0.2.1`），只標提交，不附韌體。
 
-- **不相容：範例疊加檔 `hwdef/hub8735ultra/sensors-example.dat` 移到[範例庫][examples]。** 建置時改用範例庫的 `examples/bmi160-bmp280-qmc5883l/overlay.dat`，感測器設定相同。
-- **不相容：SERIAL0（LOG UART，PF3、PF4）預設打開，跑 MAVLink2。** 疊加檔把這兩支腳拿去當別的用途時，要先關掉 SERIAL0，寫法見 [CHANGELOG][changelog]。
-- 新增：主控台 MAVLink。地面站接開發板的 USB 序列埠、115200 baud 就能連線，不需要 Wi-Fi；燒錄前先讓地面站斷開這個埠。見[〈板型〉][boards]。
-- 新增：類比輸入換算成電壓，可以用類比電池監測；hwdef 可以列多支類比腳。見[〈自訂板〉][custom]。
-- 新增：DShot150、DShot300、DShot600 與電調遙測（TLM 線），見[〈馬達輸出〉][motors]。
-- 新增：microSD 卡（FatFs），地面站的 MAVLink FTP 看得到卡上的檔案，記錄可以寫進卡；見[〈SD 卡〉][sd]。
-- 新增：只收的序列埠；開發板應用程式的新呼叫點與查詢，見[〈開發板的應用程式〉][app]。
-- 變更（安全）：解鎖中主迴圈超過 100 ms 沒跑完一圈時，PWM 停送、DShot 改送油門 0；執行中抹除參數區時，一般解鎖被擋。
-- 變更：Wi-Fi UDP 把幾則 MAVLink 湊成一個資料包再送（每則最多晚約 10 ms），驅動緩衝不足時重試；執行中的警告也送到地面站。
+- **變更：SERIAL0（LOG UART）在 HAL 初始化時就接手，之後的文字不再送出。** 序列終端機只看得到最早的幾行開機訊息；Wi-Fi 的連線訊息（含開發板的 IP）改以 STATUSTEXT 送到地面站，在接 COM 埠的地面站看，見[〈從零開始〉][start]第 7 步。
+- 變更：類比輸入套用晶片的 ADC 出廠校正。
+- 修正：類比輸入在第一次取樣前回 0，不再回 NaN；原本會記成內部錯誤、擋解鎖。
+- 修正：IO 與 Storage 執行緒在 `setup()` 之前就開始；原本 `setup()` 裡每次存參數都要等 2 秒。
+- 新增：序列埠支援同位元與兩個停止位元（SBUS 經外接反相器可用）；通用板編進外接 I²C 氣壓計的搜尋與空速計，設參數才啟用。
 
-上一版 v0.1.1（2026-10-19）：開機時先清 I²C 匯流排，板上反覆開機沒有再出現氣壓計初始化失敗；一個 hwdef 可以設四條 I²C 匯流排。每一版的完整變更見 [CHANGELOG][changelog]。
+上一版 v0.2.0（2026-10-22）：加了主控台 MAVLink、類比電壓、microSD 卡、DShot 與電調遙測；範例疊加檔移到範例庫、SERIAL0 預設佔 PF3／PF4 兩處不相容。每一版的完整變更見 [CHANGELOG][changelog]。
 
 ## 授權
 

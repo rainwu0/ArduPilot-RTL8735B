@@ -156,11 +156,13 @@ static void test_adc_init_failure_raw_sample_and_voltage()
     assert(analog.channel(ANALOG_INPUT_BOARD_VCC) == nullptr);
     AP_HAL::AnalogSource *source = analog.channel(2);
     assert(source != nullptr);
-    // 還沒有取樣：原始值與電壓都是 NaN
-    assert(isnan(source->read_latest()));
-    assert(isnan(source->voltage_latest()));
-    assert(isnan(source->voltage_average()));
-    assert(isnan(source->voltage_average_ratiometric()));
+    // 還沒有取樣：原始值與電壓都是 0，不是 NaN（比照 AP_HAL_ChibiOS 的 AnalogSource，初值 0）。
+    // 上層綁腳後緊接著讀（AP_BattMonitor_Analog::read()），NaN 一路進到 constrain_float 會記成內部錯誤、擋解鎖
+    assert(source->read_latest() == 0.0f);
+    assert(source->read_average() == 0.0f);
+    assert(source->voltage_latest() == 0.0f);
+    assert(source->voltage_average() == 0.0f);
+    assert(source->voltage_average_ratiometric() == 0.0f);
     assert(isnan(analog.board_voltage()));
 
     // 只接受板型 hwdef 列出的類比腳
@@ -182,6 +184,8 @@ static void test_adc_init_failure_raw_sample_and_voltage()
     io_fake_adc_values[0] = 0;
     scheduler.service_io();
     assert(near(source->voltage_latest(), 0.0f));
+    assert(near(source->voltage_average(), (4095.0f + 0.0f) / 2.0f * 3.3f / 4095.0f));
+    // 兩次讀之間沒有新取樣：回上一次的平均（比照 AP_HAL_ChibiOS 的 read_average）
     assert(near(source->voltage_average(), (4095.0f + 0.0f) / 2.0f * 3.3f / 4095.0f));
 
     // AP_BattMonitor_Analog::read() 每次讀電壓前都呼叫 set_pin(同一支腳)（ArduPilot 9f648ccabc
@@ -607,6 +611,9 @@ static int alt_board_scenario()
     assert(current->read_average() == 400.0f && source->read_average() == 1234.0f);
     // set_pin 換到另一支腳：之後讀新腳的通道
     assert(current->set_pin(10));
+    // 換腳後、新腳的第一次取樣前：舊腳的值清成 0，不是 NaN（比照 AP_HAL_ChibiOS 的 set_pin）
+    assert(current->read_latest() == 0.0f && current->read_average() == 0.0f);
+    assert(current->voltage_average() == 0.0f);
     scheduler.service_io();
     assert(current->read_latest() == 4000.0f);
     return 0;

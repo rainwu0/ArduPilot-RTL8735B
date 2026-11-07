@@ -1,6 +1,6 @@
 #pragma once
 // 測試替身。出處：AP_HAVE_GCS_SEND_TEXT、GCS_SEND_TEXT 的名稱與用法依 ArduPilot 9f648ccabc 的
-// libraries/GCS_MAVLink/GCS.h；MAV_SEVERITY_WARNING 的值依 MAVLink common.xml（4）。只寫受測程式用到的部分，自己撰寫。
+// libraries/GCS_MAVLink/GCS.h；MAV_SEVERITY_WARNING、MAV_SEVERITY_INFO 的值依 MAVLink common.xml（4、6）。只寫受測程式用到的部分，自己撰寫。
 
 /*
  * HAL 的主機測試用：GCS_SEND_TEXT 不送出，改把「[嚴重度] 文字」一行記在 fake_statustext()。
@@ -14,6 +14,7 @@
 
 enum MAV_SEVERITY {
     MAV_SEVERITY_WARNING = 4,
+    MAV_SEVERITY_INFO = 6,
 };
 
 inline std::string &fake_statustext()

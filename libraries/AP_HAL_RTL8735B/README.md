@@ -62,7 +62,7 @@ SDK 預設放在本儲存庫旁的 `../ambpro2_sdk`。放在其他位置時，�
 主控台 MAVLink（只有建置與主機測試，沒有上板）：
 
 - SERIAL0 是 LOG UART，經板上的 USB 轉 UART 接到開發板的 USB 序列埠，也就是燒錄用的那個埠。`SERIAL0_PROTOCOL` 預設 2（MAVLink2），`SERIAL0_BAUD` 預設 115，地面站接這個 COM 埠、115200 baud 就能連線，不需要 Wi-Fi。
-- ArduPilot 開始用 SERIAL0 之前，SDK 的開機訊息照常從這個埠印出，用一般的序列埠終端機、115200 baud 讀得到。開始之後，SDK 與 HAL 以 printf 印的文字都不送出，不插進 MAVLink 封包之間；HAL 的執行期警告（馬達輸出的頻率與模式、Wi-Fi 斷線）以 STATUSTEXT 送到地面站。當機（HardFault）時：經 SDK 印的傾印看不到，要看時把 SERIAL0 關掉；晶片若不經 SDK 直接寫這個 UART，仍可能有非 MAVLink 的字混進來，這時主迴圈已停、不再送 MAVLink，地面站會因檢查碼不符丟掉這些字。這是推論：實測上，沒有這個行為、SDK 除錯列印開著的映像在 HardFault 時這個埠印出了 Bus Fault 與 HardFault，分不出是誰印的；開啟 SERIAL0 的映像在 HardFault 時這個埠沒有任何字，就表示不會混進來。
+- HAL 初始化時（`setup()` 之前、參數區初始化之前）就接手 SERIAL0。在那之前，開機程式與 SDK 的開機訊息照常從這個埠印出，用一般的序列埠終端機、115200 baud 讀得到。接手之後，SDK 與 HAL 以 printf 印的文字都不送出，不插進 MAVLink 封包之間；HAL 的執行期訊息以 STATUSTEXT 送到地面站：馬達輸出的頻率與模式、Wi-Fi 的連線經過（`WiFi: joining`、`WiFi: up, local <IP>:<埠>`、`WiFi: join failed`、`WiFi: no STA credentials`）與斷線。地面站接這個 COM 埠就讀得到開發板在 Wi-Fi 上的 IP。當機（HardFault）時：經 SDK 印的傾印看不到，要看時把 SERIAL0 關掉；晶片若不經 SDK 直接寫這個 UART，仍可能有非 MAVLink 的字混進來，這時主迴圈已停、不再送 MAVLink，地面站會因檢查碼不符丟掉這些字。這是推論：實測上，沒有這個行為、SDK 除錯列印開著的映像在 HardFault 時這個埠印出了 Bus Fault 與 HardFault，分不出是誰印的；開啟 SERIAL0 的映像在 HardFault 時這個埠沒有任何字，就表示不會混進來。
 - ArduPilot 開始用 SERIAL0 之後，這個埠收到的位元組只交給 MAVLink，SDK 主控台不再收到指令。
 - 燒錄也用這個埠：燒錄前先讓地面站斷開它。
 - 不要 SERIAL0 時，在疊加檔寫 `undef HAL_RTL8735B_SERIAL0_ENABLED`，再 `define HAL_RTL8735B_SERIAL0_ENABLED 0`。
@@ -344,7 +344,7 @@ FatFs 在 `fatfs/`：R0.14b，取自 ArduPilot 的 ChibiOS 子模組（`modules/
 | UART | 待複驗 | 8N1 待複驗。其他格式（無／奇／偶同位元、1 或 2 個停止位元）只建置與主機測試，未上板。不支援硬體反相與半雙工：SDK `d1b6426` 的 UART 暫存器只有 IrDA 脈波用的反相位元（`rtl8735b_uart_type.h` 的 `irda_tx_inv`、`irda_rx_inv`），沒有單線模式；一般模式下設這兩個位元能不能反相是推論為不能，上板收得到反相的 8N1 資料就能推翻。只收的埠（TX 寫 `PIN_NC`）只建置與主機測試，未上板 |
 | Wi-Fi MAVLink（UDP） | 板上驗證（T2） | STA 模式。送出重試與湊包（見〈Wi-Fi〉）：已設計並實作；只經主機測試驗證，還沒接實物測試 |
 | Wi-Fi MAVLink（TCP） | 僅建置 | 已設計並實作；只經主機測試驗證，還沒接實物測試。建置時選擇，與 UDP 二選一 |
-| 主控台 MAVLink（SERIAL0） | 僅建置 | 已設計並實作；只經主機測試驗證，還沒接實物測試。LOG UART，經開發板的 USB 序列埠，115200 baud；接手後 SDK 與 HAL 的 printf 文字不送出，HAL 的執行期警告走 STATUSTEXT。晶片自己的 USB 不做。見〈板型〉的〈主控台 MAVLink〉 |
+| 主控台 MAVLink（SERIAL0） | 僅建置 | 已設計並實作；只經主機測試驗證，還沒接實物測試。LOG UART，經開發板的 USB 序列埠，115200 baud；接手後 SDK 與 HAL 的 printf 文字不送出，HAL 的執行期訊息（含 Wi-Fi 的 IP）走 STATUSTEXT。晶片自己的 USB 不做。見〈板型〉的〈主控台 MAVLink〉 |
 | RC 輸入 | 僅建置 | 已設計並實作；只經主機測試驗證，還沒接實物測試。序列 RC（AP_RCProtocol），預設在 SERIAL4；支援不反相的協定（CRSF、ELRS 等）；SBUS 要外接反相器（接法見〈板型〉）。主機測試涵蓋輪流試格式。地面站的 RC override 走 MAVLink，不經過 RC 輸入；它在板上的使用待複驗 |
 | GPS | 僅建置 | 已設計並實作；只經主機測試驗證，還沒接實物測試。預設在 SERIAL3；接 SERIAL1 要改 `SERIAL1_PROTOCOL`（接法見〈板型〉）。主機測試涵蓋自動換鮑率 |
 | 外接氣壓計與空速計 | 僅建置 | 已設計並實作；只經主機測試驗證，還沒接實物測試。ArduPilot 的外接 I²C 氣壓計搜尋與空速計編進板型，設 `BARO_PROBE_EXT`、`ARSPD_TYPE` 就能用；外接羅盤要寫 `COMPASS` 列（見〈自訂板〉）。主機測試只檢查板型的設定 |

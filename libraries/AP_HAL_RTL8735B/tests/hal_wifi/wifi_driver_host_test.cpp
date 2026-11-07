@@ -176,9 +176,12 @@ void test_without_credentials_driver_is_disabled()
     reset(fake);
     WiFiDriver d(WiFiDriver::Protocol::UDP, kLocalPort, kGcsPort);
     assert(d.status().state == LinkState::NOT_STARTED);
+    fake_statustext().clear();
     d.begin(57600);
     assert(!d.is_initialized());
     assert(d.status().state == LinkState::DISABLED);
+    // SERIAL0 接手 LOG UART 之後 printf 不送出：沒有帳密也以 STATUSTEXT（警告）告訴地面站
+    assert(fake_statustext() == "[4] WiFi: no STA credentials in this image; WiFi MAVLink port disabled\n");
     assert(fake.created_tasks == 0);
     const uint8_t b[3] = {1, 2, 3};
     assert(d.write(b, sizeof(b)) == 0);
@@ -232,14 +235,22 @@ void test_start_and_join_failures_retry()
     assert(fake.start_calls == 2 && d.status().state == LinkState::CONNECTING);
 
     fake.join_result = RTL8735B_WIFI_ERR_JOIN;
+    fake_statustext().clear();
     d._link_step(2000);
     assert(d.status().state == LinkState::WAIT_RETRY);
+    // 連線中（資訊）與失敗（警告）都送 STATUSTEXT：SERIAL0 接手 LOG UART 之後 printf 不送出
+    assert(fake_statustext().find("[6] WiFi: joining (SSID length ") == 0);
+    assert(fake_statustext().find("[4] WiFi: join failed (") != std::string::npos);
     assert(d.status().join_attempts == 1 && d.status().join_failures == 1);
     assert(fake.leave_calls == 1 && fake.open_calls == 0);
     fake.join_result = RTL8735B_WIFI_OK;
+    fake_statustext().clear();
     d._link_step(2000 + WiFiDriver::RETRY_DELAY_MS);   // WAIT_RETRY -> CONNECTING
     d._link_step(2000 + WiFiDriver::RETRY_DELAY_MS);   // CONNECTING -> UP
     assert(d.status().state == LinkState::UP);
+    // 連上時開發板的 IP 與埠也送 STATUSTEXT（資訊），地面站接 COM 埠就看得到
+    assert(fake_statustext().find("[6] WiFi: up, local 192.168.1.23:" + std::to_string(kLocalPort) + "\n") !=
+           std::string::npos);
     assert(fake.start_calls == 2);   // wifi_on 成功後不重做
     assert(fake.opened_port == kLocalPort);
     assert(d.status().local_address == kLocalIp);

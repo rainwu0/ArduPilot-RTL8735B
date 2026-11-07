@@ -40,6 +40,20 @@ AP_HAL::HAL fake_hal{&fake_rcout, nullptr, &fake_storage, 0};
 // 與正式 HAL 一樣是靜態物件（_min_delay_cb_ms 為 0）
 Scheduler sched;
 
+// 替身 xTaskCreate 記下的執行緒入口；thread_delay_budget 用完時替身 vTaskDelay 跳回測試（run_thread）
+struct CreatedTask {
+    const char *name;
+    TaskFunction_t fn;
+    void *arg;
+};
+CreatedTask created_tasks[8];
+unsigned created_count;
+bool thread_running;
+unsigned thread_delay_budget;
+jmp_buf thread_jump;
+unsigned io_proc_calls;
+unsigned storage_ticks;
+
 unsigned checks;
 unsigned failures;
 
@@ -102,6 +116,11 @@ void reboot_record(char event)
 
 const AP_HAL::HAL &hal = fake_hal;
 
+void AP_HAL::Storage::_timer_tick()
+{
+    storage_ticks++;
+}
+
 void AP_HAL::RCOutput::force_safety_on()
 {
     reboot_record('S');
@@ -156,6 +175,12 @@ void rtl8735b_dshot_emergency_stop(void) {}
 // 第 n 個 tick 邊界：實際只等 n-1 到 n 個 tick。n 為 0 只重新排程（1343–1372 行）。
 void vTaskDelay(TickType_t ticks)
 {
+    if (thread_running) {
+        if (thread_delay_budget == 0) {
+            longjmp(thread_jump, 1);
+        }
+        thread_delay_budget--;
+    }
     if (ticks == 0) {
         yield_calls++;
         return;
@@ -171,8 +196,11 @@ TickType_t xTaskGetTickCount(void)
     return TickType_t(now_us / 1000);
 }
 
-BaseType_t xTaskCreate(TaskFunction_t, const char *, uint32_t, void *, UBaseType_t, TaskHandle_t *handle)
+BaseType_t xTaskCreate(TaskFunction_t fn, const char *name, uint32_t, void *arg, UBaseType_t, TaskHandle_t *handle)
 {
+    if (created_count < sizeof(created_tasks) / sizeof(created_tasks[0])) {
+        created_tasks[created_count++] = CreatedTask{name, fn, arg};
+    }
     if (handle != nullptr) {
         *handle = &created_task_tag;
     }
@@ -359,6 +387,48 @@ void test_reboot_order()
 
 } // namespace
 
+// 執行緒入口跑到第 delays 次 vTaskDelay 為止（執行緒本身是無窮迴圈）
+void run_thread(const char *name, unsigned delays)
+{
+    for (unsigned i = 0; i < created_count; i++) {
+        if (strcmp(created_tasks[i].name, name) == 0) {
+            thread_running = true;
+            thread_delay_budget = delays;
+            if (setjmp(thread_jump) == 0) {
+                created_tasks[i].fn(created_tasks[i].arg);
+            }
+            thread_running = false;
+            return;
+        }
+    }
+    expect(false, "init() 沒有建立 %s", name);
+}
+
+void count_io(void *)
+{
+    io_proc_calls++;
+}
+
+// AP_Param 的存檔由 IO 執行緒寫進 Storage、Storage 執行緒寫進 Flash；AP_Param::flush() 最多等 2 秒。
+// 兩個執行緒要在 setup() 之前就跑（HAL 在呼叫 setup() 前 hal_initialized()），比照 AP_HAL_ChibiOS
+// （ArduPilot 9f648ccabc HAL_ChibiOS_Class.cpp:282、Scheduler.cpp:559、631）；等到 set_system_initialized()
+// 才跑的話，setup() 裡每次 flush 都空等滿 2 秒
+void test_io_and_storage_threads_start_before_setup()
+{
+    sched.register_io_process(AP_HAL::MemberProc{count_io, nullptr});
+    run_thread("APM_IO", 20);
+    run_thread("APM_STORAGE", 20);
+    expect(io_proc_calls == 0 && storage_ticks == 0,
+           "HAL 初始化之前 IO、Storage 執行緒不該做事（IO %u 次、Storage %u 次）", io_proc_calls, storage_ticks);
+
+    sched.hal_initialized();
+    expect(!sched.is_system_initialized(), "hal_initialized() 不等於 setup() 做完");
+    run_thread("APM_IO", 20);
+    run_thread("APM_STORAGE", 20);
+    expect(io_proc_calls > 0, "HAL 初始化後、setup() 做完前，IO 執行緒要跑 IO 回呼");
+    expect(storage_ticks > 0, "HAL 初始化後、setup() 做完前，Storage 執行緒要寫 Storage");
+}
+
 int main()
 {
     current_task = main_task;
@@ -371,6 +441,7 @@ int main()
     test_sweep();
     test_main_thread_spin_yields();
     test_reboot_order();
+    test_io_and_storage_threads_start_before_setup();
 
     printf("現況：其他執行緒 delay_microseconds 掃描中短於要求 %u/%u 次（未要求，待追蹤）\n",
            other_short_waits, other_waits);

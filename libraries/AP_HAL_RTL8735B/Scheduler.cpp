@@ -40,6 +40,7 @@ Scheduler::Scheduler() :
     _num_io_procs(0),
     _in_io_proc(false),
     _initialized(false),
+    _hal_initialized(false),
     _main_last_block_us(0),
     _main_task_handle(nullptr),
     _timer_task_handle(nullptr),
@@ -357,7 +358,10 @@ void Scheduler::_run_io()
 void Scheduler::_io_thread(void *arg)
 {
     Scheduler *sched = (Scheduler *)arg;
-    while (!sched->_initialized) {
+    // setup() 期間就要跑：AP_Param 的存檔（例如開機時的 STAT_BOOTCNT）由這裡寫出，AP_Param::flush() 最多等 2 秒。
+    // 等到 setup() 做完才跑的話，setup 裡每次 flush 都空等滿 2 秒，setup 卡住時存檔也寫不進去。
+    // 比照 AP_HAL_ChibiOS（ArduPilot 9f648ccabc Scheduler.cpp:559、631 等 _hal_initialized）
+    while (!sched->_hal_initialized) {
         vTaskDelay(1);
     }
     while (true) {
@@ -398,7 +402,8 @@ void Scheduler::_rcin_thread(void *arg)
 void Scheduler::_storage_thread(void *arg)
 {
     Scheduler *sched = (Scheduler *)arg;
-    while (!sched->_initialized) {
+    // 和 IO 執行緒一起從 setup() 之前開始：IO 執行緒寫進 Storage 的參數由這裡寫進 Flash
+    while (!sched->_hal_initialized) {
         vTaskDelay(10);
     }
     while (true) {

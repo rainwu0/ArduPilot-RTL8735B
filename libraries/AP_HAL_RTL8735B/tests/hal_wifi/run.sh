@@ -22,10 +22,15 @@ for t in wifi_tx_retry wifi_coalesce; do
 done
 
 # 真的 RingBuffer 與 mavlink_packetise（AP_HAL/utility）；AP_HAL、FreeRTOS、MAVLink 常數用替身。
-for ssid_len in 7 0; do
+# 三種建置：有帳密（板型的預設熱點也在，帳密優先）、沒有帳密而用預設熱點、兩者都沒有（Wi-Fi 不啟用）。
+# 預設熱點的值照 hwdef/rtl8735b-empty/hwdef.dat 的 WIFI_SSID_STATION、WIFI_PWD。
+for variant in 7:ardupilot 0:ardupilot 0:; do
+    ssid_len=${variant%%:*}
+    default_ssid=${variant#*:}
     cc -std=c11 -Wall -Wextra -Werror -DWIFI_TEST_SSID_LEN="$ssid_len" -I"$lib_dir" \
         -c "$test_dir/wifi_test_credentials.c" -o "$out/credentials-$ssid_len.o"
     c++ -std=c++17 -Wall -Wextra -Werror -pthread \
+        -DWIFI_SSID_STATION="\"$default_ssid\"" -DWIFI_PWD='"ardupilot1"' \
         -I"$test_dir/wifi_fakes" -I"$lib_dir/.." -I"$lib_dir" \
         "$lib_dir/WiFiDriver.cpp" \
         "$lib_dir/StatusText.cpp" \
@@ -33,6 +38,6 @@ for ssid_len in 7 0; do
         "$lib_dir/../AP_HAL/utility/packetise.cpp" \
         "$test_dir/wifi_driver_host_test.cpp" \
         "$out/credentials-$ssid_len.o" \
-        -o "$out/wifi-driver-test-$ssid_len"
-    timeout 60 "$out/wifi-driver-test-$ssid_len"
+        -o "$out/wifi-driver-test"
+    timeout 60 "$out/wifi-driver-test"
 done

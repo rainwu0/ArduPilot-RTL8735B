@@ -191,6 +191,25 @@ void test_without_credentials_driver_is_disabled()
     assert(fake.sdk_calls == 0);
 }
 
+// 建置時沒有帳密：連板型 hwdef 的公開預設熱點（WIFI_SSID_STATION、WIFI_PWD），連線流程與有帳密時相同
+void test_without_credentials_joins_default_hotspot()
+{
+    FakeNet fake;
+    reset(fake);
+    WiFiDriver d(WiFiDriver::Protocol::UDP, kLocalPort, kGcsPort);
+    fake_statustext().clear();
+    bring_up(d);
+    assert(d.is_initialized());
+    assert(fake.created_tasks == 1);
+    assert(fake.join_calls == 1);
+    // 地面站看得到正在連板型的預設熱點；只送 SSID 的長度，不送 SSID 與密碼
+    const std::string joining = "[6] WiFi: joining the board's default hotspot (SSID length " +
+                                std::to_string(strlen(WIFI_SSID_STATION)) + ")\n";
+    assert(fake_statustext().find(joining) == 0);
+    assert(fake_statustext().find(WIFI_SSID_STATION) == std::string::npos);
+    assert(fake_statustext().find(WIFI_PWD) == std::string::npos);
+}
+
 void test_begin_creates_one_task_and_buffers()
 {
     FakeNet fake;
@@ -987,8 +1006,14 @@ int rtl8735b_wifi_join(const uint8_t *ssid, uint8_t ssid_len, const uint8_t *pas
 {
     net->sdk_calls++;
     net->join_calls++;
-    assert(ssid_len == 7 && memcmp(ssid, "lab-net", 7) == 0);
-    assert(password_len == 8 && memcmp(password, "12345678", 8) == 0);
+    if (rtl8735b_wifi_ssid_len != 0) {
+        // 建置時的帳密優先於板型的預設熱點
+        assert(ssid_len == 7 && memcmp(ssid, "lab-net", 7) == 0);
+        assert(password_len == 8 && memcmp(password, "12345678", 8) == 0);
+    } else {
+        assert(ssid_len == strlen(WIFI_SSID_STATION) && memcmp(ssid, WIFI_SSID_STATION, ssid_len) == 0);
+        assert(password_len == strlen(WIFI_PWD) && memcmp(password, WIFI_PWD, password_len) == 0);
+    }
     if (net->block_join) {
         std::unique_lock<std::mutex> lock(net->join_mutex);
         net->join_entered = true;
@@ -1133,9 +1158,14 @@ uint32_t AP_HAL::millis() { return 0; }
 
 int main()
 {
-    if (rtl8735b_wifi_ssid_len == 0) {
+    if (rtl8735b_wifi_ssid_len == 0 && strlen(WIFI_SSID_STATION) == 0) {
         test_without_credentials_driver_is_disabled();
-        printf("wifi_driver host test (no credentials): PASS\n");
+        printf("wifi_driver host test (no credentials, no default hotspot): PASS\n");
+        return 0;
+    }
+    if (rtl8735b_wifi_ssid_len == 0) {
+        test_without_credentials_joins_default_hotspot();
+        printf("wifi_driver host test (no credentials, default hotspot): PASS\n");
         return 0;
     }
     test_begin_creates_one_task_and_buffers();

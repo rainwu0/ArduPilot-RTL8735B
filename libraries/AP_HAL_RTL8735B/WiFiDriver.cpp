@@ -18,7 +18,40 @@
 
 using namespace RTL8735B;
 
+// 建置時沒有帳密（沒有 RTL8735B_WIFI_CONFIG 設定檔）時連的預設熱點，由板型 hwdef 定義；名稱同 AP_HAL_ESP32
+// station 模式（ArduPilot 9f648ccabc 的 libraries/AP_HAL_ESP32/WiFiDriver.cpp）。沒有定義或 SSID 為 "" 時
+// Wi-Fi 不啟用。長度上限同 rtl8735b_wifi_join（wifi_shim.c）：SSID 32 bytes，密碼空白或 8–64 字元。
+#ifndef WIFI_SSID_STATION
+#define WIFI_SSID_STATION ""
+#endif
+#ifndef WIFI_PWD
+#define WIFI_PWD ""
+#endif
+static_assert(sizeof(WIFI_SSID_STATION) - 1 <= 32, "WIFI_SSID_STATION longer than 32 bytes");
+static_assert(sizeof(WIFI_PWD) - 1 == 0 || (sizeof(WIFI_PWD) - 1 >= 8 && sizeof(WIFI_PWD) - 1 <= 64),
+              "WIFI_PWD must be empty or 8-64 characters");
+
 namespace {
+
+struct StaCredentials {
+    const uint8_t *ssid;
+    uint8_t ssid_len;
+    const uint8_t *password;
+    uint8_t password_len;
+    bool board_default;
+};
+
+// 建置時的帳密優先；沒有時用板型的預設熱點
+StaCredentials sta_credentials()
+{
+    if (rtl8735b_wifi_ssid_len != 0) {
+        return {rtl8735b_wifi_ssid, rtl8735b_wifi_ssid_len, rtl8735b_wifi_password, rtl8735b_wifi_password_len, false};
+    }
+    static const char ssid[] = WIFI_SSID_STATION;
+    static const char password[] = WIFI_PWD;
+    return {reinterpret_cast<const uint8_t *>(ssid), uint8_t(sizeof(ssid) - 1),
+            reinterpret_cast<const uint8_t *>(password), uint8_t(sizeof(password) - 1), true};
+}
 
 // MAVLink 協定常數（modules/mavlink 產生的標頭同值）；HAL 不引入整個 GCS_MAVLink。
 constexpr uint8_t MAVLINK2_STX = 253;
@@ -118,7 +151,7 @@ void WiFiDriver::_begin(uint32_t baud, uint16_t rx_space, uint16_t tx_space)
     WITH_SEMAPHORE(_read_mutex);
     WITH_SEMAPHORE(_write_mutex);
 
-    if (rtl8735b_wifi_ssid_len == 0) {
+    if (sta_credentials().ssid_len == 0) {
         _state.store(LinkState::DISABLED);
         if (!_disabled_reported) {
             RTL8735B::report_warning("WiFi: no STA credentials in this image; WiFi MAVLink port disabled");
@@ -484,10 +517,15 @@ uint32_t WiFiDriver::_link_step(uint32_t now_ms)
 
     case LinkState::CONNECTING: {
         _join_attempts.fetch_add(1);
-        // 連線的經過以 STATUSTEXT 送地面站：SERIAL0 接手 LOG UART 之後 printf 不送出
-        RTL8735B::report_info("WiFi: joining (SSID length %u)", (unsigned)rtl8735b_wifi_ssid_len);
-        const int join = rtl8735b_wifi_join(rtl8735b_wifi_ssid, rtl8735b_wifi_ssid_len,
-                                             rtl8735b_wifi_password, rtl8735b_wifi_password_len);
+        const StaCredentials sta = sta_credentials();
+        // 連線的經過以 STATUSTEXT 送地面站：SERIAL0 接手 LOG UART 之後 printf 不送出。
+        // 只送 SSID 的長度，不送 SSID 與密碼；用板型預設熱點時另外標明。
+        if (sta.board_default) {
+            RTL8735B::report_info("WiFi: joining the board's default hotspot (SSID length %u)", (unsigned)sta.ssid_len);
+        } else {
+            RTL8735B::report_info("WiFi: joining (SSID length %u)", (unsigned)sta.ssid_len);
+        }
+        const int join = rtl8735b_wifi_join(sta.ssid, sta.ssid_len, sta.password, sta.password_len);
         bool opened = false;
         if (join == RTL8735B_WIFI_OK) {
             _refresh_address();

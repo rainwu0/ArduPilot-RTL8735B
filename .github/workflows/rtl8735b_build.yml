@@ -11,7 +11,7 @@ on:
       board:
         description: Board
         type: choice
-        options: [hub8735ultra, amb82-mini, rtl8735b-empty]
+        options: [hub8735ultra, amb82-mini, rtl8735b-empty, hub8735ultra-expansion]
         default: hub8735ultra
 
 permissions:

@@ -4,7 +4,7 @@
 
 ### How it was tested / 怎麼試的
 
-- Board type / 板型: <!-- hub8735ultra / amb82-mini / custom board 自訂板 (--extra-hwdef) -->
+- Board type / 板型: <!-- hub8735ultra / hub8735ultra-expansion / amb82-mini / custom board 自訂板 (--extra-hwdef) -->
 - [ ] `Tools/scripts/rtl8735b_test.sh` passes / 跑過
 - [ ] Cross build / 交叉建置過 (`Tools/scripts/rtl8735b_test.sh --build`, or 或 `./waf configure --board ... && ./waf copter`)
 - [ ] Tried on a board / 在開發板上試過: <!-- which board, what, the result / 哪塊開發板、試了什麼、結果 -->

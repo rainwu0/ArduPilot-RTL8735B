@@ -48,6 +48,12 @@ __attribute__((weak)) void rtl8735b_app_after_setup(void)
 {
 }
 
+// Util::safety_switch_state() 在未解鎖時呼叫；回傳 0 表示不擋解鎖
+__attribute__((weak)) int rtl8735b_app_arming_blocked(void)
+{
+    return 0;
+}
+
 // Scheduler::reboot() 在輸出安全之後、重置之前呼叫
 __attribute__((weak)) void rtl8735b_app_before_reset(void)
 {

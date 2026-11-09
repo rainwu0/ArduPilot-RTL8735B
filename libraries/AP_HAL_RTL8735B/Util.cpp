@@ -19,6 +19,7 @@
 #include "Util.h"
 #include "RCOutput.h"
 #include "wdt_shim.h"
+#include "app/rtl8735b_app.h"
 
 #include <FreeRTOS.h>
 
@@ -26,6 +27,14 @@ using namespace RTL8735B;
 
 AP_HAL::Util::safety_state Util::safety_switch_state()
 {
+    // 開發板的應用程式要擋解鎖時（app/rtl8735b_app.h），未解鎖就回報安全開關未解除。Copter 的
+    // AP_Arming_Copter::arm_checks 不論 ARMING_SKIPCHK 都查這一項，只有強制解鎖不經過；其他載具由
+    // AP_Arming::hardware_safety_check 檢查，ARMING_SKIPCHK 略過安全開關檢查或強制解鎖時不擋。
+    // 可能從不同的 task 呼叫（解鎖檢查、狀態回報、Lua 腳本、電調校正）。
+    // 已解鎖時照實回報；PWM 輸出由 RCOutput 自己的狀態控制，不受這裡影響
+    if (!get_soft_armed() && rtl8735b_app_arming_blocked()) {
+        return SAFETY_DISARMED;
+    }
     const AP_HAL::HAL &hal = AP_HAL::get_HAL();
     return static_cast<RTL8735B::RCOutput *>(hal.rcout)->safety_switch_state();
 }

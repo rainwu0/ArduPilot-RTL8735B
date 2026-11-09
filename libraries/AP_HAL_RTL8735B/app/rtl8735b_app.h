@@ -40,6 +40,18 @@ void rtl8735b_app_init(void);
 void rtl8735b_app_after_setup(void);
 
 /*
+ * 回傳非 0 時，未解鎖的載具回報安全開關未解除（Util::safety_switch_state() 回 SAFETY_DISARMED）。效果依載具而定：
+ * - Copter：一般解鎖一律被擋（地面站顯示 Safety Switch），ARMING_SKIPCHK 也不略過這項；只有強制解鎖不經這項檢查。
+ * - 其他載具（Plane、Rover 等）：由解鎖前檢查的安全開關那項擋（AP_Arming::hardware_safety_check）；
+ *   ARMING_SKIPCHK 略過安全開關檢查、或強制解鎖時不擋。
+ * 已解鎖時不呼叫，不影響任何事。
+ * 可能從不同的 task 呼叫：主 task 的解鎖檢查與狀態回報、Lua 腳本、開機時的電調校正迴圈等。
+ * 實作只回傳一次就能讀完的變數（例如 volatile uint8_t），不阻塞、不拿鎖。
+ * 例如經 Wi-Fi 更新韌體的應用程式，在收映像與試開新映像的期間擋解鎖。
+ */
+int rtl8735b_app_arming_blocked(void);
+
+/*
  * 韌體自己要重置之前呼叫：Scheduler::reboot()，例如地面站的重開機指令、要重開才生效的參數。
  * 讓應用程式把會影響下一次開機的硬體放回安全狀態，例如兼作開機模式腳的 GPIO：
  * RTL8735B 在重置時讀 PA5 的電位決定進不進燒錄模式；HUB 8735 ultra 的 D14（PA5）在 variant.h 標為 Sensor power on。

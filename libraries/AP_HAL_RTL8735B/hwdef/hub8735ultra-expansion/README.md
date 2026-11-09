@@ -158,7 +158,7 @@ GY-271 (compass, QST QMC5883L, I²C address 0x0D; datasheet QMC5883L 1.0, Table 
 Vector version: [wiring.svg](wiring.svg).
 
 - This is the wiring of the T5 quadcopter: a 2S LiPo on the battery pads of the MicoAir Bluejay-4IN1-33A, a 5 V BEC from the same pads into J6, the ESC's VBAT into J3 and its current output into J5 pin 1, and J4 pins 1–4 to the ESC's M1–M4. J4 pin 5 is the only ground wire between the expansion board and the ESC.
-- J4 pins 1–4 go straight to the ESC's M1–M4. The T5 quadcopter's ESC-to-motor wiring swaps motors 2 and 4, and it uses `SERVO2_FUNCTION` 36 and `SERVO4_FUNCTION` 34. The frame parameter file uses ArduPilot's order, 33 to 36; the motor test under *Parameters* decides which applies.
+- J4 pins 1–4 go straight to the ESC's M1–M4. On the T5 quadcopter, outputs 1–4 drive motors 1, 4, 3 and 2: the frame parameter file sets `SERVO1_FUNCTION` to `SERVO4_FUNCTION` to 33, 36, 35 and 34, as in the diagram.
 - J9, J10, J11 and J14 are not used on the T5 quadcopter.
 
 Mounting orientation:
@@ -182,7 +182,7 @@ Mounting orientation:
 | SERIALn | Chip UART | TX | RX | Default protocol | On the expansion board |
 |---|---|---|---|---|---|
 | SERIAL0 | UART1 (LOG UART) | D17 (PF4) | D16 (PF3) | MAVLink2, 115200 baud | Not connected: USB-C CNA1 on the development board |
-| SERIAL1 | UART2 | D8 (PD15) | D15 (PD16) | GPS (`SERIAL1_PROTOCOL` 5, `defaults.parm`) | J10 |
+| SERIAL1 | UART2 | D8 (PD15) | D15 (PD16) | GPS (5) | J10 |
 | SERIAL2 | — | — | — | MAVLink2 | Wi-Fi, see *Wi-Fi Module* |
 | SERIAL3 | UART0 | None | D10 (PA3) | ESC telemetry (16) | J5 pin 2 |
 | SERIAL4 | UART3 | D6 (PE1) | D5 (PE2) | RC input (23) | J11 |
@@ -227,7 +227,7 @@ As on the HUB 8735 ultra, see [its GPIOs](../hub8735ultra/README.md#gpios). D7 i
 
 ## Battery Monitoring
 
-- `defaults.parm` sets analog voltage and current (`BATT_MONITOR` 4): voltage on analog pin 2 with `BATT_VOLT_MULT` 6.0, current on analog pin 9 with `BATT_AMP_PERVLT` 78.43 (the ESC's current output, 12.75 mV/A).
+- `hwdef.dat` sets analog voltage and current as the default (`BATT_MONITOR` 4): voltage on analog pin 2 with `BATT_VOLT_MULT` 6.0, current on analog pin 9 with `BATT_AMP_PERVLT` 78.43 (the ESC's current output, 12.75 mV/A).
 - `BATT_VOLT_MULT` 6.0 is the nominal ratio of the 100 kΩ / 20 kΩ divider, and `BATT_AMP_OFFSET` is ArduPilot's default 0; both are calibrated on each vehicle, see *Parameters*.
 - Status: see [Status](#status).
 
@@ -243,7 +243,9 @@ Three groups: what the board type sets, what the frame parameter file sets, and 
 
 ### Set by the board type
 
-`defaults.parm` in this folder is built into the firmware. A value already saved on the board takes precedence over it.
+These defaults are built into the firmware. A value already saved on the board takes precedence over them.
+
+In `hwdef.dat`:
 
 | Parameter | Value | Unit | Range | From |
 |---|---|---|---|---|
@@ -252,22 +254,27 @@ Three groups: what the board type sets, what the frame parameter file sets, and 
 | `BATT_VOLT_MULT` | 6.0 | — | — | 100 kΩ / 20 kΩ divider, nominal |
 | `BATT_CURR_PIN` | 9 | — | −1 to 127 | D9, analog pin 9 |
 | `BATT_AMP_PERVLT` | 78.43 | A/V | — | ESC current output, 12.75 mV/A |
+| `SERIAL1_PROTOCOL` | 5 | — | List; 5 is GPS | J10 |
+
+In `defaults.parm` in this folder:
+
+| Parameter | Value | Unit | Range | From |
+|---|---|---|---|---|
 | `MOT_PWM_TYPE` | 5 | — | List; 5 is DShot300 | J4 outputs 1–4 |
 | `SERVO_DSHOT_ESC` | 2 | — | List; 2 is BLHeli_S/BlueJay | Bluejay ESC |
 | `SERVO_BLH_AUTO` | 1 | — | 0 or 1 | BLHeli pass-through on the motor outputs |
-| `SERIAL1_PROTOCOL` | 5 | — | List; 5 is GPS | J10 |
 
 `hwdef.dat` also sets SERIAL3 to receive only, with ESC telemetry as its default protocol, and D9 (PA2) as analog pin 9.
 
 ### Set by the frame parameter file
 
-[`Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param`](../../../../Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param) is for a 3.5-inch quad X with a 4-in-1 Bluejay ESC on DShot300 and a 2S battery, as on the T5 quadcopter. It is loaded from the ground station; it does not repeat the values of `defaults.parm`.
+[`Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param`](../../../../Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param) is for a 3.5-inch quad X with a 4-in-1 Bluejay ESC on DShot300 and a 2S battery, as on the T5 quadcopter. It is loaded from the ground station; it does not repeat the board type's defaults.
 
 | Parameter | Value | Unit | Range | From |
 |---|---|---|---|---|
 | `FRAME_CLASS` | 1 | — | List; 1 is Quad | Quadcopter |
 | `FRAME_TYPE` | 1 | — | List; 1 is X | X frame |
-| `SERVO1_FUNCTION` to `SERVO4_FUNCTION` | 33, 34, 35, 36 | — | List; 33–36 are Motor1–Motor4 | ArduPilot's motor order, see *Wiring Diagram* |
+| `SERVO1_FUNCTION` to `SERVO4_FUNCTION` | 33, 36, 35, 34 | — | List; 33–36 are Motor1–Motor4 | Wiring of the T5 quadcopter, see *Wiring Diagram* |
 | `SERVO1_MIN` to `SERVO4_MIN` | 1000 | PWM | 800 to 2200 | |
 | `SERVO1_MAX` to `SERVO4_MAX` | 2000 | PWM | 800 to 2200 | |
 | `SERVO1_TRIM` to `SERVO4_TRIM` | 1000 | PWM | 800 to 2200 | |
@@ -312,12 +319,12 @@ These differ on each vehicle and are in neither file:
 ```
 
 - The image is `build/hub8735ultra-expansion/sdk_build/flash_ntz.bin`. Setting up the tools and the SDK, and the Wi-Fi settings file, are in [Build the firmware](../../docs/building.md).
-- `hwdef.dat` includes [`../hub8735ultra/hwdef.dat`](../hub8735ultra/hwdef.dat) and adds the three sensors, I²C bus 2 on D3 and D4, SERIAL3 receive-only, analog pin 9 and `defaults.parm`. No overlay is needed.
+- `hwdef.dat` includes [`../hub8735ultra/hwdef.dat`](../hub8735ultra/hwdef.dat) and adds the three sensors, I²C bus 2 on D3 and D4, SERIAL3 receive-only, analog pin 9, the battery monitor and GPS defaults, and `defaults.parm`. No overlay is needed.
 - This repository does not provide firmware images.
 
 ## Loading Firmware
 
-As on the HUB 8735 ultra, see [its Loading Firmware](../hub8735ultra/README.md#loading-firmware), with the battery disconnected. J6 and the USB-C connectors share 5 V: with J6 powered, plugging in USB connects the two supplies.
+As on the HUB 8735 ultra, see [its Loading Firmware](../hub8735ultra/README.md#loading-firmware), with the battery disconnected. Before plugging in USB, disconnect the power from J6.
 
 ## Other Links
 

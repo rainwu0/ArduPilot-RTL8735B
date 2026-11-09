@@ -20,7 +20,7 @@
 
 ### 新增（Added）
 
-- 板型 `hub8735ultra-expansion`：HUB 8735 ultra 加擴充板，含 BMI160、BMP280、QMC5883L，電池電壓在類比腳 2、電調電流在類比腳 9，SERIAL3 只收電調遙測，並有 DShot300 與電池監測的預設參數。見[它的 README](hwdef/hub8735ultra-expansion/README.zh-TW.md)。
+- 板型 `hub8735ultra-expansion`：HUB 8735 ultra 加擴充板，含 BMI160、BMP280、QMC5883L，電池電壓在類比腳 2、電調電流在類比腳 9，SERIAL3 只收電調遙測；電池監測與 SERIAL1 的 GPS 預設在 `hwdef.dat`，DShot300 在 `defaults.parm`。見[它的 README](hwdef/hub8735ultra-expansion/README.zh-TW.md)。
 - `Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param`：給 3.5 吋四軸 X、4 合 1 Bluejay 電調（DShot300）、2S 電池的參數。
 - 文件：`hub8735ultra-expansion` 的 README，含擴充板的接點、感測器模組、接線圖、T5 那台四軸的照片與影片，以及它的參數。
 

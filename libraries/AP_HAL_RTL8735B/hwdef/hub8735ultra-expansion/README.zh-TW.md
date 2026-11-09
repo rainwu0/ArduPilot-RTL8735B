@@ -158,7 +158,7 @@ GY-271（羅盤，QST QMC5883L，I²C 位址 0x0D；資料表 QMC5883L 1.0 Table
 向量版：[wiring.zh-TW.svg](wiring.zh-TW.svg)。
 
 - 這是 T5 那台四軸的接法：2S 鋰電池焊在 MicoAir Bluejay-4IN1-33A 的電池焊點，5 V BEC 從同一組焊點取電接 J6；電調的 VBAT 接 J3、電流輸出接 J5 第 1 腳；J4 第 1～4 腳接電調的 M1～M4。J4 第 5 腳是擴充板和電調之間唯一的地線。
-- J4 第 1～4 腳直接接電調的 M1～M4。T5 那台四軸在電調到馬達的接線上把 2、4 號馬達對調，用 `SERVO2_FUNCTION` 36、`SERVO4_FUNCTION` 34。整機參數檔用 ArduPilot 的順序 33～36；哪一種對，以〈參數〉裡的馬達測試為準。
+- J4 第 1～4 腳直接接電調的 M1～M4。T5 那台四軸的輸出 1～4 驅動 1、4、3、2 號馬達：整機參數檔把 `SERVO1_FUNCTION`～`SERVO4_FUNCTION` 設成 33、36、35、34，和圖上相同。
 - J9、J10、J11、J14 在 T5 那台四軸上沒有用到。
 
 安裝方向：
@@ -182,7 +182,7 @@ GY-271（羅盤，QST QMC5883L，I²C 位址 0x0D；資料表 QMC5883L 1.0 Table
 | SERIALn | 晶片 UART | TX | RX | 預設協定 | 在擴充板上 |
 |---|---|---|---|---|---|
 | SERIAL0 | UART1（LOG UART） | D17（PF4） | D16（PF3） | MAVLink2，115200 baud | 不接：開發板的 USB-C CNA1 |
-| SERIAL1 | UART2 | D8（PD15） | D15（PD16） | GPS（`SERIAL1_PROTOCOL` 5，`defaults.parm`） | J10 |
+| SERIAL1 | UART2 | D8（PD15） | D15（PD16） | GPS（5） | J10 |
 | SERIAL2 | — | — | — | MAVLink2 | Wi-Fi，見〈Wi-Fi 模組〉 |
 | SERIAL3 | UART0 | 無 | D10（PA3） | 電調遙測（16） | J5 第 2 腳 |
 | SERIAL4 | UART3 | D6（PE1） | D5（PE2） | 遙控輸入（23） | J11 |
@@ -227,7 +227,7 @@ GY-271（羅盤，QST QMC5883L，I²C 位址 0x0D；資料表 QMC5883L 1.0 Table
 
 ## 電池監測
 
-- `defaults.parm` 設類比電壓與電流（`BATT_MONITOR` 4）：電壓在類比腳 2，`BATT_VOLT_MULT` 6.0；電流在類比腳 9，`BATT_AMP_PERVLT` 78.43（電調的電流輸出，12.75 mV/A）。
+- `hwdef.dat` 預設類比電壓與電流（`BATT_MONITOR` 4）：電壓在類比腳 2，`BATT_VOLT_MULT` 6.0；電流在類比腳 9，`BATT_AMP_PERVLT` 78.43（電調的電流輸出，12.75 mV/A）。
 - `BATT_VOLT_MULT` 6.0 是 100 kΩ／20 kΩ 分壓的標稱比例，`BATT_AMP_OFFSET` 是 ArduPilot 的預設 0；兩者每台都要校正，見〈參數〉。
 - 現況：見[現況](#現況)。
 
@@ -243,7 +243,9 @@ GY-271（羅盤，QST QMC5883L，I²C 位址 0x0D；資料表 QMC5883L 1.0 Table
 
 ### 板型設好的
 
-這個資料夾的 `defaults.parm` 編進韌體。板上已經存了值的參數，以存的值為準。
+這些預設值編進韌體。板上已經存了值的參數，以存的值為準。
+
+在 `hwdef.dat`：
 
 | 參數 | 值 | 單位 | 範圍 | 依據 |
 |---|---|---|---|---|
@@ -252,22 +254,27 @@ GY-271（羅盤，QST QMC5883L，I²C 位址 0x0D；資料表 QMC5883L 1.0 Table
 | `BATT_VOLT_MULT` | 6.0 | — | — | 100 kΩ／20 kΩ 分壓，標稱值 |
 | `BATT_CURR_PIN` | 9 | — | −1～127 | D9，類比腳 9 |
 | `BATT_AMP_PERVLT` | 78.43 | A/V | — | 電調的電流輸出，12.75 mV/A |
+| `SERIAL1_PROTOCOL` | 5 | — | 選項；5 是 GPS | J10 |
+
+在這個資料夾的 `defaults.parm`：
+
+| 參數 | 值 | 單位 | 範圍 | 依據 |
+|---|---|---|---|---|
 | `MOT_PWM_TYPE` | 5 | — | 選項；5 是 DShot300 | J4 的輸出 1～4 |
 | `SERVO_DSHOT_ESC` | 2 | — | 選項；2 是 BLHeli_S/BlueJay | Bluejay 電調 |
 | `SERVO_BLH_AUTO` | 1 | — | 0 或 1 | 馬達輸出的 BLHeli 直通 |
-| `SERIAL1_PROTOCOL` | 5 | — | 選項；5 是 GPS | J10 |
 
 `hwdef.dat` 另外設定：SERIAL3 只收、預設協定是電調遙測，D9（PA2）是類比腳 9。
 
 ### 整機參數檔設的
 
-[`Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param`](../../../../Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param) 給 3.5 吋四軸 X、4 合 1 Bluejay 電調（DShot300）、2S 電池，和 T5 那台四軸相同。在地面站載入；`defaults.parm` 已有的值不重複。
+[`Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param`](../../../../Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param) 給 3.5 吋四軸 X、4 合 1 Bluejay 電調（DShot300）、2S 電池，和 T5 那台四軸相同。在地面站載入；板型已設好的值不重複。
 
 | 參數 | 值 | 單位 | 範圍 | 依據 |
 |---|---|---|---|---|
 | `FRAME_CLASS` | 1 | — | 選項；1 是 Quad | 四軸 |
 | `FRAME_TYPE` | 1 | — | 選項；1 是 X | X 型機架 |
-| `SERVO1_FUNCTION`～`SERVO4_FUNCTION` | 33、34、35、36 | — | 選項；33～36 是 Motor1～Motor4 | ArduPilot 的馬達順序，見〈接線圖〉 |
+| `SERVO1_FUNCTION`～`SERVO4_FUNCTION` | 33、36、35、34 | — | 選項；33～36 是 Motor1～Motor4 | T5 那台四軸的接法，見〈接線圖〉 |
 | `SERVO1_MIN`～`SERVO4_MIN` | 1000 | PWM | 800～2200 | |
 | `SERVO1_MAX`～`SERVO4_MAX` | 2000 | PWM | 800～2200 | |
 | `SERVO1_TRIM`～`SERVO4_TRIM` | 1000 | PWM | 800～2200 | |
@@ -312,12 +319,12 @@ GY-271（羅盤，QST QMC5883L，I²C 位址 0x0D；資料表 QMC5883L 1.0 Table
 ```
 
 - 映像是 `build/hub8735ultra-expansion/sdk_build/flash_ntz.bin`。工具、SDK 與 Wi-Fi 設定檔見[建置韌體](../../docs/building.zh-TW.md)。
-- `hwdef.dat` include [`../hub8735ultra/hwdef.dat`](../hub8735ultra/hwdef.dat)，加上三個感測器、D3 與 D4 的 I²C 匯流排 2、SERIAL3 只收、類比腳 9 與 `defaults.parm`。不用疊加檔。
+- `hwdef.dat` include [`../hub8735ultra/hwdef.dat`](../hub8735ultra/hwdef.dat)，加上三個感測器、D3 與 D4 的 I²C 匯流排 2、SERIAL3 只收、類比腳 9、電池監測與 GPS 的預設，以及 `defaults.parm`。不用疊加檔。
 - 本庫不提供韌體映像。
 
 ## 燒錄韌體
 
-和 HUB 8735 ultra 相同，見[它的燒錄韌體](../hub8735ultra/README.zh-TW.md#燒錄韌體)，燒錄時拔掉電池。J6 和 USB-C 共用 5 V：J6 接著電源時插 USB，兩個電源會接在一起。
+和 HUB 8735 ultra 相同，見[它的燒錄韌體](../hub8735ultra/README.zh-TW.md#燒錄韌體)，燒錄時拔掉電池。插 USB 之前，先拔掉 J6 的電源。
 
 ## 其他連結
 

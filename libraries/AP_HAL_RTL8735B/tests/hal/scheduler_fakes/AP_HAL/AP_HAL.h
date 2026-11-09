@@ -41,7 +41,7 @@ public:
 
 class Storage {
 public:
-    void _timer_tick() {}
+    void _timer_tick();  // 測試數 storage 執行緒跑了幾次（scheduler_host_test.cpp）
 };
 
 // 介面照 libraries/AP_HAL/Scheduler.h；delay_microseconds_boost 的預設實作與正式基底類別相同

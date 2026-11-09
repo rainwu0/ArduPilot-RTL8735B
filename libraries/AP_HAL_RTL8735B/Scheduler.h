@@ -45,6 +45,8 @@ public:
     bool     in_main_thread() const override;
     void     set_system_initialized() override;
     bool     is_system_initialized() override;
+    // HAL 的裝置都初始化好、呼叫 setup() 之前設；IO 與 Storage 執行緒從這時開始跑（同 ChibiOS 的 hal_initialized()）
+    void     hal_initialized() { _hal_initialized = true; }
     void     expect_delay_ms(uint32_t ms) override;
     bool     in_expected_delay(void) const override;
 
@@ -101,6 +103,7 @@ private:
     Semaphore _io_sem;
 
     volatile bool _initialized;
+    volatile bool _hal_initialized;
 
     // 主執行緒上一次以 vTaskDelay 讓出 CPU 後醒來的時間（micros64）
     uint64_t _main_last_block_us;

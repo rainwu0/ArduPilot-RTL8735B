@@ -171,6 +171,9 @@ void HAL_RTL8735B::run(int argc, char * const argv[], Callbacks* callbacks) cons
     storage->init();
     rcin->init();
 
+    // IO 與 Storage 執行緒從這裡開始跑，setup() 裡的參數存檔才寫得出去
+    // （比照 AP_HAL_ChibiOS 在 setup() 前呼叫 hal_initialized()，ArduPilot 9f648ccabc HAL_ChibiOS_Class.cpp:282）
+    schedulerInstance.hal_initialized();
     callbacks->setup();
 
     // 硬體看門狗：setup() 之後依 BRD_OPTIONS bit0 啟動，主迴圈每圈餵狗；

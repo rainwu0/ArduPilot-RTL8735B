@@ -1,38 +1,48 @@
-# 參與
+# Contributing
 
-English: [CONTRIBUTING.en.md](CONTRIBUTING.en.md)
+[繁體中文](CONTRIBUTING.zh-TW.md)
 
-歡迎在這裡開 issue、送 PR，中文或英文都可以。這裡不是 ArduPilot 專案，RTL8735B 的問題請不要拿到 ArduPilot。
+Issues and pull requests are welcome here, in Chinese or English. This repository is not the ArduPilot project; problems with the RTL8735B port are handled here.
 
-## 回報問題
+## Reporting problems
 
-開 issue 時選對應的範本，盡量附上：
+When you open an issue, pick the matching template and include as much as you can of:
 
-- 開發板與板型（`--board`），有疊加檔的話附上它（拿掉帳密）；
-- 本儲存庫的提交（`git rev-parse --short HEAD`）；
-- 建置指令，以及出錯的那段輸出或 LOG UART 的開機訊息。
+- the board and the board type (`--board`), and your overlay if you use one;
+- the commit of this repository (`git rev-parse --short HEAD`);
+- the build command, and the part of the output where it went wrong, or the messages from the ground station or the boot messages on the USB serial port.
 
-**不要附含 Wi-Fi 帳密的映像或設定檔。** 帳密是編進韌體的，拿到映像就可能讀得出來。
+An image built with a Wi-Fi settings file contains the credentials, and anyone who has it may be able to read them. Images attached to an issue are built without `RTL8735B_WIFI_CONFIG`, and overlays and settings files are attached with the credentials removed.
 
-「我照 README 做、在某塊開發板上成功了」也值得回報，功能狀態表就是靠這些更新的。
+"I followed the documentation and it worked on my board" is worth reporting too; that is how the feature status gets updated.
 
-安全問題（例如能讓別人控制飛控、讀出帳密）不要開公開的 issue，請到本儲存庫的 Security 分頁，用「Report a vulnerability」私下回報。
+Security problems, for example something that lets others control the flight controller or read the credentials, are reported privately as described in [SECURITY](SECURITY.md).
 
-## 送 PR
+## Sending pull requests
 
-- 照 ArduPilot 的慣例：一個提交只動一個子系統（例如 `AP_HAL_RTL8735B:`、`hwdef:`、`waf:`、`Tools:`），提交訊息用英文寫成 `Subsystem: summary`。
-- 首頁、CONTRIBUTING、HAL README、〈從零開始〉和 CHANGELOG 有台灣用語的繁體中文、英文兩版：改其中一版時，另一版在同一個提交裡一起改。其他 README 與程式註解用台灣用語的繁體中文。
-- 使用者看得到的改動（行為、疊加檔的寫法、參數、建置或燒錄的步驟），在 `libraries/AP_HAL_RTL8735B/CHANGELOG.md` 與 `CHANGELOG.en.md` 的 `[Unreleased]` 底下加一條，分類照 Keep a Changelog（新增、變更、修正、移除等）。
-- 送之前先跑測試；改了 HAL 或建置相關的檔案，加 `--build` 再交叉建置一次（要 SDK，見 HAL README〈取得與建置〉）：
+- Follow ArduPilot's conventions: each commit touches only one subsystem (for example `AP_HAL_RTL8735B:`, `hwdef:`, `waf:`, `Tools:`), and the commit message is in English, in the form `Subsystem: summary`.
+- Run the tests before sending. If you changed the HAL or anything build-related, add `--build` to also cross-build once (this needs the SDK, see [Build the firmware](/libraries/AP_HAL_RTL8735B/docs/building.md)):
 
   ```bash
   Tools/scripts/rtl8735b_test.sh
   Tools/scripts/rtl8735b_test.sh --build
   ```
 
-  PR 會在 GitHub Actions 跑同一套主機測試和提交慣例檢查，外部貢獻者的 PR 要等維護者核准才會開始跑；交叉建置不會自動跑。修錯誤時，先寫一個修正前會失敗的測試，見 `libraries/AP_HAL_RTL8735B/tests/README.md`。
+  PRs run the same host tests and the commit convention check on GitHub Actions; for PRs from outside contributors they start only after the maintainer approves, and the cross build does not run automatically. When you fix a bug, first write a test that fails before the fix; see `libraries/AP_HAL_RTL8735B/tests/README.md` (in Chinese).
+- In the PR, say which board you tried it on and how; if you only built it, write "build only".
+- The scope is the HAL plus what this chip needs to fit into ArduPilot; features for a particular vehicle belong in your own project.
+- Keep changes to ArduPilot's shared code (outside the HAL) as small as possible, and list each one in *Changes to ArduPilot shared code* in the [HAL README](/libraries/AP_HAL_RTL8735B/README.md).
+- When code is adapted from another public source, name the source and a fixed commit in the file header.
 
-- 在 PR 裡寫清楚在哪塊開發板上試過、怎麼試的；只建置過也直接寫「只建置」。
-- 範圍只到 HAL，以及讓這顆晶片接上 ArduPilot 所必要的部分；特定機體的功能請放在自己的專案。
-- 對 ArduPilot 共用程式（HAL 以外）的修改盡量少，要改的話寫進 HAL README 的〈對 ArduPilot 共用程式的修改〉。
-- 程式改寫自其他公開來源時，在檔頭註明出處與固定的提交。
+## Documentation
+
+- Documents that come in two languages have the English version under the default file name and the Traditional Chinese (Taiwan) version under `.zh-TW.md`, with the same structure and content; each links to the other at the top. When you change one, change the other in the same commit.
+- Code comments, `BOARD_TESTS.md` and `tests/README.md` are in Traditional Chinese (Taiwan).
+- Where things go, under `libraries/AP_HAL_RTL8735B/`:
+  - facts about one board: `hwdef/<board type>/README.md`, in the sections of an ArduPilot board README;
+  - how to do something: `docs/building.md`, `docs/flashing.md`, `docs/custom-boards.md`;
+  - settings and behavior: the reference documents in `docs/`;
+  - why the port works as it does: `docs/design.md`;
+  - the first run for a new user: `GETTING_STARTED.md`.
+- A row in `docs/feature-status.md` becomes "Verified on a board" only with a record in `BOARD_TESTS.md`.
+- For changes users can see (behavior, overlay syntax, parameters, build or flashing steps, document names), add an entry under `[Unreleased]` in `libraries/AP_HAL_RTL8735B/CHANGELOG.md` and `CHANGELOG.zh-TW.md`, in the Keep a Changelog sections (Added, Changed, Fixed, Removed and so on).

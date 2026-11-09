@@ -1,8 +1,8 @@
-# RTL8735B 的交叉建置：照 HAL README〈取得與建置〉逐行做，每次都從鎖定的來源下載 Realtek SDK 與 ASDK。
+# RTL8735B 的交叉建置：照 libraries/AP_HAL_RTL8735B/docs/building.md 逐行做，每次都從鎖定的來源下載 Realtek SDK 與 ASDK。
 # 只能手動觸發（要有寫入權限）。
 # 建置輸出不公開：SDK 的編譯警告會引用 SDK 的原始碼行，所以完整輸出只寫進 runner 上的檔案，
 # 這裡只印結果、映像大小與 sha256；不上傳 artifact，也不用 cache 存 SDK、工具鏈或產物。
-# README〈取得與建置〉改了，這裡要跟著改。
+# docs/building.md 的步驟改了，這裡要跟著改。
 name: RTL8735B build
 
 on:
@@ -31,7 +31,7 @@ jobs:
     env:
       BOARD: ${{ inputs.board }}
     steps:
-      # README 的步驟以有 sudo 的一般 Ubuntu 22.04 為前提；容器裡先補上 sudo 與 git
+      # docs/building.md 的步驟以有 sudo 的一般 Ubuntu 22.04 為前提；容器裡先補上 sudo 與 git
       - name: Install sudo and git
         run: |
           apt-get update
@@ -42,7 +42,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Build (HAL README, Get and build)
+      - name: Build (docs/building.md)
         shell: bash
         run: |
           git config --global --add safe.directory '*'
@@ -67,7 +67,7 @@ jobs:
           # 映像關卡的一行（大小與上限），以及 waf 的結果行；都不含 SDK 原始碼
           grep -E "^firmware_ntz.bin: |^'(configure|copter)' finished successfully" "$log" || true
           if [ "$rc" -ne 0 ]; then
-            # 失敗在 README 的哪一步：set -x 的最後幾行指令
+            # 失敗在 docs/building.md 的哪一步：set -x 的最後幾行指令
             grep '^+ ' "$log" | tail -n 3 || true
             # 只印本儲存庫檔案的錯誤，不印 SDK 路徑下的
             grep -E "(error|Error):" "$log" | grep -v "ambpro2_sdk" | tail -n 40 || true

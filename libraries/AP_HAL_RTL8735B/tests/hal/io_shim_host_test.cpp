@@ -199,6 +199,9 @@ static void test_adc_init_failure_raw_sample_and_voltage()
     assert(io_fake_adc_pin_en == 1U && io_fake_adc_cvlist_channel == 0 && io_fake_adc_read_channel == 0);
     assert(rtl8735b_adc_read_u16(1) == -1);
     assert(io_fake_adc_init_calls == 3);
+    // 沒有燒錄出廠校正參數（全是 0xFF）：照原始值，不呼叫校正換算；adapter 的 use_cali 一律不開
+    assert(io_fake_adc_cali_calls == 0);
+    assert(io_fake_adc_init_use_cali == 0);
 }
 
 static void test_pwm_shim_rejects_bad_values_and_stops_sdk_init_default()
@@ -610,6 +613,29 @@ static int alt_board_scenario()
 }
 #endif
 
+// 有出廠校正參數時，讀值經 SDK 的 hal_adc_calc_cali_val 換成校正後的 12 位元值，限制在 0–4095。
+// adapter 的 use_cali 不開：參數放在 HAL 自己的結構，校正只套一次。
+static int adc_cali_scenario()
+{
+    io_fake_reset();
+    io_fake_adc_program_cali(1000, 1100, 1, -20);
+    assert(rtl8735b_adc_init(2) == 0);
+    assert(io_fake_adc_init_use_cali == 0);
+
+    io_fake_adc_values[0] = 2000;
+    assert(rtl8735b_adc_read_u16(2) == 2000 * 1100 / 1000 - 20);
+    assert(io_fake_adc_cali_calls == 1);
+    assert(io_fake_adc_cali_seen.gain_deno == 1000 && io_fake_adc_cali_seen.gain_mole == 1100);
+    assert(io_fake_adc_cali_seen.offset_deno == 1 && io_fake_adc_cali_seen.offset_mole == -20);
+
+    // 換算結果超出 12 位元：限制在 0–4095
+    io_fake_adc_values[0] = 10;
+    assert(rtl8735b_adc_read_u16(2) == 0);
+    io_fake_adc_values[0] = 4095;
+    assert(rtl8735b_adc_read_u16(2) == 4095);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
 #ifdef IO_ALT_BOARD
@@ -619,6 +645,9 @@ int main(int argc, char **argv)
 #endif
     if (argc > 1 && strcmp(argv[1], "oneshot125") == 0) {
         return oneshot125_scenario();
+    }
+    if (argc > 1 && strcmp(argv[1], "adc_cali") == 0) {
+        return adc_cali_scenario();
     }
     io_fake_reset();
     test_gpio_whitelist_and_output_order();

@@ -12,6 +12,10 @@ unsigned io_fake_adc_init_calls;
 uint32_t io_fake_adc_pin_en;
 uint8_t io_fake_adc_cvlist_channel = 0xFF;
 uint8_t io_fake_adc_read_channel = 0xFF;
+uint8_t io_fake_adc_cali_otp[10];
+uint8_t io_fake_adc_init_use_cali;
+unsigned io_fake_adc_cali_calls;
+hal_adc_cali_para_t io_fake_adc_cali_seen;
 unsigned io_fake_gpio_init_calls;
 unsigned io_fake_pwm_init_calls;
 unsigned io_fake_pwm_start_calls;
@@ -81,6 +85,10 @@ extern "C" void io_fake_reset(void)
     io_fake_adc_pin_en = 0;
     io_fake_adc_cvlist_channel = 0xFF;
     io_fake_adc_read_channel = 0xFF;
+    memset(io_fake_adc_cali_otp, 0xFF, sizeof(io_fake_adc_cali_otp));
+    io_fake_adc_init_use_cali = 0xFF;
+    io_fake_adc_cali_calls = 0;
+    memset(&io_fake_adc_cali_seen, 0, sizeof(io_fake_adc_cali_seen));
     io_fake_gpio_init_calls = 0;
     io_fake_pwm_init_calls = 0;
     io_fake_pwm_start_calls = 0;
@@ -234,14 +242,17 @@ extern "C" void gpio_irq_deinit(gpio_irq_t *obj)
     obj->handler = nullptr;
 }
 
+// use_cali 的預設值在 ROM、看不到：替身設成 1，HAL 要自己關掉
 extern "C" void hal_adc_load_default(hal_adc_adapter_t *obj)
 {
     memset(obj, 0, sizeof(*obj));
+    obj->use_cali = 1;
 }
 
 extern "C" hal_status_t hal_adc_init(hal_adc_adapter_t *obj)
 {
     io_fake_adc_init_calls++;
+    io_fake_adc_init_use_cali = obj->use_cali;
     io_fake_adc_pin_en = obj->plft_dat.pin_en.w;
     return io_fake_adc_init_status;
 }
@@ -263,6 +274,30 @@ extern "C" uint16_t hal_adc_single_read(hal_adc_adapter_t *, uint8_t channel)
 {
     io_fake_adc_read_channel = channel;
     return channel < 8 && (io_fake_adc_pin_en & (1UL << channel)) != 0 ? io_fake_adc_values[channel] : 0;
+}
+extern "C" void io_fake_adc_program_cali(int16_t gain_deno, int16_t gain_mole, int16_t offset_deno, int32_t offset_mole)
+{
+    memcpy(&io_fake_adc_cali_otp[0], &gain_deno, 2);
+    memcpy(&io_fake_adc_cali_otp[2], &gain_mole, 2);
+    memcpy(&io_fake_adc_cali_otp[4], &offset_deno, 2);
+    memcpy(&io_fake_adc_cali_otp[6], &offset_mole, 4);
+}
+
+// 只模擬 0x4A8–0x4B1；範圍外的位址讀到 0xFF（未燒錄）
+extern "C" void hal_adc_read_cali_param(uint16_t addr, uint8_t *param_addr, uint8_t param_len)
+{
+    for (uint8_t i = 0; i < param_len; i++) {
+        const unsigned at = (unsigned)addr + i;
+        param_addr[i] = at >= 0x4A8 && at < 0x4A8 + sizeof(io_fake_adc_cali_otp) ? io_fake_adc_cali_otp[at - 0x4A8] : 0xFF;
+    }
+}
+
+// 替身的換算：raw × gain_mole ÷ gain_deno ＋ offset_mole ÷ offset_deno（SDK 的實際算式在 ROM，看不到）
+extern "C" uint32_t hal_adc_calc_cali_val(uint16_t adc_read_val, hal_adc_cali_para_t *p)
+{
+    io_fake_adc_cali_calls++;
+    io_fake_adc_cali_seen = *p;
+    return (uint32_t)((int32_t)adc_read_val * p->gain_mole / p->gain_deno + p->offset_mole / p->offset_deno);
 }
 extern "C" void hal_delay_ms(uint32_t) {}
 

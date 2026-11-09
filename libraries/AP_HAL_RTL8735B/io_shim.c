@@ -28,6 +28,10 @@ static uint8_t gpio_irq_active[RTL8735B_GPIO_PIN_COUNT];
 static hal_adc_adapter_t adc_adapter;
 static uint8_t adc_initialized;
 static uint8_t adc_channel;
+// 晶片的 ADC 出廠校正參數。放在 HAL 自己的結構、adapter 的 use_cali 不開，讀值時自己換算一次：
+// SDK 的單次讀取（hal_adc_single_read）會不會依 use_cali 自己套校正看不到（ROM），這樣不會套兩次
+static hal_adc_cali_para_t adc_cali;
+static uint8_t adc_use_cali;
 
 static pwmout_t pwm_objects[RTL8735B_RCOUT_CHANNELS];
 static uint8_t pwm_initialized[RTL8735B_RCOUT_CHANNELS];
@@ -161,6 +165,23 @@ int rtl8735b_gpio_irq_attach(uint8_t logical_pin, uint8_t trigger, uint32_t irq_
     return 0;
 }
 
+/*
+  讀出廠校正參數，讀法和位址照 Realtek 公開的 hal_adc_reinit（Ameba-AIoT/ameba-rtos-pro2 eb5c0907c40d 的
+  component/soc/8735b/fwlib/rtl8735b/source/ram/hal_adc.c 285–330 行）：任一項是全 1 表示沒有燒錄，不用校正。
+  分母為 0 也不用，免得換算時除以 0。
+ */
+static void adc_load_cali(void)
+{
+    memset(&adc_cali, 0, sizeof(adc_cali));
+    hal_adc_read_cali_param(HP_ADC_GAIN_DENO_ADDR, (uint8_t *)&adc_cali.gain_deno, sizeof(adc_cali.gain_deno));
+    hal_adc_read_cali_param(HP_ADC_GAIN_MOLE_ADDR, (uint8_t *)&adc_cali.gain_mole, sizeof(adc_cali.gain_mole));
+    hal_adc_read_cali_param(HP_ADC_OFFSET_DENO_ADDR, (uint8_t *)&adc_cali.offset_deno, sizeof(adc_cali.offset_deno));
+    hal_adc_read_cali_param(HP_ADC_OFFSET_MOLE_ADDR, (uint8_t *)&adc_cali.offset_mole, sizeof(adc_cali.offset_mole));
+    adc_use_cali = (uint16_t)adc_cali.gain_deno != 0xFFFFU && (uint16_t)adc_cali.gain_mole != 0xFFFFU &&
+                   (uint16_t)adc_cali.offset_deno != 0xFFFFU && (uint32_t)adc_cali.offset_mole != 0xFFFFFFFFUL &&
+                   adc_cali.gain_deno != 0 && adc_cali.offset_deno != 0;
+}
+
 int rtl8735b_adc_init(uint8_t logical_pin)
 {
     // ADC 通道來自開發板 hwdef 的 RTL8735B_ADC 表：PF0–PF3 是通道 0–3，PA0–PA3 是外接通道 4–7
@@ -173,6 +194,8 @@ int rtl8735b_adc_init(uint8_t logical_pin)
     if (!adc_initialized) {
         memset(&adc_adapter, 0, sizeof(adc_adapter));
         hal_adc_load_default(&adc_adapter);
+        // 校正由 rtl8735b_adc_read_u16 自己套（見 adc_cali）；SDK 的預設值不論是什麼都關掉
+        adc_adapter.use_cali = 0;
         // 表裡每一支類比腳都在初始化時打開；轉換清單只放 logical_pin 那一個，單次讀取指定通道
         // （和 SDK mbed 的 analogin_read 相同，analogin_api.c 以 hal_adc_single_read 讀各自的通道）
         for (uint8_t i = 0; i < rtl8735b_adc_channel_count(); i++) {
@@ -194,6 +217,7 @@ int rtl8735b_adc_init(uint8_t logical_pin)
             memset(&adc_adapter, 0, sizeof(adc_adapter));
             return (int)status;
         }
+        adc_load_cali();
         adc_initialized = 1;
     }
     return 0;
@@ -205,8 +229,16 @@ int32_t rtl8735b_adc_read_u16(uint8_t logical_pin)
     if (rtl8735b_analog_pin(logical_pin) == RTL8735B_INVALID_PIN || channel > 7U || !adc_initialized) {
         return -1;
     }
-    // 與 SDK analogin_read_u16 相同，回傳 12 位元原始碼；讀取 API 不提供失敗狀態。
-    return (int32_t)hal_adc_single_read(&adc_adapter, channel);
+    // 讀取 API 不提供失敗狀態。有出廠校正參數時以 SDK 的 hal_adc_calc_cali_val 換算。
+    // 推論：換算結果仍是 12 位元的轉換值（參數名稱是 real code 對 ideal code，hal_adc.h 的
+    // hal_adc_read_fifo_w_sts 把結果放回資料欄位），所以照樣限制在 0–4095、由 AnalogIn 以 3.3 V 滿刻度換成電壓。
+    // 能推翻的證據：上板量已知電壓，換算後的值不是約「電壓 ÷ 3.3 V × 4095」。
+    const uint16_t raw = hal_adc_single_read(&adc_adapter, channel);
+    if (!adc_use_cali) {
+        return (int32_t)raw;
+    }
+    const int32_t value = (int32_t)hal_adc_calc_cali_val(raw, &adc_cali);
+    return value < 0 ? 0 : (value > 4095 ? 4095 : value);
 }
 
 static int pwm_ensure_initialized(uint8_t channel)

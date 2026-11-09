@@ -200,6 +200,44 @@ class Hub8735UltraTest(unittest.TestCase):
         self.assertNotIn('hub8735ultra', EMPTY.read_text(encoding='utf-8'))
 
 
+class Hub8735UltraExpansionTest(unittest.TestCase):
+    '''hub8735ultra-expansion：include hub8735ultra，加擴充板上的三個感測器與外接 I²C 座的第二條匯流排'''
+
+    @classmethod
+    def setUpClass(cls):
+        cls.header = generate(base=HAL / 'hwdef/hub8735ultra-expansion/hwdef.dat')
+        cls.board = generate(base=HAL / 'hwdef/hub8735ultra/hwdef.dat')
+
+    def test_board_name(self):
+        self.assertIn('#define HAL_RTL8735B_BOARD_NAME "hub8735ultra-expansion"', self.header)
+
+    def test_sensors(self):
+        # BMI160 在 SPI 裝置 bmi160；BMP280（0x76＝118）與 QMC5883L（0x0D，外接）在 I²C 匯流排 1
+        self.assertIn('AP_InertialSensor_BMI160::probe(*this,hal.spi->get_device("bmi160"),'
+                      'ROTATION_ROLL_180_YAW_270)', self.header)
+        self.assertIn('probe_i2c_dev(AP_Baro_BMP280::probe, 1, 118)', self.header)
+        self.assertIn('AP_Compass_QMC5883L::probe(GET_I2C_DEVICE(1,0x0d),true,ROTATION_NONE)', self.header)
+
+    def test_second_i2c_bus_on_the_external_header(self):
+        # 第一條照開發板（D0 SDA＝PF2、D1 SCL＝PF1），外接座走第二條（D3 SDA＝PE4、D4 SCL＝PE3）
+        self.assertEqual(table(self.header, 'HAL_RTL8735B_I2C_BUSES'),
+                         ['{1,1,PIN_F2,PIN_F1,400000U,0}', '{2,2,PIN_E4,PIN_E3,400000U,0}'])
+        self.assertEqual(count(self.header, 'HAL_RTL8735B_I2C_BUS_COUNT'), 2)
+
+    def test_rest_matches_hub8735ultra(self):
+        # SPI、PWM、GPIO、類比輸入與單行的 define（序列埠、Wi-Fi、SD 卡等）都照開發板
+        for name in ('HAL_RTL8735B_SPI_BUSES', 'HAL_RTL8735B_SPI_DEVICES', 'HAL_RTL8735B_RCOUT_PINS',
+                     'HAL_RTL8735B_GPIO_PINS', 'HAL_RTL8735B_ADC_PINS'):
+            with self.subTest(name=name):
+                self.assertEqual(table(self.header, name), table(self.board, name))
+        lines = set(self.header.splitlines())
+        for line in self.board.splitlines():
+            if re.match(r'#define \w+ \S', line) and not re.match(
+                    r'#define (HAL_RTL8735B_BOARD_NAME|HAL_RTL8735B_I2C_BUS_COUNT) ', line):
+                with self.subTest(line=line):
+                    self.assertIn(line, lines)
+
+
 class RulesTest(unittest.TestCase):
     '''寫錯要在建置時報錯，不留到開機'''
 

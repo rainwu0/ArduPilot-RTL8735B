@@ -81,6 +81,8 @@ SERIAL4 預設是 RC 輸入（`DEFAULT_SERIAL4_PROTOCOL SerialProtocol_RCIN`）�
 
 Wi-Fi 是 SERIAL2（`HAL_RTL8735B_WIFI_SERIAL 2`），以 UDP 跑 MAVLink2：本機埠 14555，還沒有地面站時把 HEARTBEAT 廣播到 14550 埠。見 [Wi-Fi](../../docs/wifi.zh-TW.md)。
 
+沒有 Wi-Fi 設定檔時，開發板連這個板型設定的預設熱點：`WIFI_SSID_STATION` `"ardupilot"`、`WIFI_PWD` `"ardupilot1"`（[預設熱點](../../docs/wifi.zh-TW.md#預設熱點)）。
+
 ## GPIO
 
 | 邏輯編號 | 晶片腳位 | 方向 |

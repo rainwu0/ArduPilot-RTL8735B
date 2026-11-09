@@ -36,6 +36,7 @@ HUB 8735 ultra 是 ideasHatch 的 RTL8735B 開發板，晶片在板上的 Winste
 | 遙控接收機接 SERIAL4 | 要補：接接收機驗一次 |
 | PWM 輸出 1–4：一般 PWM、OneShot、OneShot125、有刷、DShot150、DShot600 | 要補：接電調或馬達驗一次 |
 | Wi-Fi MAVLink（TCP） | 要補：上板驗一次 |
+| 連預設 Wi-Fi 熱點 `ardupilot` | 要補：上板驗一次 |
 | GPIO：D7、D25 與 D26 的 LED | 要補：上板驗一次 |
 | D2 以外的類比腳 | 要補：上板驗一次 |
 | 電池電壓與電流 | 要補：校正 |
@@ -164,7 +165,8 @@ git clone --branch v0.1.0 https://github.com/rainwu0/ArduPilot-Hub8735Ultra.git 
 
 ## Wi-Fi 模組
 
-- 開發板的 Wi-Fi 以 station（STA）模式在 SERIAL2 跑 MAVLink：預設 UDP，或在疊加檔改成 TCP server。設定檔、埠、訊息與安全上的限制見 [Wi-Fi](../../docs/wifi.zh-TW.md)。
+- 開發板的 Wi-Fi 以 station（STA）模式在 SERIAL2 跑 MAVLink：預設 UDP，或在疊加檔改成 TCP server。預設熱點、設定檔、埠、訊息與安全上的限制見 [Wi-Fi](../../docs/wifi.zh-TW.md)。
+- 沒有 Wi-Fi 設定檔時，開發板連到[預設熱點](../../docs/wifi.zh-TW.md#預設熱點)（SSID `ardupilot`、密碼 `ardupilot1`）。
 - 狀態：見[現況](#現況)。
 - 要等氣壓計初始化之後，Wi-Fi 通道才有 MAVLink，見〈接線圖〉。
 

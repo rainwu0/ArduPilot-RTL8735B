@@ -15,6 +15,7 @@
 ### 變更（Changed）
 
 - **沒有 Wi-Fi 設定檔時，三個板型改連預設熱點**：SSID `ardupilot`、密碼 `ardupilot1`；原本是 Wi-Fi 不啟用。地面站收到 `WiFi: joining the board's default hotspot (SSID length N)`；沒設 `RTL8735B_WIFI_CONFIG` 時，建置訊息寫明連預設熱點。見[預設熱點](docs/wifi.zh-TW.md#預設熱點)。
+- 文件：[Wi-Fi](docs/wifi.zh-TW.md) 加〈預設熱點〉一節，〈從零開始〉可以用預設熱點，不用設定檔。
 
 ## [0.2.1] - 2026-11-10
 

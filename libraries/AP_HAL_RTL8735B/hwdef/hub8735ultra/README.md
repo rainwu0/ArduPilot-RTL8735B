@@ -36,6 +36,7 @@ The board has no IMU, barometer or compass (schematic, BOM); sensors connect to 
 | RC receiver on SERIAL4 | Needs: one try with a receiver |
 | PWM outputs 1–4: normal PWM, OneShot, OneShot125, brushed, DShot150, DShot600 | Needs: one try with ESCs or motors |
 | Wi-Fi MAVLink over TCP | Needs: one try on a board |
+| Joining the default Wi-Fi hotspot `ardupilot` | Needs: one try on a board |
 | GPIOs: D7, the LEDs on D25 and D26 | Needs: one try on a board |
 | Analog pins other than D2 | Needs: one try on a board |
 | Battery voltage and current | Needs: calibration |
@@ -164,7 +165,8 @@ Other sensors, pins and buses: [Describe your own board](../../docs/custom-board
 
 ## Wi-Fi Module
 
-- The board's Wi-Fi runs MAVLink in station (STA) mode on SERIAL2: UDP by default, or a TCP server chosen in an overlay. The settings file, ports, messages and security limits are in [Wi-Fi](../../docs/wifi.md).
+- The board's Wi-Fi runs MAVLink in station (STA) mode on SERIAL2: UDP by default, or a TCP server chosen in an overlay. The default hotspot, the settings file, ports, messages and security limits are in [Wi-Fi](../../docs/wifi.md).
+- Without a Wi-Fi settings file, the board joins the [default hotspot](../../docs/wifi.md#default-hotspot) (SSID `ardupilot`, password `ardupilot1`).
 - Status: see [Status](#status).
 - The Wi-Fi channel carries MAVLink only once a barometer is initialized, see *Wiring Diagram*.
 

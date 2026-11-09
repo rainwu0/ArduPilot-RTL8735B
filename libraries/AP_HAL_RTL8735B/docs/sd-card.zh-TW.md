@@ -6,7 +6,7 @@
 
 ## 設定
 
-- 板型 `rtl8735b-empty` 打開（hwdef 的 `define HAL_RTL8735B_SDCARD_ENABLED 1`），include 它的 `hub8735ultra`、`amb82-mini` 也一樣。
+- 板型 `rtl8735b-empty` 打開（hwdef 的 `define HAL_RTL8735B_SDCARD_ENABLED 1`），include 它的 `hub8735ultra`、`amb82-mini`，以及 include `hub8735ultra` 的 `hub8735ultra-expansion` 也一樣。
 - 沒有 SD 卡座的自訂板，在疊加檔以 `undef HAL_RTL8735B_SDCARD_ENABLED` 關掉。
 
 ## 卡與掛載

@@ -11,8 +11,9 @@ This is an unofficial port maintained by one person, unrelated to the ArduPilot 
 | Board type | Board | Board tests |
 |---|---|---|
 | [`hub8735ultra`](hwdef/hub8735ultra/README.md) | HUB 8735 ultra (ideasHatch) | Development and every board test so far use this board |
+| [`hub8735ultra-expansion`](hwdef/hub8735ultra-expansion/README.md) | HUB 8735 ultra on its expansion board, with an IMU, a barometer and a compass | T5, the flights of this hardware |
 | [`amb82-mini`](hwdef/amb82-mini/README.md) | AMB82-mini | See its [Status](hwdef/amb82-mini/README.md#status) |
-| [`rtl8735b-empty`](hwdef/rtl8735b-empty/README.md) | None: the settings the other two include | No board records of its own |
+| [`rtl8735b-empty`](hwdef/rtl8735b-empty/README.md) | None: the settings the other board types include | No board records of its own |
 
 ## Documentation
 

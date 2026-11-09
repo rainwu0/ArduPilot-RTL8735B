@@ -11,8 +11,9 @@
 | 板型 | 開發板 | 上板測試 |
 |---|---|---|
 | [`hub8735ultra`](hwdef/hub8735ultra/README.zh-TW.md) | HUB 8735 ultra（ideasHatch） | 開發與到目前為止的上板測試都用這塊板子 |
+| [`hub8735ultra-expansion`](hwdef/hub8735ultra-expansion/README.zh-TW.md) | HUB 8735 ultra 加擴充板（IMU、氣壓計、羅盤） | T5，這套硬體的飛行 |
 | [`amb82-mini`](hwdef/amb82-mini/README.zh-TW.md) | AMB82-mini | 見它的[現況](hwdef/amb82-mini/README.zh-TW.md#現況) |
-| [`rtl8735b-empty`](hwdef/rtl8735b-empty/README.zh-TW.md) | 無：另外兩個板型 include 的設定 | 沒有自己的板上紀錄 |
+| [`rtl8735b-empty`](hwdef/rtl8735b-empty/README.zh-TW.md) | 無：其他板型 include 的設定 | 沒有自己的板上紀錄 |
 
 ## 文件
 

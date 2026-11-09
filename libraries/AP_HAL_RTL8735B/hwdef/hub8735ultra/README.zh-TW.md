@@ -27,7 +27,7 @@ HUB 8735 ultra 是 ideasHatch 的 RTL8735B 開發板，晶片在板上的 Winste
 | 項目 | 狀態 |
 |---|---|
 | 照〈接線圖〉接感測器，地面站經 Wi-Fi（UDP）連線 | 能用（T2） |
-| 加擴充板裝在 3.5 吋四軸上飛行，DShot300 | 能用（T5） |
+| 加擴充板（[`hub8735ultra-expansion`](../hub8735ultra-expansion/README.zh-TW.md)）裝在 3.5 吋四軸上飛行，DShot300 | 能用（T5） |
 | 經 CNA1 手動燒錄 | 能用（T1） |
 | `--upload` | 要補：上板驗一次 |
 | SERIAL0：USB 序列埠上的 MAVLink | 要補：上板驗一次 |
@@ -98,6 +98,7 @@ SPK（JA8.8）是音訊輸出，本移植不用。
 | 羅盤 | GY-271（QMC5883L） | I²C 匯流排 1：和 BMP280 共用 D0、D1 |
 
 - 三個模組接 3.3V（JA2.1）與 GND。模組上的腳名依廠商不同，以手上模組的絲印為準。
+- 板型 [`hub8735ultra-expansion`](../hub8735ultra-expansion/README.zh-TW.md) 把同樣三個感測器裝在擴充板上，不用疊加檔。
 - 這個接法的疊加檔在範例庫：[`examples/bmi160-bmp280-qmc5883l/overlay.dat`](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/blob/v0.1.0/examples/bmi160-bmp280-qmc5883l/overlay.dat)（rainwu0/ArduPilot-Hub8735Ultra `v0.1.0`），範例的 README 有接線圖、參數與檢查方法。
 
 ```bash

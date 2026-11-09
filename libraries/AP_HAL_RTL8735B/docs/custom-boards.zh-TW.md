@@ -11,7 +11,7 @@
 ./waf copter
 ```
 
-- 從最接近的板型開始（[`hub8735ultra`](../hwdef/hub8735ultra/README.zh-TW.md)、[`amb82-mini`](../hwdef/amb82-mini/README.zh-TW.md) 或 [`rtl8735b-empty`](../hwdef/rtl8735b-empty/README.zh-TW.md)），疊加檔只寫不同的部分。
+- 從最接近的板型開始（[`hub8735ultra`](../hwdef/hub8735ultra/README.zh-TW.md)、[`hub8735ultra-expansion`](../hwdef/hub8735ultra-expansion/README.zh-TW.md)、[`amb82-mini`](../hwdef/amb82-mini/README.zh-TW.md) 或 [`rtl8735b-empty`](../hwdef/rtl8735b-empty/README.zh-TW.md)），疊加檔只寫不同的部分。
 - 疊加檔不是板型，所以 `./waf list_boards` 不會多出新的板子。
 
 ## 加上感測器

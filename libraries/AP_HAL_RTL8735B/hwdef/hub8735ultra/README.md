@@ -27,7 +27,7 @@ The board has no IMU, barometer or compass (schematic, BOM); sensors connect to 
 | Item | Status |
 |---|---|
 | Sensors wired as in *Wiring Diagram*, ground station over Wi-Fi (UDP) | Works (T2) |
-| Flying a 3.5-inch quadcopter, with an expansion board and DShot300 | Works (T5) |
+| Flying a 3.5-inch quadcopter, with an expansion board ([`hub8735ultra-expansion`](../hub8735ultra-expansion/README.md)) and DShot300 | Works (T5) |
 | Manual flashing through CNA1 | Works (T1) |
 | `--upload` | Needs: one try on a board |
 | SERIAL0: MAVLink on the USB serial port | Needs: one try on a board |
@@ -98,6 +98,7 @@ The board type itself has no sensors. Without a barometer, boot stops at `Config
 | Compass | GY-271 (QMC5883L) | I²C bus 1: shares D0 and D1 with the BMP280 |
 
 - The three modules connect to 3.3V (JA2.1) and GND. Pin names on the modules vary by maker; the silkscreen on the module you have is what counts.
+- The board type [`hub8735ultra-expansion`](../hub8735ultra-expansion/README.md) has the same three sensors on an expansion board, with no overlay.
 - The overlay for this wiring is in the examples repository: [`examples/bmi160-bmp280-qmc5883l/overlay.dat`](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/blob/v0.1.0/examples/bmi160-bmp280-qmc5883l/overlay.dat) (rainwu0/ArduPilot-Hub8735Ultra `v0.1.0`); the example's README has the wiring drawing, parameters and checks.
 
 ```bash

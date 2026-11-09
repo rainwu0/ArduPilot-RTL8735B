@@ -8,7 +8,7 @@ HAL 怎麼用晶片的 Wi-Fi：預設熱點、設定檔、MAVLink 的埠、UDP �
 
 沒有設定檔時，開發板以 station（STA）模式連到預設熱點：SSID `ardupilot`、密碼 `ardupilot1`，和 ArduPilot ESP32 HAL 程式裡的預設相同（ArduPilot `9f648ccabc` 的 `libraries/AP_HAL_ESP32/WiFiDriver.cpp`）。用手機或電腦開一個同名、同密碼的熱點，地面站連同一個熱點。
 
-- 這組值由板型 `rtl8735b-empty` 的 `hwdef.dat` 以 `WIFI_SSID_STATION`、`WIFI_PWD` 設定；`hub8735ultra` 與 `amb82-mini` 都 include 它。
+- 這組值由板型 `rtl8735b-empty` 的 `hwdef.dat` 以 `WIFI_SSID_STATION`、`WIFI_PWD` 設定；`hub8735ultra` 與 `amb82-mini` 都 include 它，`hub8735ultra-expansion` include `hub8735ultra`。
 - 換成自己的熱點：給設定檔（見下一節），或在疊加檔 `undef` 後重新 `define` `WIFI_SSID_STATION`、`WIFI_PWD`。設定檔優先於疊加檔。
 - `WIFI_SSID_STATION` 是 `""` 或沒有定義、又沒有設定檔時，Wi-Fi 不啟用。
 - 這組值是公開的：附近任何人都能開一個同名、同密碼的熱點讓開發板連上，或連進你開的熱點，看到並送出 MAVLink。

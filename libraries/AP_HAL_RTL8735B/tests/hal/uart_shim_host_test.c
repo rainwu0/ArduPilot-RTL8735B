@@ -66,6 +66,28 @@ static int format_calls;
 static uint32_t format_parity;
 static uint32_t format_stop;
 
+// SDK 主控台原本的 stdio 輸出入：輸出直接寫進 LOG UART（替身記下字數）
+static int console_chars;
+
+static void console_putc(void *adapter, const char c)
+{
+    assert(adapter == &log_adp);
+    (void)c;
+    console_chars++;
+}
+
+static int console_getc(void *adapter, char *c)
+{
+    (void)adapter;
+    (void)c;
+    return 0;
+}
+
+void stdio_port_init(void *adapter, stdio_putc_t putc, stdio_getc_t getc)
+{
+    console_port = (stdio_port_t){ adapter, putc, getc };
+}
+
 static void reset_fake(void)
 {
     format_calls = 0;
@@ -76,9 +98,10 @@ static void reset_fake(void)
     memset(&logu, 0, sizeof(logu));
     memset(&log_regs, 0, sizeof(log_regs));
     log_adp = (hal_uart_adapter_t){ &log_regs, LOG_UART, LOG_TX_PIN, LOG_RX_PIN };
-    console_port = (stdio_port_t){ &log_adp, NULL, NULL };
+    console_port = (stdio_port_t){ &log_adp, console_putc, console_getc };
     log_regs.ier_b.erbi = 1;
     log_tx_events = 0;
+    console_chars = 0;
 }
 
 static void push_log_rx(int count)
@@ -428,6 +451,30 @@ static void test_log_uart_reuses_console_adapter(void)
     puts("PASS log-uart-reuses-console-adapter");
 }
 
+// SERIAL0 接手 LOG UART 期間，SDK 經 stdio 印的文字丟掉，不插進 MAVLink；釋放後換回原本的輸出。
+static void test_log_uart_quiets_sdk_text_while_open(void)
+{
+    reset_fake();
+    assert(rtl8735b_uart_init(LOG_UART, LOG_TX_PIN, LOG_RX_PIN, 115200) == 0);
+    assert(console_port.adapter == &log_adp && console_port.getc == console_getc);
+    assert(console_port.putc != console_putc && console_port.putc != NULL);
+    console_port.putc(console_port.adapter, 'x');
+    assert(console_chars == 0 && logu.sent == 0);
+
+    rtl8735b_uart_free(LOG_UART);
+    assert(console_port.adapter == &log_adp);
+    assert(console_port.putc == console_putc && console_port.getc == console_getc);
+    console_port.putc(console_port.adapter, 'y');
+    assert(console_chars == 1);
+
+    // 開啟失敗時不動 SDK 的輸出
+    reset_fake();
+    log_adp.rx_pin = 2;
+    assert(rtl8735b_uart_init(LOG_UART, LOG_TX_PIN, LOG_RX_PIN, 115200) == -1);
+    assert(console_port.putc == console_putc);
+    puts("PASS log-uart-quiets-sdk-text-while-open");
+}
+
 // 拿不到主控台的 adapter，或 hwdef 的腳位和它不同：開啟失敗，不碰硬體。
 static void test_log_uart_rejects_unusable_adapter(void)
 {
@@ -510,6 +557,7 @@ int main(void)
     test_rx_only_port();
     test_log_uart_reuses_console_adapter();
     test_log_uart_rejects_unusable_adapter();
+    test_log_uart_quiets_sdk_text_while_open();
     test_init_masks_and_drains_before_hooking();
     test_rx_irq_before_handler_masks_rx();
     test_stale_callback_after_free_touches_nothing();

@@ -21,7 +21,8 @@ run_uart() {
     # __wrap_fputc/__wrap_fputs 參照的 newlib __real_* 在主機上不存在，靠 --gc-sections 移除。
     local uart_sdk="$out/uart_sdk" name
     mkdir -p "$uart_sdk"
-    for name in hal_timer.h sys_api.h hal_uart.h objects.h serial_api.h serial_ex_api.h cmsis_compiler.h; do
+    for name in hal_timer.h sys_api.h hal_uart.h objects.h serial_api.h serial_ex_api.h cmsis_compiler.h \
+            stdio_port_func.h; do
         printf '#include "fake_uart_sdk.h"\n' > "$uart_sdk/$name"
     done
     cc "${CFLAGS[@]}" -ffunction-sections -I"$uart_sdk" -I"$test_dir/fakes/uart_sdk" -I"$lib_dir" \

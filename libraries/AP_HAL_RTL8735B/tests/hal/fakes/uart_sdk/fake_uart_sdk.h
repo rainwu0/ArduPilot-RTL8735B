@@ -56,6 +56,7 @@ int hal_uart_writeable(hal_uart_adapter_t *adapter);
 void hal_uart_putc(hal_uart_adapter_t *adapter, uint8_t value);
 hal_status_t hal_uart_reset_rx_fifo(hal_uart_adapter_t *adapter);
 void hal_uart_set_rx_fifo_level(hal_uart_adapter_t *adapter, uint32_t level);
+void stdio_port_init(void *adapter, stdio_putc_t putc, stdio_getc_t getc);
 void hal_uart_rxind_hook(hal_uart_adapter_t *adapter, uart_irq_callback_t callback, uint32_t id, uint32_t event);
 void hal_uart_txtd_hook(hal_uart_adapter_t *adapter, uart_irq_callback_t callback, uint32_t id, uint32_t event);
 void serial_rx_fifo_level(serial_t *serial, int level);

@@ -13,6 +13,7 @@
 #include <objects.h>
 #include <serial_api.h>
 #include <serial_ex_api.h>
+#include <stdio_port_func.h>
 #include <cmsis_compiler.h>
 #include <string.h>
 
@@ -57,6 +58,21 @@ extern const hal_misc_func_stubs_t hal_misc_stubs;
 
 static hal_uart_adapter_t *log_adapter;
 static uint8_t log_tx_irq_enabled;
+
+/*
+ * SERIAL0 接手 LOG UART 期間，SDK 經 stdio 印的文字（printf 與 SDK 的除錯訊息）丟掉，不插進 MAVLink
+ * 封包之間；釋放時以原本的 putc 換回。只用公開 API stdio_port_init（stdio_port_func.h）。
+ * 推論：走同一個 stdio 的當機傾印也一併看不到；HAL 自己的執行期警告另以 STATUSTEXT 送出（StatusText.h）。
+ */
+static stdio_putc_t log_saved_putc;
+static stdio_getc_t log_saved_getc;
+static uint8_t log_quiet;
+
+static void _log_quiet_putc(void *adapter, const char c)
+{
+    (void)adapter;
+    (void)c;
+}
 
 static hal_uart_adapter_t *_log_console_adapter(void)
 {
@@ -166,6 +182,11 @@ static int _log_uart_init(uint32_t tx_pin, uint32_t rx_pin, uint32_t baud)
     uart_initialized[RTL8735B_UART_LOG] = 1;
     hal_uart_txtd_hook(adapter, _log_tx_irq, RTL8735B_UART_LOG, TxIrq);
     hal_uart_rxind_hook(adapter, _log_rx_irq, RTL8735B_UART_LOG, RxIrq);
+    const stdio_port_t *port = hal_misc_stubs.pstdio_port;
+    log_saved_putc = port->putc;
+    log_saved_getc = port->getc;
+    stdio_port_init(adapter, _log_quiet_putc, log_saved_getc);
+    log_quiet = 1;
     return (int)HAL_OK;
 }
 
@@ -255,6 +276,10 @@ void rtl8735b_uart_free(uint8_t uart_id)
         _log_irq_set(RTL8735B_UART_IRQ_TX, 0);
         uart_initialized[uart_id] = 0;
         uart_irq_handlers[uart_id] = NULL;
+        if (log_quiet) {
+            stdio_port_init(log_adapter, log_saved_putc, log_saved_getc);
+            log_quiet = 0;
+        }
         return;
     }
     serial_irq_set(&uart_objects[uart_id], RxIrq, 0);

@@ -72,7 +72,7 @@ The details, including where to clone in WSL and the Wi-Fi settings file, are in
 | SD card and logs | Needs: one try with a card |
 | MAVLink on the USB serial port, Wi-Fi TCP, the default Wi-Fi hotspot, `--upload` | Needs: one try on a board |
 | AMB82-mini | Needs: one try on a board |
-| Firmware update over Wi-Fi | None |
+| Firmware update over Wi-Fi | Needs: one try on a board |
 
 The records are in [BOARD_TESTS.md][tests-board] (in Chinese). The status of each HAL feature is in [Feature status][status], and that of each board under *Specifications* in its README; what changed in each version is in the [CHANGELOG][changelog].
 

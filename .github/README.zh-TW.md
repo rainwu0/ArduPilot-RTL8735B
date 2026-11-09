@@ -28,7 +28,7 @@ ArduPilot 在 Realtek RTL8735B SoC 上的非官方移植。文件有繁體中文
 
 - ArduPilot master `9f648ccabc`（2026-09-25）加上 RTL8735B 的 HAL，保留 ArduPilot 的完整歷史。HAL 在 `libraries/AP_HAL_RTL8735B/`；對 ArduPilot 共用程式的修改列在 [HAL README][hal]。
 - 板型：`hub8735ultra`，用於 ideasHatch 的 HUB 8735 ultra（[板商資料](https://github.com/ideashatch/HUB-8735)），開發與上板測試都在這塊上做；`hub8735ultra-expansion`，HUB 8735 ultra 加擴充板，含 IMU、氣壓計與羅盤；`amb82-mini`；`rtl8735b-empty`，其他板型 include 的設定。每個板型在 [`hwdef/`][boards] 下有 README。
-- 板型都沒有感測器。感測器、安裝方向與預設參數寫在疊加的 hwdef。附接線與參數的現成疊加檔在[範例庫][examples]。
+- 除了 `hub8735ultra-expansion`，板型都沒有感測器。感測器、安裝方向與預設參數寫在疊加的 hwdef。附接線與參數的現成疊加檔在[範例庫][examples]。
 
 ## 安裝
 

@@ -28,7 +28,7 @@ This repository is [ArduPilot](https://github.com/ArduPilot/ardupilot) with a ha
 
 - ArduPilot master `9f648ccabc` (2026-09-25) plus a HAL for the RTL8735B, with ArduPilot's full history kept. The HAL is in `libraries/AP_HAL_RTL8735B/`; changes to ArduPilot's shared code are listed in the [HAL README][hal].
 - Board types: `hub8735ultra` for the HUB 8735 ultra from ideasHatch ([vendor resources](https://github.com/ideashatch/HUB-8735)), where all development and board tests happen; `hub8735ultra-expansion`, the HUB 8735 ultra on its expansion board with an IMU, a barometer and a compass; `amb82-mini`; and `rtl8735b-empty`, the settings the others include. Each has a README under [`hwdef/`][boards].
-- The board types have no sensors. Sensors, their mounting and default parameters go in an overlay hwdef. Ready-made overlays with wiring and parameters are in the [examples repository][examples].
+- Apart from `hub8735ultra-expansion`, the board types have no sensors. Sensors, their mounting and default parameters go in an overlay hwdef. Ready-made overlays with wiring and parameters are in the [examples repository][examples].
 
 ## Install
 

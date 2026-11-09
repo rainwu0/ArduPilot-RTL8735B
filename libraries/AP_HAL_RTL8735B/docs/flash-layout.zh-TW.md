@@ -22,7 +22,9 @@ FLASH_LAYOUT sdk-d1b6426
 - 燒錄預設建置的 `flash_ntz.bin` 時，開發板的分割表會換成 `realtek-ota`。HUB 8735 ultra（ideashatch/HUB-8735 `870a7e0` 發行的板商套件 4.1.1）與 AMB82-mini（Ameba-AIoT/ameba-arduino-pro2 `93d6351`）的 Arduino 套件在 OTA Mode=Enable 時，以及新版 SDK（Ameba-AIoT/ameba-rtos-pro2 `eb5c090`），都用這個版面。`sdk-d1b6426` 沿用 SDK `d1b6426` 原本的分割。
 - 建置時以 SDK 的分割表為底，只改寫各記錄的位址與長度。
 - 映像上限是 fw1 的長度，因為韌體燒在 fw1。`firmware_ntz.bin` 超過上限，或建出的 `flash_ntz.bin` 的槽記錄與版面不同時，建置失敗。
-- 本儲存庫不提供 Wi-Fi 韌體更新，不會寫入 fw2；fw2 只是分割表中的一筆記錄。
+- 經 USB 序列埠燒錄時，韌體寫在 fw1。[經 Wi-Fi 更新](flashing.zh-TW.md#經-wi-fi-更新)寫另一槽：fw1 在執行時寫 fw2，fw2 在執行時寫 fw1。它不改分割表；開發板的分割表和韌體的 `FLASH_LAYOUT` 不同時，開發板拒收更新，換版面要經 USB 序列埠燒錄。
+- 經 Wi-Fi 送的映像試開三次都沒有確認時，開發板清掉它的標籤，回到另一槽開機。
+- 每個槽最後的 4 KiB 放經 Wi-Fi 更新的試開紀錄。經 Wi-Fi 送的映像最多是較短的槽減 4 KiB：`realtek-ota` 是 4,190,208 bytes，`sdk-d1b6426` 是 3,665,920 bytes，`arduino-default` 是 61,440 bytes，比韌體小。
 - 版面在 `./waf configure` 時讀進來：改了 hwdef 或疊加檔的 `FLASH_LAYOUT` 之後要重新 configure。
 
 ## 參數儲存

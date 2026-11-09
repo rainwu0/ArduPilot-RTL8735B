@@ -68,4 +68,5 @@ When the hotspot is not there or the password is wrong, the board tries again 1 
 - Default hotspot: see [Default hotspot](#default-hotspot).
 - MAVLink over UDP has no authentication. While there is no ground station yet, or after the ground station has sent nothing for more than 3 seconds, any source that sends packets to the local port is taken as the new ground station, including other flight controllers or programs on the same subnet, and its RC override is accepted too. With no ground station, the HEARTBEAT is broadcast to the whole subnet.
 - MAVLink over TCP has no authentication either. Once the ground station has sent nothing for more than 3 seconds, a new connection from any host on the subnet replaces it.
+- Update over Wi-Fi (`app/ota`, TCP port 8266): see [its security limits](flashing.md#security-limits).
 - On a network that only you control, no other device can reach the board's MAVLink port. How to report a security problem is in [SECURITY](../../../.github/SECURITY.md).

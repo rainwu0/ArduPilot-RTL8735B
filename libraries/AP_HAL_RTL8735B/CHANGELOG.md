@@ -12,6 +12,7 @@ The status of each feature in a given version is what that version's feature sta
 
 ### Added
 
+- Update over Wi-Fi: the board application `app/ota` takes an image signed with a key from ArduPilot's `generate_keys.py`, on TCP port 8266, writes it to the other firmware slot and boots it on trial; after three trial boots without confirmation it goes back to the previous slot. `Tools/scripts/rtl8735b_ota_sign.py` signs `firmware_ntz.bin`, and `Tools/scripts/rtl8735b_ota_send.py` sends it or asks which slot runs. `RTL8735B_OTA_PUBLIC_KEY` names the public key at build time. See [Update over Wi-Fi](docs/flashing.md#update-over-wi-fi).
 - Board application interface: `rtl8735b_app_arming_blocked`; while it returns non-zero, a normal arm is refused. See [Board applications](docs/board-applications.md).
 
 ## [0.2.3] - 2026-11-15

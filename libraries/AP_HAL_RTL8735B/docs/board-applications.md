@@ -50,6 +50,12 @@ The application's `.c` files also get these definitions, with values from the hw
 
 The firmware's own sources do not get them.
 
+The application is also linked with `ota_public_key.c`, which the build generates from the file in `RTL8735B_OTA_PUBLIC_KEY`: `rtl8735b_ota_public_key` (32 bytes) and `rtl8735b_ota_public_key_len` (0 without a key), declared in `app/ota/ota_app.h`.
+
+## `app/ota`
+
+`app/ota` is an application in this repository that updates the firmware over Wi-Fi; see [Update over Wi-Fi](flashing.md#update-over-wi-fi). It defines `rtl8735b_app_init`, `rtl8735b_app_after_setup` and `rtl8735b_app_arming_blocked`. Before its own resets it calls `rtl8735b_app_before_reset`, also from a FreeRTOS timer callback; an application built from a copy of the directory puts its own hardware back there.
+
 ## `examples/AppHost`
 
 On a board without sensors, the `examples/AppHost` example runs the application: it starts only Wi-Fi and the main loop, does not initialize sensors or arm, and leaves the PWM outputs safe, so `setup()` finishes and the main loop runs. A normal vehicle image on a board without an IMU stops at inertial sensor initialization, and `rtl8735b_app_after_setup` is never called.

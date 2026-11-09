@@ -47,6 +47,36 @@ git submodule update --init --recursive modules/waf modules/mavlink modules/Dron
 export RTL8735B_WIFI_CONFIG=~/wifi.txt
 ```
 
+## 為經 Wi-Fi 更新建置
+
+[經 Wi-Fi 更新](flashing.zh-TW.md#經-wi-fi-更新)要韌體裡有開發板的應用程式 `app/ota` 與公鑰。
+
+1. 用 ArduPilot 的 `Tools/scripts/signing/generate_keys.py` 產生一組金鑰，它需要 `pymonocypher` 3.1.3.2：
+
+   ```bash
+   python3 -m pip install pymonocypher==3.1.3.2
+   python3 Tools/scripts/signing/generate_keys.py mykey
+   ```
+
+   產生 `mykey_private_key.dat` 與 `mykey_public_key.dat`。私鑰在電腦上簽映像；韌體裡只有公鑰。
+
+2. 疊加檔加上應用程式：
+
+   ```text
+   env RTL8735B_APP_DIR libraries/AP_HAL_RTL8735B/app/ota
+   ```
+
+3. 把 `RTL8735B_OTA_PUBLIC_KEY` 指向公鑰檔，再照下面 configure 與建置：
+
+   ```bash
+   export RTL8735B_OTA_PUBLIC_KEY=~/mykey_public_key.dat
+   ```
+
+- 建置印出 `OTA 公鑰：取自 <路徑>`。
+- 給的是私鑰檔，或不是 `generate_keys.py` 產生的公鑰檔時，建置停止。
+- 沒有設 `RTL8735B_OTA_PUBLIC_KEY` 時，韌體沒有公鑰，開發板拒收所有映像。
+- 公鑰只編進有開發板應用程式的韌體。沒有應用程式時，建置印出 `OTA 公鑰：沒有開發板的應用程式（env RTL8735B_APP_DIR），公鑰不會編進韌體`。
+
 ## configure 與建置
 
 ```bash

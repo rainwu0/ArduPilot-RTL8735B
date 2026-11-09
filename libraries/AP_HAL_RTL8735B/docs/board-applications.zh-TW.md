@@ -50,6 +50,12 @@ env RTL8735B_APP_DIR <目錄>
 
 韌體本身的原始碼沒有這些定義。
 
+應用程式另外連結建置時由 `RTL8735B_OTA_PUBLIC_KEY` 的檔案產生的 `ota_public_key.c`：`rtl8735b_ota_public_key`（32 bytes）與 `rtl8735b_ota_public_key_len`（沒有公鑰時是 0），宣告在 `app/ota/ota_app.h`。
+
+## `app/ota`
+
+`app/ota` 是本儲存庫裡經 Wi-Fi 更新韌體的應用程式，見[經 Wi-Fi 更新](flashing.zh-TW.md#經-wi-fi-更新)。它定義 `rtl8735b_app_init`、`rtl8735b_app_after_setup` 與 `rtl8735b_app_arming_blocked`。它自己重置之前會呼叫 `rtl8735b_app_before_reset`，也可能從 FreeRTOS 計時器回呼呼叫；複製這個目錄、加上自己的程式時，在那裡把自己的硬體放回原狀。
+
 ## `examples/AppHost`
 
 沒有感測器的開發板，用範例 `examples/AppHost` 執行應用程式：它只開 Wi-Fi 與主迴圈，不初始化感測器、不解鎖，PWM 輸出留在安全狀態，所以 `setup()` 會結束、主迴圈照常跑。一般的載具映像在沒有 IMU 的開發板上停在慣性感測器的初始化，`rtl8735b_app_after_setup` 不會被呼叫。

@@ -10,6 +10,12 @@ The status of each feature in a given version is what that version's feature sta
 
 ## [Unreleased]
 
+Compatible with v0.2.1: existing overlays, commands and parameters keep working; the changes need a new build and flash.
+
+### Changed
+
+- **Without a Wi-Fi settings file, the three board types now join a default hotspot**, SSID `ardupilot` and password `ardupilot1`; before, Wi-Fi was off. The ground station receives `WiFi: joining the board's default hotspot (SSID length N)`, and the build message for an unset `RTL8735B_WIFI_CONFIG` names the default hotspot. See [Default hotspot](docs/wifi.md#default-hotspot).
+
 ## [0.2.1] - 2026-11-10
 
 Compatible with v0.2.0: existing overlays, commands and parameters keep working; the changes need a new build and flash.

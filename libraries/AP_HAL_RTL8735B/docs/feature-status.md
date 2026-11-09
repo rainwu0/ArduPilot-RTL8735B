@@ -31,6 +31,7 @@ With the board type `hub8735ultra` and no barometer, boot stops at `Config Error
 | Receive-only UART ports | Needs: one try on a board | TX pin set to `PIN_NC` |
 | UART inversion, half duplex | None | See [Design notes](design.md#no-inversion-on-the-serial-ports) |
 | Wi-Fi MAVLink (UDP) | Works (T2, T5) | STA mode |
+| Default hotspot (no settings file) | Needs: one try on a board | SSID `ardupilot`, password `ardupilot1`, see [Wi-Fi](wifi.md#default-hotspot) |
 | Wi-Fi send retry and frame packing | Needs: one try on a board | See [Wi-Fi](wifi.md) |
 | Wi-Fi MAVLink (TCP) | Needs: one try on a board | Chosen at build time, either this or UDP |
 | Console MAVLink (SERIAL0) | Needs: one try on a board | LOG UART through the board's USB serial port at 115200 baud; once it takes over, SDK and HAL printf text is not sent and the HAL's runtime messages (including the Wi-Fi IP) go as STATUSTEXT. The chip's own USB is not used. See [UART Mapping](../hwdef/hub8735ultra/README.md#uart-mapping) in the HUB 8735 ultra README |

@@ -41,7 +41,7 @@ git submodule update --init --recursive modules/waf modules/mavlink modules/Dron
 
 ## Set the Wi-Fi settings file
 
-To have the board join a hotspot, point `RTL8735B_WIFI_CONFIG` at a settings file before building; without it, the image has no Wi-Fi. The file's format is in [Wi-Fi](wifi.md#settings-file).
+To have the board join your own hotspot, point `RTL8735B_WIFI_CONFIG` at a settings file before building; without it, the board joins the [default hotspot](wifi.md#default-hotspot) `ardupilot`. The file's format is in [Wi-Fi](wifi.md#settings-file).
 
 ```bash
 export RTL8735B_WIFI_CONFIG=~/wifi.txt
@@ -56,7 +56,7 @@ export RTL8735B_WIFI_CONFIG=~/wifi.txt
 
 - `--board` is one of the board types in `hwdef/`: [`hub8735ultra`](../hwdef/hub8735ultra/README.md), [`amb82-mini`](../hwdef/amb82-mini/README.md), [`rtl8735b-empty`](../hwdef/rtl8735b-empty/README.md).
 - The board types have no sensors. Sensors, mounting orientation and default parameters go in an overlay, added with `--extra-hwdef <file>` on the configure line; see [Describe your own board](custom-boards.md).
-- Near the start, the build prints `Wi-Fi STA: 帳密取自 <path>` ("credentials taken from …") when it uses the settings file, or `Wi-Fi STA: 未設定` ("not set").
+- Near the start, the build prints `Wi-Fi STA: 帳密取自 <path>` ("credentials taken from …") when it uses the settings file, or `Wi-Fi STA: 未設定（…），開發板連板型的預設熱點…` ("not set; the board joins the board type's default hotspot").
 - The last line is `'copter' finished successfully`. Lines with `warning:`, `sed: can't read ...` and `JSON header - entry : fail` come from the SDK and do not affect the result.
 - The image is `build/<board type>/sdk_build/flash_ntz.bin`, for example `build/hub8735ultra/sdk_build/flash_ntz.bin`.
 - After changing the settings file, `./waf copter` again is enough. After changing `FLASH_LAYOUT`, run configure again.

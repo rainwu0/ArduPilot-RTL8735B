@@ -1,18 +1,8 @@
 # Defaults set by the expansion board wiring (board hub8735ultra-expansion).
-# 只放擴充板的接線決定的值；機架、電池門檻、安裝方向、校正、失效保護不放在這裡。
-
-# 電池：類比電壓與電流。電壓從 J3 經 100 kΩ／20 kΩ 分壓接 D2（類比輸入 2），倍率是標稱值，各機用電錶校正；
-# 電流是電調的電流輸出（12.75 mV/A）經 J5 接 D9（類比輸入 9），零點 BATT_AMP_OFFSET 用預設 0，各機自己校
-BATT_MONITOR 4
-BATT_VOLT_PIN 2
-BATT_VOLT_MULT 6.0
-BATT_CURR_PIN 9
-BATT_AMP_PERVLT 78.43
+# 只放擴充板的接線決定、又沒有 hwdef 巨集可用的值；電池監測與 SERIAL1 的預設在 hwdef.dat。
+# 機架、電池門檻、安裝方向、校正、失效保護不放在這裡。
 
 # 馬達輸出 1–4（J4）：DShot300；電調型號值是 BLHeli_S／Bluejay
 MOT_PWM_TYPE 5
 SERVO_DSHOT_ESC 2
 SERVO_BLH_AUTO 1
-
-# J10 給 GPS（SERIAL1）
-SERIAL1_PROTOCOL 5

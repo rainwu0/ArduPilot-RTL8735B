@@ -231,9 +231,22 @@ class Hub8735UltraExpansionTest(unittest.TestCase):
         self.assertIn('#define DEFAULT_SERIAL3_PROTOCOL SerialProtocol_ESCTelemetry', self.header)
         self.assertEqual(table(self.header, 'HAL_RTL8735B_ADC_PINS'), ['{2,PIN_F0,0}', '{9,PIN_A2,6}'])
 
+    def test_battery_and_gps_defaults_in_hwdef(self):
+        # 電池監測照 ArduPilot 的板型做法由 hwdef 給預設（AP_BattMonitor 的 HAL_BATT_*）：類比電壓 D2（分壓 100 kΩ／20 kΩ）
+        # 與電流 D9（電調電流輸出 12.75 mV/A）；J10 給 GPS（AP_SerialManager 的 DEFAULT_SERIAL1_PROTOCOL）
+        for line in ('#define HAL_BATT_MONITOR_DEFAULT 4', '#define HAL_BATT_VOLT_PIN 2',
+                     '#define HAL_BATT_VOLT_SCALE 6.0', '#define HAL_BATT_CURR_PIN 9',
+                     '#define HAL_BATT_CURR_SCALE 78.43', '#define DEFAULT_SERIAL1_PROTOCOL SerialProtocol_GPS'):
+            with self.subTest(line=line):
+                self.assertIn(line, self.header.splitlines())
+
     def test_default_parameters_come_from_romfs(self):
         self.assertIn('#define HAL_PARAM_DEFAULTS_PATH "@ROMFS/defaults.parm"', self.header)
         self.assertTrue((HAL / 'hwdef/hub8735ultra-expansion/defaults.parm').is_file())
+
+    def test_no_open_questions_left(self):
+        # BMP280 在匯流排 1 已由 T5 的飛行確認（同一行 BARO，定高要用氣壓計）
+        self.assertNotIn('待確認', (HAL / 'hwdef/hub8735ultra-expansion/hwdef.dat').read_text(encoding='utf-8'))
 
     def test_rest_matches_hub8735ultra(self):
         # SPI、PWM、GPIO 與單行的 define（其他序列埠、Wi-Fi、SD 卡等）都照開發板
@@ -245,7 +258,7 @@ class Hub8735UltraExpansionTest(unittest.TestCase):
         for line in self.board.splitlines():
             if re.match(r'#define \w+ \S', line) and not re.match(
                     r'#define (HAL_RTL8735B_BOARD_NAME|HAL_RTL8735B_I2C_BUS_COUNT|HAL_RTL8735B_ADC_COUNT|'
-                    r'HAL_RTL8735B_SERIAL3_TX_PIN) ', line):
+                    r'HAL_RTL8735B_SERIAL3_TX_PIN|DEFAULT_SERIAL1_PROTOCOL) ', line):
                 with self.subTest(line=line):
                     self.assertIn(line, lines)
 
@@ -274,15 +287,12 @@ class ExpansionDefaultsTest(unittest.TestCase):
         cls.frame = read_params(ROOT / 'Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param')
 
     def test_board_defaults(self):
-        self.assertEqual(self.board, {
-            # 類比電壓（D2，分壓 100 kΩ／20 kΩ）與電流（D9，電調電流輸出 12.75 mV/A）
-            'BATT_MONITOR': '4', 'BATT_VOLT_PIN': '2', 'BATT_VOLT_MULT': '6.0',
-            'BATT_CURR_PIN': '9', 'BATT_AMP_PERVLT': '78.43',
-            # DShot300，電調型號值
-            'MOT_PWM_TYPE': '5', 'SERVO_DSHOT_ESC': '2', 'SERVO_BLH_AUTO': '1',
-            # J10 給 GPS
-            'SERIAL1_PROTOCOL': '5',
-        })
+        # 只剩沒有 hwdef 巨集可用的 DShot300 與電調型號值；電池與 SERIAL1 的預設在 hwdef.dat
+        self.assertEqual(self.board, {'MOT_PWM_TYPE': '5', 'SERVO_DSHOT_ESC': '2', 'SERVO_BLH_AUTO': '1'})
+
+    def test_frame_file_has_no_unconfirmed_values(self):
+        self.assertNotIn('待讀回', (ROOT / 'Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param')
+                         .read_text(encoding='utf-8'))
 
     def test_frame_has_the_failsafes_and_capacity(self):
         for name, value in (('BATT_CAPACITY', '550'), ('FS_GCS_ENABLE', '5'), ('FS_OPTIONS', '8'),

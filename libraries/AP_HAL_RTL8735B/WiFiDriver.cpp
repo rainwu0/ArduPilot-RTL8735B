@@ -121,7 +121,7 @@ void WiFiDriver::_begin(uint32_t baud, uint16_t rx_space, uint16_t tx_space)
     if (rtl8735b_wifi_ssid_len == 0) {
         _state.store(LinkState::DISABLED);
         if (!_disabled_reported) {
-            ::printf("WiFi: no STA credentials in this image; WiFi MAVLink port disabled\n");
+            RTL8735B::report_warning("WiFi: no STA credentials in this image; WiFi MAVLink port disabled");
             _disabled_reported = true;
         }
         return;
@@ -484,7 +484,8 @@ uint32_t WiFiDriver::_link_step(uint32_t now_ms)
 
     case LinkState::CONNECTING: {
         _join_attempts.fetch_add(1);
-        ::printf("WiFi: joining (SSID length %u)\n", (unsigned)rtl8735b_wifi_ssid_len);
+        // 連線的經過以 STATUSTEXT 送地面站：SERIAL0 接手 LOG UART 之後 printf 不送出
+        RTL8735B::report_info("WiFi: joining (SSID length %u)", (unsigned)rtl8735b_wifi_ssid_len);
         const int join = rtl8735b_wifi_join(rtl8735b_wifi_ssid, rtl8735b_wifi_ssid_len,
                                              rtl8735b_wifi_password, rtl8735b_wifi_password_len);
         bool opened = false;
@@ -498,14 +499,18 @@ uint32_t WiFiDriver::_link_step(uint32_t now_ms)
             _join_failures.fetch_add(1);
             _close_sockets();
             rtl8735b_wifi_leave();
-            ::printf("WiFi: join failed (%d)\n", join);
+            RTL8735B::report_warning("WiFi: join failed (%d)", join);
             _set_state(LinkState::WAIT_RETRY, now_ms);
             return 10;
         }
         _gcs_known.store(false);
         _clear_tx();
         _last_link_check_ms = now_ms;
-        print_ipv4("up, local", _local_address.load(), _local_port);
+        // 開發板的位址：地面站接 COM 埠（SERIAL0）就讀得到，使用者照這個 IP 分辨同一個熱點上的開發板
+        const uint32_t local = _local_address.load();
+        RTL8735B::report_info("WiFi: up, local %u.%u.%u.%u:%u",
+                              (unsigned)(local >> 24), (unsigned)((local >> 16) & 0xff),
+                              (unsigned)((local >> 8) & 0xff), (unsigned)(local & 0xff), (unsigned)_local_port);
         _set_state(LinkState::UP, now_ms);
         return 1;
     }

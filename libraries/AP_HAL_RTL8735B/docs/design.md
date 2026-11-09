@@ -65,3 +65,13 @@ In SDK `d1b6426`, the UART registers have inversion bits only for IrDA pulses (`
 ## I²C bus numbers follow the SDK
 
 Each `RTL8735B_I2CBUS` line names the SDK's I2C controller (I2C0–I2C3), because the SDK decides which pins each controller can use (`component/mbed/targets/hal/rtl8735b/i2c_api.c`). The labels in a vendor's Arduino variant can differ: the HUB 8735 ultra's `variant.h` labels PE4/PE3 as I2C0 and PA1/PA0 as I2C2, the other way round from the SDK. See [hwdef settings](hwdef.md).
+
+## Update over Wi-Fi boots the new image on trial
+
+`app/ota` runs as SDK tasks beside ArduPilot in the same firmware, at a priority below all ArduPilot threads. An update replaces the whole firmware image in the other slot: the SDK, ArduPilot and the board application together.
+
+The SDK's bootloader starts, of the two firmware slots, the one whose label `RTL8735B` is intact and whose version and timestamp are newest ([AmebaPro2 SDK documentation, *09 OTA*](https://ameba-doc-rtos-pro2-sdk.readthedocs-hosted.com/en/latest/application_note/09_OTA.html)). `app/ota` writes a new image to the other slot with the label left blank, and writes the label last, after the hash and read-back checks; a slot left by an interrupted write has no label and is not started.
+
+The last 4 KiB of the slot holds a trial record. Each boot of an unconfirmed image clears one bit of its trial count; confirming clears its state; going back clears the image's own label, and the bootloader then starts the other slot. These writes only turn bits from 1 to 0, without erasing.
+
+Blocking arming goes through the safety switch: while the vehicle is disarmed and `rtl8735b_app_arming_blocked` returns non-zero, `Util::safety_switch_state()` reports the switch as not pressed. See [Board applications](board-applications.md) and [Update over Wi-Fi](flashing.md#update-over-wi-fi).

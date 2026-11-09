@@ -55,7 +55,7 @@ HAL 各項功能的現況。各開發板的現況在各板子 README 的〈規�
 | 手動燒錄（Windows 版工具） | 能用（T1） | 見[燒錄韌體](flashing.zh-TW.md) |
 | 手動燒錄（Linux 版工具） | 要補：上板驗一次 | 見[燒錄韌體](flashing.zh-TW.md) |
 | `--upload` 燒錄 | 要補：上板驗一次 | `COMn`（Windows 版工具）與 `/dev/tty*`（Linux 版工具），見[燒錄韌體](flashing.zh-TW.md) |
-| 韌體 OTA 更新 | 沒有 | 更新韌體以燒錄進行，見[燒錄韌體](flashing.zh-TW.md) |
+| 經 Wi-Fi 更新韌體 | 要補：上板驗一次 | 開發板的應用程式 `app/ota`，見[經 Wi-Fi 更新](flashing.zh-TW.md#經-wi-fi-更新) |
 | 開發板的應用程式 | 要補：上板驗一次 | `env RTL8735B_APP_DIR`，見[開發板的應用程式](board-applications.zh-TW.md) |
 | 開發板的應用程式擋解鎖 | 要補：上板驗一次 | `rtl8735b_app_arming_blocked`，見[開發板的應用程式](board-applications.zh-TW.md) |
 | Flash 版面 `realtek-ota`（預設） | 能用（T1、T2） | 見 [Flash 版面](flash-layout.zh-TW.md) |

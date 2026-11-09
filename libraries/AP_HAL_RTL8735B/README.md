@@ -24,7 +24,7 @@ Tutorial:
 How-to guides:
 
 - [Build the firmware](docs/building.md)
-- [Flash the firmware](docs/flashing.md)
+- [Flash the firmware](docs/flashing.md): through the USB serial port, or over Wi-Fi with the board application `app/ota`
 - [Describe your own board](docs/custom-boards.md): sensors, pins, buses, serial ports and the other overlay settings
 
 Reference:
@@ -59,3 +59,5 @@ This repository as a whole is distributed under GPL-3.0: most ArduPilot and port
 Several parts of this port are adapted from ArduPilot's ESP32 port (`libraries/AP_HAL_ESP32` and `Tools/ardupilotwaf/esp32.py` in ArduPilot `9f648ccabc`): `Semaphores.cpp`, `Semaphores.h`, `system.cpp`, `hwdef/scripts/rtl8735b_hwdef.py`, and the hwdef generation and cmake setup in `Tools/ardupilotwaf/rtl8735b.py`; each file's header says so. How the Scheduler is split into FreeRTOS tasks also follows the ESP32 port's design. Both are GPL-3.0-or-later.
 
 The SD card filesystem backend `libraries/AP_Filesystem/AP_Filesystem_RTL8735B.cpp` is adapted from `AP_Filesystem_FATFS.cpp` in ArduPilot `9f648ccabc`, as its header says. FatFs in `fatfs/` is under ChaN's FatFs license (BSD-style; see `fatfs/LICENSE.txt` and each file's header) and can be distributed together with GPL-3.0 code.
+
+The board application `app/ota` compiles ArduPilot's Monocypher 3.1.2 (`libraries/AP_CheckFirmware/monocypher.cpp`, BSD-2-Clause or CC0-1.0) again as C, through `app/ota/ota_monocypher.c`.

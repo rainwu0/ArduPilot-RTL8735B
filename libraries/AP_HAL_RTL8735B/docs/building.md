@@ -47,6 +47,36 @@ To have the board join your own hotspot, point `RTL8735B_WIFI_CONFIG` at a setti
 export RTL8735B_WIFI_CONFIG=~/wifi.txt
 ```
 
+## Build for update over Wi-Fi
+
+[Update over Wi-Fi](flashing.md#update-over-wi-fi) needs the board application `app/ota` and a public key in the firmware.
+
+1. Generate a key pair with ArduPilot's `Tools/scripts/signing/generate_keys.py`, which needs `pymonocypher` 3.1.3.2:
+
+   ```bash
+   python3 -m pip install pymonocypher==3.1.3.2
+   python3 Tools/scripts/signing/generate_keys.py mykey
+   ```
+
+   It writes `mykey_private_key.dat` and `mykey_public_key.dat`. The private key signs images on the computer; the firmware holds only the public key.
+
+2. Add the application to the overlay:
+
+   ```text
+   env RTL8735B_APP_DIR libraries/AP_HAL_RTL8735B/app/ota
+   ```
+
+3. Point `RTL8735B_OTA_PUBLIC_KEY` at the public key file, then configure and build as below:
+
+   ```bash
+   export RTL8735B_OTA_PUBLIC_KEY=~/mykey_public_key.dat
+   ```
+
+- The build prints `OTA 公鑰：取自 <path>` ("public key taken from …").
+- A private key file, or a file that is not a public key from `generate_keys.py`, stops the build.
+- Without `RTL8735B_OTA_PUBLIC_KEY`, the firmware has no key, and the board refuses every image.
+- The key is built only into firmware with a board application. Without one, the build prints `OTA 公鑰：沒有開發板的應用程式（env RTL8735B_APP_DIR），公鑰不會編進韌體` ("no board application; the public key is not built into the firmware").
+
 ## Configure and build
 
 ```bash

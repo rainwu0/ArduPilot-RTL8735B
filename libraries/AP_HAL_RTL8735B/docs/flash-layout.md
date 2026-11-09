@@ -22,7 +22,9 @@ FLASH_LAYOUT sdk-d1b6426
 - Flashing a `flash_ntz.bin` from a default build changes the board's partition table to `realtek-ota`. The Arduino packages for the HUB 8735 ultra (vendor package 4.1.1, released in ideashatch/HUB-8735 `870a7e0`) and the AMB82-mini (Ameba-AIoT/ameba-arduino-pro2 `93d6351`) use this layout with OTA Mode=Enable, and so does the newer SDK (Ameba-AIoT/ameba-rtos-pro2 `eb5c090`). `sdk-d1b6426` keeps the original partitions of SDK `d1b6426`.
 - The build starts from the SDK's partition table and rewrites only the address and length of each record.
 - The image limit is the length of fw1, because the firmware is written to fw1. If `firmware_ntz.bin` exceeds the limit, or the slot records in the built `flash_ntz.bin` differ from the layout, the build fails.
-- This repository does not provide Wi-Fi firmware updates and does not write fw2; fw2 is only a record in the partition table.
+- Flashing through the USB serial port writes the firmware to fw1. [Update over Wi-Fi](flashing.md#update-over-wi-fi) writes the other slot: fw2 while fw1 runs, fw1 while fw2 runs. It does not change the partition table; the board refuses updates when its partition table differs from the firmware's `FLASH_LAYOUT`, and a different layout is flashed through the USB serial port.
+- An image sent over Wi-Fi that stays unconfirmed through three trial boots is dropped: the board clears its label and boots the other slot again.
+- The last 4 KiB of each slot holds the trial record of update over Wi-Fi. An image sent over Wi-Fi is at most the shorter slot minus 4 KiB: 4,190,208 bytes with `realtek-ota`, 3,665,920 bytes with `sdk-d1b6426`, and 61,440 bytes with `arduino-default`, smaller than the firmware.
 - The layout is read at `./waf configure`: after changing `FLASH_LAYOUT` in hwdef or an overlay, configure again.
 
 ## Parameter storage

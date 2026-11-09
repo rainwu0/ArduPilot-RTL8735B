@@ -23,6 +23,7 @@
 - 板型 `hub8735ultra-expansion`：HUB 8735 ultra 加擴充板，含 BMI160、BMP280、QMC5883L，電池電壓在類比腳 2、電調電流在類比腳 9，SERIAL3 只收電調遙測；電池監測與 SERIAL1 的 GPS 預設在 `hwdef.dat`，DShot300 在 `defaults.parm`。見[它的 README](hwdef/hub8735ultra-expansion/README.zh-TW.md)。
 - `Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param`：給 3.5 吋四軸 X、4 合 1 Bluejay 電調（DShot300）、2S 電池的參數。
 - 文件：`hub8735ultra-expansion` 的 README，含擴充板的接點、感測器模組、接線圖、T5 那台四軸的照片與影片，以及它的參數。
+- 經 Wi-Fi 更新：開發板的應用程式 `app/ota` 在 TCP 埠 8266 收以 ArduPilot `generate_keys.py` 的金鑰簽章的映像，寫進另一個韌體槽並試開；試開三次都沒有確認就退回原來的槽。`Tools/scripts/rtl8735b_ota_sign.py` 簽 `firmware_ntz.bin`，`Tools/scripts/rtl8735b_ota_send.py` 送出映像或查詢執行中的槽。建置時以 `RTL8735B_OTA_PUBLIC_KEY` 指定公鑰。見[經 Wi-Fi 更新](docs/flashing.zh-TW.md#經-wi-fi-更新)。
 - 開發板的應用程式介面：`rtl8735b_app_arming_blocked`，回傳非 0 時一般解鎖被拒。見[開發板的應用程式](docs/board-applications.zh-TW.md)。
 
 ## [0.2.1] - 2026-11-10

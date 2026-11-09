@@ -65,3 +65,13 @@ SDK `d1b6426` 的 UART 暫存器只有 IrDA 脈波用的反相位元（`rtl8735b
 ## I²C 匯流排編號依 SDK
 
 每一行 `RTL8735B_I2CBUS` 寫的是 SDK 的 I2C 控制器（I2C0–I2C3），因為各控制器能用哪些腳由 SDK 決定（`component/mbed/targets/hal/rtl8735b/i2c_api.c`）。板商 Arduino variant 的標示可能不同：HUB 8735 ultra 的 `variant.h` 把 PE4／PE3 標成 I2C0、PA1／PA0 標成 I2C2，和 SDK 相反。見 [hwdef 設定](hwdef.zh-TW.md)。
+
+## 經 Wi-Fi 更新以試開的方式啟動新映像
+
+`app/ota` 以 SDK 的 task 和 ArduPilot 並排跑在同一份韌體裡，優先權低於 ArduPilot 的所有執行緒。一次更新換掉另一槽的整份韌體映像：SDK、ArduPilot 與開發板的應用程式一起換。
+
+SDK 的 bootloader 在兩個韌體槽中，啟動標籤 `RTL8735B` 完整、版本與時間戳最新的那一個（[AmebaPro2 SDK 文件〈09 OTA〉](https://ameba-doc-rtos-pro2-sdk.readthedocs-hosted.com/en/latest/application_note/09_OTA.html)）。`app/ota` 把新映像寫進另一槽時標籤先留白，雜湊與讀回核對都通過後最後才寫標籤；寫到一半中斷的槽沒有標籤，不會被啟動。
+
+槽最後的 4 KiB 放試開紀錄。沒有確認的映像每開機一次，清掉試開次數的一個位元；確認時清掉它的狀態；退回時清掉映像自己的標籤，bootloader 就改啟動另一槽。這些寫入都只把位元由 1 變成 0，不抹除。
+
+擋解鎖經由安全開關：載具未解鎖、`rtl8735b_app_arming_blocked` 回傳非 0 時，`Util::safety_switch_state()` 回報安全開關未解除。見[開發板的應用程式](board-applications.zh-TW.md)與[經 Wi-Fi 更新](flashing.zh-TW.md#經-wi-fi-更新)。

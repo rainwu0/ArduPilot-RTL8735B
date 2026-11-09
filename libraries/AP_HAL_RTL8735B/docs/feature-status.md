@@ -55,7 +55,7 @@ With the board type `hub8735ultra` and no barometer, boot stops at `Config Error
 | Manual flashing (Windows tool) | Works (T1) | See [Flash the firmware](flashing.md) |
 | Manual flashing (Linux tool) | Needs: one try on a board | See [Flash the firmware](flashing.md) |
 | `--upload` flashing | Needs: one try on a board | `COMn` (Windows tool) and `/dev/tty*` (Linux tool), see [Flash the firmware](flashing.md) |
-| Firmware OTA update | None | Firmware is updated by flashing, see [Flash the firmware](flashing.md) |
+| Firmware update over Wi-Fi | Needs: one try on a board | Board application `app/ota`, see [Update over Wi-Fi](flashing.md#update-over-wi-fi) |
 | Board applications | Needs: one try on a board | `env RTL8735B_APP_DIR`, see [Board applications](board-applications.md) |
 | Board applications blocking arming | Needs: one try on a board | `rtl8735b_app_arming_blocked`, see [Board applications](board-applications.md) |
 | Flash layout `realtek-ota` (default) | Works (T1, T2) | See [Flash layout](flash-layout.md) |

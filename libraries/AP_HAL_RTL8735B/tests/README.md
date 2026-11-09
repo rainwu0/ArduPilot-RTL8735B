@@ -18,7 +18,10 @@ Tools/scripts/rtl8735b_test.sh
 | `test_rtl8735b_flash_layout.py` | Flash 版面、分割表、映像大小檢查 |
 | `test_sdk_extract.py` | 建置時從 SDK 取得原始碼清單的工具 |
 | `test_rtl8735b_upload.py` | `--upload` 燒錄的參數與流程 |
+| `test_rtl8735b_ota_key.py` | OTA 公鑰產生器（`hwdef/scripts/rtl8735b_ota_key.py`）：公鑰檔格式、拒絕私鑰檔，以及公鑰只編進開發板的應用程式 |
+| `test_rtl8735b_ota_tools.py` | OTA 簽章與傳送工具（`Tools/scripts/rtl8735b_ota_*.py`）：檔案格式、對假接收端的協定與錯誤處理，以及送給真的接收端的端對端（簽章部分要 `pymonocypher`，沒有時略過） |
 | `hal/` | 序列埠、SPI／I²C、IO（GPIO、類比輸入、PWM、看門狗）、RC 輸入、參數儲存、排程、SD 卡（區塊存取，以及從檔案系統後端經 FatFs 到區塊存取）、DShot |
+| `../app/ota/tests/` | OTA 接收端（`app/ota/`）的 C 程式：核心、Flash、連線協定與開發板應用程式，用替身在主機上以 AddressSanitizer 編譯執行；需要 C 編譯器 |
 | `hal_wifi/` | Wi-Fi 帳密產生器、SDK 的 C 包裝、WiFiDriver 的 UDP 與 TCP |
 
 - `hal/`、`hal_wifi/` 把正式的 HAL 原始碼和替身（`fakes/` 等目錄裡的 SDK、FreeRTOS、AP_HAL）一起在主機上編譯執行。替身不是硬體模型：主機測試通過，不代表在開發板上能用。板上的驗證結果見 [功能狀態](../docs/feature-status.zh-TW.md)。

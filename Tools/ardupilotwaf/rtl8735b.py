@@ -26,6 +26,7 @@ import rtl8735b_upload
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../../libraries/AP_HAL_RTL8735B/hwdef/scripts'))
 import rtl8735b_flash_layout
 import rtl8735b_hwdef
+import rtl8735b_ota_key
 import rtl8735b_wifi_config
 
 
@@ -107,6 +108,23 @@ def generate_wifi_credentials(bld):
     return out
 
 
+def generate_ota_public_key(bld):
+    '''經 Wi-Fi 更新韌體的應用程式（app/ota）驗簽章用的公鑰，在建置時由環境變數 RTL8735B_OTA_PUBLIC_KEY 指向的
+    公鑰檔產生（hwdef/scripts/rtl8735b_ota_key.py），做法同 Wi-Fi 帳密。沒指定時長度 0，接收端一律拒收。
+    cmake 只把它編進開發板的應用程式，沒有應用程式的韌體不變'''
+    key = os.environ.get('RTL8735B_OTA_PUBLIC_KEY') or None
+    out = bld.bldnode.make_node('rtl8735b/ota_public_key.c').abspath()
+    try:
+        status = rtl8735b_ota_key.generate(key, out)
+    except rtl8735b_ota_key.OtaKeyError as e:
+        bld.fatal('OTA 公鑰錯誤（RTL8735B_OTA_PUBLIC_KEY=%s）：%s' % (key, e))
+    if status == 'configured':
+        print('OTA 公鑰：取自 %s' % key)
+        if not bld.env.RTL8735B_APP_DIR:
+            print('OTA 公鑰：沒有開發板的應用程式（env RTL8735B_APP_DIR），公鑰不會編進韌體')
+    return out
+
+
 def generate_partition_table(bld):
     '''SDK 打包用的分割表：以使用者 SDK 範例專案的分割表為底，依 hwdef 的 FLASH_LAYOUT 改寫 PARTAB
     （hwdef/scripts/rtl8735b_flash_layout.py）。每次建置都重寫，SDK 端的 cmake 以它取代 SDK 的那一份'''
@@ -138,6 +156,7 @@ def pre_build(self):
     save_build_state_on_hangup()
     lib_vars = OrderedDict()
     lib_vars['RTL8735B_WIFI_CREDENTIALS_SOURCE'] = generate_wifi_credentials(self)
+    lib_vars['RTL8735B_OTA_PUBLIC_KEY_SOURCE'] = generate_ota_public_key(self)
     lib_vars['RTL8735B_PARTITION_TABLE'] = generate_partition_table(self)
     # 版面名稱與 fw1、fw2 的位址與長度：cmake 只把它們加成應用程式原始碼的編譯定義（app/rtl8735b_app.h）。
     # 版面已由 generate_partition_table 檢查過

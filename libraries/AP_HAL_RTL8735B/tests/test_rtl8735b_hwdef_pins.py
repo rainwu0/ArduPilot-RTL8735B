@@ -224,18 +224,88 @@ class Hub8735UltraExpansionTest(unittest.TestCase):
                          ['{1,1,PIN_F2,PIN_F1,400000U,0}', '{2,2,PIN_E4,PIN_E3,400000U,0}'])
         self.assertEqual(count(self.header, 'HAL_RTL8735B_I2C_BUS_COUNT'), 2)
 
+    def test_esc_header_takes_uart0_rx_and_adc9(self):
+        # 電調接頭：UART0（SERIAL3）只收電調遙測（D10＝PA3），讓出的 TX 腳 D9＝PA2 當類比輸入 9 讀電調的電流輸出
+        self.assertIn('#define HAL_RTL8735B_SERIAL3_TX_PIN PIN_NC', self.header)
+        self.assertIn('#define HAL_RTL8735B_SERIAL3_RX_PIN PIN_A3', self.header)
+        self.assertIn('#define DEFAULT_SERIAL3_PROTOCOL SerialProtocol_ESCTelemetry', self.header)
+        self.assertEqual(table(self.header, 'HAL_RTL8735B_ADC_PINS'), ['{2,PIN_F0,0}', '{9,PIN_A2,6}'])
+
+    def test_default_parameters_come_from_romfs(self):
+        self.assertIn('#define HAL_PARAM_DEFAULTS_PATH "@ROMFS/defaults.parm"', self.header)
+        self.assertTrue((HAL / 'hwdef/hub8735ultra-expansion/defaults.parm').is_file())
+
     def test_rest_matches_hub8735ultra(self):
-        # SPI、PWM、GPIO、類比輸入與單行的 define（序列埠、Wi-Fi、SD 卡等）都照開發板
+        # SPI、PWM、GPIO 與單行的 define（其他序列埠、Wi-Fi、SD 卡等）都照開發板
         for name in ('HAL_RTL8735B_SPI_BUSES', 'HAL_RTL8735B_SPI_DEVICES', 'HAL_RTL8735B_RCOUT_PINS',
-                     'HAL_RTL8735B_GPIO_PINS', 'HAL_RTL8735B_ADC_PINS'):
+                     'HAL_RTL8735B_GPIO_PINS'):
             with self.subTest(name=name):
                 self.assertEqual(table(self.header, name), table(self.board, name))
         lines = set(self.header.splitlines())
         for line in self.board.splitlines():
             if re.match(r'#define \w+ \S', line) and not re.match(
-                    r'#define (HAL_RTL8735B_BOARD_NAME|HAL_RTL8735B_I2C_BUS_COUNT) ', line):
+                    r'#define (HAL_RTL8735B_BOARD_NAME|HAL_RTL8735B_I2C_BUS_COUNT|HAL_RTL8735B_ADC_COUNT|'
+                    r'HAL_RTL8735B_SERIAL3_TX_PIN) ', line):
                 with self.subTest(line=line):
                     self.assertIn(line, lines)
+
+
+def read_params(path):
+    '''參數檔（每行「名稱 值」或「名稱,值」，# 開頭是註解）→ {名稱: 值}；同一個名稱寫兩次算錯'''
+    params = {}
+    for line in path.read_text(encoding='utf-8').splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        name, value = re.split(r'[\s,]+', line, maxsplit=1)
+        if name in params:
+            raise ValueError('%s 寫了兩次：%s' % (path.name, name))
+        params[name] = value
+    return params
+
+
+class ExpansionDefaultsTest(unittest.TestCase):
+    '''擴充板的參數：板型的 defaults.parm 只放接線決定的值，機架、電池門檻、方向、校正、失效保護放整機參數檔；
+    每個參數只放一處'''
+
+    @classmethod
+    def setUpClass(cls):
+        cls.board = read_params(HAL / 'hwdef/hub8735ultra-expansion/defaults.parm')
+        cls.frame = read_params(ROOT / 'Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param')
+
+    def test_board_defaults(self):
+        self.assertEqual(self.board, {
+            # 類比電壓（D2，分壓 100 kΩ／20 kΩ）與電流（D9，電調電流輸出 12.75 mV/A）
+            'BATT_MONITOR': '4', 'BATT_VOLT_PIN': '2', 'BATT_VOLT_MULT': '6.0',
+            'BATT_CURR_PIN': '9', 'BATT_AMP_PERVLT': '78.43',
+            # DShot300，電調型號值
+            'MOT_PWM_TYPE': '5', 'SERVO_DSHOT_ESC': '2', 'SERVO_BLH_AUTO': '1',
+            # J10 給 GPS
+            'SERIAL1_PROTOCOL': '5',
+        })
+
+    def test_frame_has_the_failsafes_and_capacity(self):
+        for name, value in (('BATT_CAPACITY', '550'), ('FS_GCS_ENABLE', '5'), ('FS_OPTIONS', '8'),
+                            ('FS_THR_ENABLE', '3'), ('FRAME_CLASS', '1'), ('FRAME_TYPE', '1')):
+            with self.subTest(name=name):
+                self.assertEqual(self.frame.get(name), value)
+
+    def test_each_parameter_in_one_place(self):
+        self.assertEqual(set(self.board) & set(self.frame), set())
+
+    def test_left_out_of_both(self):
+        # BATT_AMP_OFFSET 0 是預設值；EK3_IMU_MASK、BRD_SAFETY_MASK、NTF_BUZZ_TYPES、RELAY1_FUNCTION 由韌體自動決定；
+        # 校正值、機身與網路設定每台不同
+        for name in ('BATT_AMP_OFFSET', 'EK3_IMU_MASK', 'BRD_SAFETY_MASK', 'NTF_BUZZ_TYPES', 'RELAY1_FUNCTION',
+                     'RC_OPTIONS', 'RC9_OPTION', 'SYSID_THISMAV'):
+            with self.subTest(name=name):
+                self.assertNotIn(name, self.board)
+                self.assertNotIn(name, self.frame)
+        for params in (self.board, self.frame):
+            for name in params:
+                with self.subTest(name=name):
+                    self.assertIsNone(re.match(r'(INS_(ACC|GYR)\w*(OFFS|SCAL)|COMPASS_(OFS|DIA|ODI|SCALE)|'
+                                               r'AHRS_TRIM|BARO\d?_GND|MAV\d_|\w*_DEV_ID|STAT_)', name))
 
 
 class RulesTest(unittest.TestCase):

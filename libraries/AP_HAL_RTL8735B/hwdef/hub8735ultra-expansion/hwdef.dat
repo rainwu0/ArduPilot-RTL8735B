@@ -18,3 +18,13 @@ COMPASS QMC5883L I2C:1:0x0D true ROTATION_NONE
 
 # 擴充板的外接 I²C 座走第二條匯流排（D3＝PE4 SDA、D4＝PE3 SCL；SDK 的 I2C2），座上有 10 kΩ 上拉
 RTL8735B_I2CBUS 2 2 PIN_E4 PIN_E3 400000 external
+
+# 電調接頭：UART0（SERIAL3）只收電調遙測（D10＝PA3），TX 腳 D9＝PA2 改當類比輸入 9，讀電調的電流輸出（BATT_CURR_PIN 9）
+undef HAL_RTL8735B_SERIAL3_TX_PIN
+define HAL_RTL8735B_SERIAL3_TX_PIN PIN_NC
+RTL8735B_ADC 9 PIN_A2
+define DEFAULT_SERIAL3_PROTOCOL SerialProtocol_ESCTelemetry
+
+# 預設參數：這個資料夾的 defaults.parm（電池監測、DShot300、電調型號）；ROMFS 的路徑以儲存庫根目錄為基準
+ROMFS defaults.parm libraries/AP_HAL_RTL8735B/hwdef/hub8735ultra-expansion/defaults.parm
+define HAL_PARAM_DEFAULTS_PATH "@ROMFS/defaults.parm"

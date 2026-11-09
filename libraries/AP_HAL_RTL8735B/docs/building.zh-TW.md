@@ -55,7 +55,7 @@ export RTL8735B_WIFI_CONFIG=~/wifi.txt
 ```
 
 - `--board` 是 `hwdef/` 裡的一個板型：[`hub8735ultra`](../hwdef/hub8735ultra/README.zh-TW.md)、[`hub8735ultra-expansion`](../hwdef/hub8735ultra-expansion/README.zh-TW.md)、[`amb82-mini`](../hwdef/amb82-mini/README.zh-TW.md)、[`rtl8735b-empty`](../hwdef/rtl8735b-empty/README.zh-TW.md)。
-- 板型都沒有感測器。感測器、安裝方向與預設參數寫在疊加檔，在 configure 那一行以 `--extra-hwdef <檔案>` 加上；見[描述自己的開發板](custom-boards.zh-TW.md)。
+- 除了 `hub8735ultra-expansion`，板型都沒有感測器。感測器、安裝方向與預設參數寫在疊加檔，在 configure 那一行以 `--extra-hwdef <檔案>` 加上；見[描述自己的開發板](custom-boards.zh-TW.md)。
 - 建置開頭附近，用到設定檔時印 `Wi-Fi STA: 帳密取自 <路徑>`，沒有時印 `Wi-Fi STA: 未設定（…），開發板連板型的預設熱點…`。
 - 最後一行是 `'copter' finished successfully`。中間有 `warning:`、`sed: can't read ...`、`JSON header - entry : fail` 的行，都來自 SDK，不影響結果。
 - 映像是 `build/<板型>/sdk_build/flash_ntz.bin`，例如 `build/hub8735ultra/sdk_build/flash_ntz.bin`。

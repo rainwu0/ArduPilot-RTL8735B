@@ -1,10 +1,10 @@
 # 上板驗證紀錄
 
-README〈功能狀態〉標「板上驗證」的項目，都在這裡有一筆紀錄。每筆綁定建置時的提交，只增不改；結果被推翻時加一筆新的，舊的留著並註明被哪一筆取代。主機測試與只建置的結果不寫在這裡。
+[功能狀態](docs/feature-status.zh-TW.md)標「能用」的項目，都在這裡有一筆紀錄。每筆綁定建置時的提交，只增不改；結果被推翻時加一筆新的，舊的留著並註明被哪一筆取代。主機測試與只建置的結果不寫在這裡。
 
 原始 log 不在儲存庫裡，紀錄只摘錄關鍵的幾行。
 
-### T1 沒有感測器的開機與 Wi-Fi 連線
+## T1 沒有感測器的開機與 Wi-Fi 連線
 
 - 日期：2026-10-13
 - 提交：`ebcbb5a8f6`
@@ -17,17 +17,19 @@ README〈功能狀態〉標「板上驗證」的項目，都在這裡有一筆�
   2. 錄 LOG UART，按 reset。
 - 預期：開機、連上 Wi-Fi；沒有氣壓計，所以停在氣壓計的 Config Error。
 - 結果：通過（只限上面兩項）。關鍵輸出：
-  ```
+
+  ```text
   download success
   WiFi: joining (SSID length 20)
   WiFi: up, local 192.168.137.216:14555
   Config Error: Baro: unable to initialise driver
   ```
+
   `Config Error` 每 5 秒重印一次。這時 ArduPilot 停在氣壓計初始化，還沒建立 MAVLink 通道（`ArduCopter/system.cpp` 的 `init_ardupilot` 先 `barometer.init()` 再 `gcs().setup_uarts()`），所以沒有 Wi-Fi MAVLink。
 - 怎麼確認對象是這塊開發板：只用這塊開發板的序列埠，沒有做網路檢查。
 - 沒測到的：Wi-Fi MAVLink、參數保存、TCP、`--upload`，以及所有感測器。
 
-### T2 範例疊加檔：感測器、Wi-Fi MAVLink（UDP）、參數保存、姿態
+## T2 範例疊加檔：感測器、Wi-Fi MAVLink（UDP）、參數保存、姿態
 
 - 日期：2026-10-14
 - 提交：`0320831602`
@@ -43,11 +45,13 @@ README〈功能狀態〉標「板上驗證」的項目，都在這裡有一筆�
 - 預期：開機沒有 `Config Error`；三個感測器都被偵測到（`INS_ACC_ID`、`BARO1_DEVID`、`COMPASS_DEV_ID` 都不是 0）；參數在重開機後保留；水平時 roll、pitch 接近 0，前方抬起時 pitch 為正、後方抬起時為負。
 - 結果：通過。關鍵輸出：
   - 開機（步驟 3 的重開機，完整錄到）：`Config Error` 出現 0 次。
-    ```
+
+    ```text
     WiFi: up, local 192.168.137.49:14557
     WiFi: ground station 192.168.137.1:14550
     QMC5883L found on bus 1 id 855305 address 0x0d
     ```
+
   - 心跳：10 秒 10 則，系統編號 3，未解鎖。參數：927 筆全部收到，`INS_ACC_ID` 589834、`BARO1_DEVID` 226825、`COMPASS_DEV_ID` 855305。
   - 參數保存：寫入 3，重開機後讀回 3，最後寫回 2.5。
   - 姿態：
@@ -73,7 +77,7 @@ README〈功能狀態〉標「板上驗證」的項目，都在這裡有一筆�
   - 主迴圈頻率；
   - TCP、`--upload`、飛行、馬達與 PWM 輸出、RC 輸入、GPS、長時間穩定性。
 
-### T3 I²C 開機清匯流排：不斷電重開機時氣壓計的初始化
+## T3 I²C 開機清匯流排：不斷電重開機時氣壓計的初始化
 
 - 日期：2026-10-16、2026-10-17
 - 提交：映像不是由本儲存庫的提交建置，而是由未公開的專案以同一份 HAL 修改加上未公開的應用程式建置。I²C 的程式（`bus_shim.c`、`I2CDevice.cpp`）和本儲存庫的 `7c010012fd` 相同，只差三行註解的用字；沒有之後的 `bffd9a9748`、`bd1ea0f7a2`（每條匯流排各自的狀態與 task）。
@@ -95,7 +99,7 @@ README〈功能狀態〉標「板上驗證」的項目，都在這裡有一筆�
   - 傳輸逾時後的重新初始化、清匯流排與停用；
   - 多條 I²C 匯流排，以及 `bffd9a9748`、`bd1ea0f7a2` 之後的程式。
 
-### T4 主迴圈：正常運作的頻率、IMU 斷線時其他 task 是否照常
+## T4 主迴圈：正常運作的頻率、IMU 斷線時其他 task 是否照常
 
 - 日期：2026-10-16（甲）、2026-10-17（乙）
 - 提交：映像不是由本儲存庫的提交建置，而是由未公開的專案以同一份 HAL 修改加上未公開的應用程式建置。兩份映像的 `Scheduler.h` 和本儲存庫的 `6ea8e665d0` 相同，`Scheduler.cpp` 只多了重開機前呼叫應用程式的兩行與註解，和讓出無關。
@@ -113,3 +117,35 @@ README〈功能狀態〉標「板上驗證」的項目，都在這裡有一筆�
 - 怎麼確認對象是這塊開發板：甲同 T3；乙只看 192.168.137.35 送來的封包。
 - 判讀：乙的主迴圈沒有卡住，加速度與角速度是 0 而不是停在最後的值，推論是 SCLK 拔掉後 IMU 的驅動程式照樣讀到樣本（全是 0），`wait_for_sample()` 沒有空轉，所以讓出可能沒有觸發。乙證明的是「拔掉 IMU 的 SCLK 時主迴圈與較低優先權的 task 照常」，不能證明讓出在 IMU 完全不送樣本時有效。能推翻這個推論的：加計數的映像在同樣操作下記到讓出。
 - 沒測到的：IMU 完全不送樣本（例如拔掉片選或電源）時的主迴圈與其他 task；讓出實際觸發的次數；負載較重時讓出造成的延遲。
+
+## T5 四軸飛行：HUB 8735 ultra 加擴充板，地面站經 Wi-Fi 遙控
+
+- 日期：2026-10-25、2026-11-06
+- HAL 版本：
+  - 2026-10-25：未公開的開發版，早於 v0.2.0。DShot、類比輸入與 I²C 的程式和 v0.2.0 相同；SD 卡、SERIAL0 的 MAVLink、以 STATUSTEXT 送出的警告，是 v0.2.0 才加入的。
+  - 2026-11-06：未公開的開發版，從 v0.2.0 之前分出。DShot、類比輸入與 I²C 的程式和 v0.2.0 相同；另有 ADC 出廠校正，以及 IO 與 Storage 執行緒在 setup 之前開始，這兩項已在 v0.2.1 公開。其他地方大多是 v0.2.0 比較新。
+- 飛行器（兩次相同）：
+  - 開發板：HUB 8735 ultra，加一塊手焊的擴充板
+  - 感測器（在擴充板上）：GY-BMI160（IMU，SPI）、GY-BMP280（氣壓計，I²C）、GY-271（QMC5883L 羅盤，I²C）
+  - 機架：HSKRC CC35 O4 版，3.5 吋，四軸 X（`FRAME_CLASS` 1、`FRAME_TYPE` 1）
+  - 馬達：HSKRC 1103 8000 kV
+  - 槳：GEMFAN D90S-3，三葉 3.5 吋
+  - 電調：MicoAir Bluejay-4IN1-33A 4 合 1 電調（韌體 Bluejay，PWM 48 kHz）
+  - 電池：TATTU ACE 2S 450 mAh 75C；BEC：JHEMCU
+  - 總重含電池 240.7 g
+- 遙控：Mission Planner 接手把，經 Wi-Fi 上的 MAVLink 送到開發板；不用遙控接收機（`RC_OPTIONS` 33）。
+- 2026-10-25：這天存下的參數裡，飛行次數 `STAT_FLTCNT` 是 3，累計飛行時間 `STAT_FLTTIME` 是 24 秒。
+- 2026-11-06：室內，飛行約 41 秒，定高（AltHold），高度 1–1.7 m。地面站經 UDP 14550 連線，衛星數 0。地面站一開始顯示 `EKF3 IMU0 MAG0 ground mag anomaly`，飛行中一直顯示 `Error compass variance`。水平方向飄移大。
+- 結果：兩次都由開發板上的 ArduPilot Copter 控制飛行。
+- 兩次都用到：
+  - DShot300（`MOT_PWM_TYPE` 5）；
+  - BMI160、BMP280、QMC5883L（`COMPASS_USE` 1、`COMPASS_EXTERNAL` 1）；
+  - 類比電池電壓（`BATT_MONITOR` 4），用來顯示與觸發低電壓失效保護；
+  - Wi-Fi MAVLink；
+  - 參數存在 Flash。
+- 有接、有設定，沒有校正：電池電壓與電流。電流的 `BATT_AMP_PERVLT` 照電調規格換算，`BATT_AMP_OFFSET` 是 0。2026-10-25 的設定下，地面站顯示的電池電壓比電錶高約 11%（電錶 7.71 V，地面站 8.58 V）。
+- 沒用到：
+  - GPS（`GPS1_TYPE` 0）；
+  - 記錄檔（`LOG_BACKEND_TYPE` 0）與 SD 卡；
+  - 電調遙測：`SERIAL3_PROTOCOL` 16 有設，這組電調沒有遙測線；
+  - 序列遙控接收機：`SERIAL4_PROTOCOL` 23 有開，`RC_OPTIONS` 設成忽略接收機。

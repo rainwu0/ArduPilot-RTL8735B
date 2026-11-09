@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="980" viewBox="0 0 1240 980" font-family="'Noto Sans TC','Microsoft JhengHei','PingFang TC','Helvetica Neue',Arial,sans-serif">
+<rect width="1240" height="980" fill="#ffffff"/>
+<text x="40" y="44" font-size="22" font-weight="bold" fill="#111">HUB 8735 ultra 排針</text>
+<text x="40" y="70" font-size="13" fill="#444">俯視元件面，USB-C 朝下；示意圖，不照比例。用途是板型 hub8735ultra 的預設設定。</text>
+<rect x="505" y="195" width="230" height="555" rx="10" fill="#eef3ee" stroke="#556655" stroke-width="2"/>
+<text x="620" y="183" font-size="14" text-anchor="middle" fill="#111">▲ 前方：microSD 端</text>
+<rect x="580" y="203" width="80" height="20" fill="#fff" stroke="#888"/>
+<text x="620" y="218" font-size="11" text-anchor="middle" fill="#555">microSD</text>
+<rect x="535" y="710" width="50" height="32" fill="#fff" stroke="#888"/>
+<text x="560" y="723" font-size="10" text-anchor="middle" fill="#555">USB-C</text>
+<text x="560" y="737" font-size="10" text-anchor="middle" fill="#555">CNA2</text>
+<rect x="655" y="710" width="50" height="32" fill="#fff" stroke="#888"/>
+<text x="680" y="723" font-size="10" text-anchor="middle" fill="#555">USB-C</text>
+<text x="680" y="737" font-size="10" text-anchor="middle" fill="#555">CNA1</text>
+<text x="620" y="770" font-size="12" text-anchor="middle" fill="#556655">HUB 8735 ultra（元件面）</text>
+<text x="540" y="236" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">JA1</text>
+<text x="540" y="470" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">JA7</text>
+<text x="700" y="236" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">JA2</text>
+<text x="700" y="470" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">JA8</text>
+<rect x="533" y="243" width="14" height="14" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="558" y="254" font-size="10" text-anchor="middle" fill="#555">1</text>
+<line x1="528" y1="250" x2="490" y2="250" stroke="#d62728" stroke-width="3"/>
+<text x="484" y="254" font-size="12" font-weight="normal" text-anchor="end" fill="#d62728">5V：5 V 電源（VIN）</text>
+<circle cx="540" cy="276" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="558" y="280" font-size="10" text-anchor="middle" fill="#555">2</text>
+<line x1="528" y1="276" x2="490" y2="276" stroke="#222222" stroke-width="3"/>
+<text x="484" y="280" font-size="12" font-weight="normal" text-anchor="end" fill="#222222">GND</text>
+<circle cx="540" cy="302" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="558" y="306" font-size="10" text-anchor="middle" fill="#555">3</text>
+<line x1="528" y1="302" x2="490" y2="302" stroke="#1f6fb4" stroke-width="3"/>
+<text x="484" y="306" font-size="12" font-weight="normal" text-anchor="end" fill="#1f6fb4">D0 · PF2：I²C 匯流排 1 SDA</text>
+<circle cx="540" cy="328" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="558" y="332" font-size="10" text-anchor="middle" fill="#555">4</text>
+<line x1="528" y1="328" x2="490" y2="328" stroke="#1f6fb4" stroke-width="3"/>
+<text x="484" y="332" font-size="12" font-weight="normal" text-anchor="end" fill="#1f6fb4">D1 · PF1：I²C 匯流排 1 SCL</text>
+<circle cx="540" cy="354" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="558" y="358" font-size="10" text-anchor="middle" fill="#555">5</text>
+<line x1="528" y1="354" x2="490" y2="354" stroke="#0f8c8c" stroke-width="3"/>
+<text x="484" y="358" font-size="12" font-weight="normal" text-anchor="end" fill="#0f8c8c">D2 · PF0：類比輸入（ADC 0）</text>
+<circle cx="540" cy="380" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="558" y="384" font-size="10" text-anchor="middle" fill="#555">6</text>
+<line x1="528" y1="380" x2="490" y2="380" stroke="#999999" stroke-width="3"/>
+<text x="484" y="384" font-size="12" font-weight="normal" text-anchor="end" fill="#999999">D3 · PE4：未設定（可改 I²C2 SDA、SPI0 CS）</text>
+<circle cx="540" cy="406" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="558" y="410" font-size="10" text-anchor="middle" fill="#555">7</text>
+<line x1="528" y1="406" x2="490" y2="406" stroke="#999999" stroke-width="3"/>
+<text x="484" y="410" font-size="12" font-weight="normal" text-anchor="end" fill="#999999">D4 · PE3：未設定（可改 I²C2 SCL、SPI0 MOSI）</text>
+<circle cx="540" cy="432" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="558" y="436" font-size="10" text-anchor="middle" fill="#555">8</text>
+<line x1="528" y1="432" x2="490" y2="432" stroke="#2a9d3a" stroke-width="3"/>
+<text x="484" y="436" font-size="12" font-weight="normal" text-anchor="end" fill="#2a9d3a">D5 · PE2：SERIAL4 RX（UART3，RC 輸入）</text>
+<rect x="533" y="477" width="14" height="14" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="558" y="488" font-size="10" text-anchor="middle" fill="#555">1</text>
+<line x1="528" y1="484" x2="490" y2="484" stroke="#2a9d3a" stroke-width="3"/>
+<text x="484" y="488" font-size="12" font-weight="normal" text-anchor="end" fill="#2a9d3a">D6 · PE1：SERIAL4 TX（UART3）</text>
+<circle cx="540" cy="510" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="558" y="514" font-size="10" text-anchor="middle" fill="#555">2</text>
+<line x1="528" y1="510" x2="490" y2="510" stroke="#5a5a5a" stroke-width="3"/>
+<text x="484" y="514" font-size="12" font-weight="normal" text-anchor="end" fill="#5a5a5a">D7 · PD17：GPIO 7（輸入）</text>
+<circle cx="540" cy="536" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="558" y="540" font-size="10" text-anchor="middle" fill="#555">3</text>
+<line x1="528" y1="536" x2="490" y2="536" stroke="#2a9d3a" stroke-width="3"/>
+<text x="484" y="540" font-size="12" font-weight="normal" text-anchor="end" fill="#2a9d3a">D8 · PD15：SERIAL1 TX（UART2，MAVLink2）</text>
+<circle cx="540" cy="562" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="558" y="566" font-size="10" text-anchor="middle" fill="#555">4</text>
+<line x1="528" y1="562" x2="490" y2="562" stroke="#2a9d3a" stroke-width="3"/>
+<text x="484" y="566" font-size="12" font-weight="normal" text-anchor="end" fill="#2a9d3a">D9 · PA2：SERIAL3 TX（UART0，GPS）</text>
+<circle cx="540" cy="588" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="558" y="592" font-size="10" text-anchor="middle" fill="#555">5</text>
+<line x1="528" y1="588" x2="490" y2="588" stroke="#2a9d3a" stroke-width="3"/>
+<text x="484" y="592" font-size="12" font-weight="normal" text-anchor="end" fill="#2a9d3a">D10 · PA3：SERIAL3 RX（UART0，GPS）</text>
+<circle cx="540" cy="614" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="558" y="618" font-size="10" text-anchor="middle" fill="#555">6</text>
+<line x1="528" y1="614" x2="490" y2="614" stroke="#8a3fb8" stroke-width="3"/>
+<text x="484" y="618" font-size="12" font-weight="normal" text-anchor="end" fill="#8a3fb8">D11 · PF14：PWM 輸出 1</text>
+<circle cx="540" cy="640" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<path d="M532 632 L548 648 M532 648 L548 632" stroke="#b00000" stroke-width="2.4"/>
+<text x="558" y="644" font-size="10" text-anchor="middle" fill="#555">7</text>
+<line x1="528" y1="640" x2="490" y2="640" stroke="#b00000" stroke-width="3"/>
+<text x="484" y="644" font-size="12" font-weight="bold" text-anchor="end" fill="#b00000">D12 · PF15：upgrade 鍵　不可接</text>
+<circle cx="540" cy="666" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<path d="M532 658 L548 674 M532 674 L548 658" stroke="#b00000" stroke-width="2.4"/>
+<text x="558" y="670" font-size="10" text-anchor="middle" fill="#555">8</text>
+<line x1="528" y1="666" x2="490" y2="666" stroke="#b00000" stroke-width="3"/>
+<text x="484" y="670" font-size="12" font-weight="bold" text-anchor="end" fill="#b00000">D13 · PF10：白色補光燈　不可接</text>
+<rect x="693" y="243" width="14" height="14" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="682" y="254" font-size="10" text-anchor="middle" fill="#555">1</text>
+<line x1="712" y1="250" x2="750" y2="250" stroke="#d62728" stroke-width="3"/>
+<text x="756" y="254" font-size="12" font-weight="normal" fill="#d62728">3.3V：3.3 V 電源</text>
+<circle cx="700" cy="276" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<path d="M692 268 L708 284 M692 284 L708 268" stroke="#b00000" stroke-width="2.4"/>
+<text x="682" y="280" font-size="10" text-anchor="middle" fill="#555">2</text>
+<line x1="712" y1="276" x2="750" y2="276" stroke="#b00000" stroke-width="3"/>
+<text x="756" y="280" font-size="12" font-weight="bold" fill="#b00000">D14 · PA5：開機模式腳　不可接</text>
+<circle cx="700" cy="302" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="682" y="306" font-size="10" text-anchor="middle" fill="#555">3</text>
+<line x1="712" y1="302" x2="750" y2="302" stroke="#2a9d3a" stroke-width="3"/>
+<text x="756" y="306" font-size="12" font-weight="normal" fill="#2a9d3a">D15 · PD16：SERIAL1 RX（UART2）</text>
+<circle cx="700" cy="328" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="682" y="332" font-size="10" text-anchor="middle" fill="#555">4</text>
+<line x1="712" y1="328" x2="750" y2="328" stroke="#222222" stroke-width="3"/>
+<text x="756" y="332" font-size="12" font-weight="normal" fill="#222222">GND</text>
+<circle cx="700" cy="354" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="682" y="358" font-size="10" text-anchor="middle" fill="#555">5</text>
+<line x1="712" y1="354" x2="750" y2="354" stroke="#d62728" stroke-width="3"/>
+<text x="756" y="358" font-size="12" font-weight="normal" fill="#d62728">VCC：5 V（和 JA1.1 的 5V 相通）</text>
+<circle cx="700" cy="380" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<path d="M692 372 L708 388 M692 388 L708 372" stroke="#b00000" stroke-width="2.4"/>
+<text x="682" y="384" font-size="10" text-anchor="middle" fill="#555">6</text>
+<line x1="712" y1="380" x2="750" y2="380" stroke="#b00000" stroke-width="3"/>
+<text x="756" y="384" font-size="12" font-weight="bold" fill="#b00000">D16 · PF3：SERIAL0 RX（LOG UART）　不可接</text>
+<circle cx="700" cy="406" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<path d="M692 398 L708 414 M692 414 L708 398" stroke="#b00000" stroke-width="2.4"/>
+<text x="682" y="410" font-size="10" text-anchor="middle" fill="#555">7</text>
+<line x1="712" y1="406" x2="750" y2="406" stroke="#b00000" stroke-width="3"/>
+<text x="756" y="410" font-size="12" font-weight="bold" fill="#b00000">D17 · PF4：SERIAL0 TX（LOG UART）　不可接</text>
+<circle cx="700" cy="432" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="682" y="436" font-size="10" text-anchor="middle" fill="#555">8</text>
+<line x1="712" y1="432" x2="750" y2="432" stroke="#222222" stroke-width="3"/>
+<text x="756" y="436" font-size="12" font-weight="normal" fill="#222222">GND</text>
+<rect x="693" y="477" width="14" height="14" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="682" y="488" font-size="10" text-anchor="middle" fill="#555">1</text>
+<line x1="712" y1="484" x2="750" y2="484" stroke="#e07b00" stroke-width="3"/>
+<text x="756" y="488" font-size="12" font-weight="normal" fill="#e07b00">D18 · PF5：SPI 匯流排 1 MISO</text>
+<circle cx="700" cy="510" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="682" y="514" font-size="10" text-anchor="middle" fill="#555">2</text>
+<line x1="712" y1="510" x2="750" y2="510" stroke="#e07b00" stroke-width="3"/>
+<text x="756" y="514" font-size="12" font-weight="normal" fill="#e07b00">D19 · PF6：SPI 匯流排 1 SCLK</text>
+<circle cx="700" cy="536" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="682" y="540" font-size="10" text-anchor="middle" fill="#555">3</text>
+<line x1="712" y1="536" x2="750" y2="536" stroke="#e07b00" stroke-width="3"/>
+<text x="756" y="540" font-size="12" font-weight="normal" fill="#e07b00">D20 · PF7：SPI 匯流排 1 MOSI</text>
+<circle cx="700" cy="562" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="682" y="566" font-size="10" text-anchor="middle" fill="#555">4</text>
+<line x1="712" y1="562" x2="750" y2="562" stroke="#e07b00" stroke-width="3"/>
+<text x="756" y="566" font-size="12" font-weight="normal" fill="#e07b00">D21 · PF8：SPI 匯流排 1 CS（bmi160）</text>
+<circle cx="700" cy="588" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="682" y="592" font-size="10" text-anchor="middle" fill="#555">5</text>
+<line x1="712" y1="588" x2="750" y2="588" stroke="#8a3fb8" stroke-width="3"/>
+<text x="756" y="592" font-size="12" font-weight="normal" fill="#8a3fb8">D22 · PF11：PWM 輸出 2</text>
+<circle cx="700" cy="614" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="682" y="618" font-size="10" text-anchor="middle" fill="#555">6</text>
+<line x1="712" y1="614" x2="750" y2="614" stroke="#8a3fb8" stroke-width="3"/>
+<text x="756" y="618" font-size="12" font-weight="normal" fill="#8a3fb8">D23 · PF12：PWM 輸出 3</text>
+<circle cx="700" cy="640" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="682" y="644" font-size="10" text-anchor="middle" fill="#555">7</text>
+<line x1="712" y1="640" x2="750" y2="640" stroke="#8a3fb8" stroke-width="3"/>
+<text x="756" y="644" font-size="12" font-weight="normal" fill="#8a3fb8">D24 · PF13：PWM 輸出 4</text>
+<circle cx="700" cy="666" r="7" fill="#fff" stroke="#333" stroke-width="1.6"/>
+<text x="682" y="670" font-size="10" text-anchor="middle" fill="#555">8</text>
+<line x1="712" y1="666" x2="750" y2="666" stroke="#999999" stroke-width="3"/>
+<text x="756" y="670" font-size="12" font-weight="normal" fill="#999999">SPK：喇叭輸出（HAL 不使用）</text>
+<line x1="40" y1="802" x2="62" y2="802" stroke="#d62728" stroke-width="4"/>
+<text x="68" y="806" font-size="12" fill="#111">電源</text>
+<line x1="120" y1="802" x2="142" y2="802" stroke="#222222" stroke-width="4"/>
+<text x="148" y="806" font-size="12" fill="#111">GND</text>
+<line x1="213" y1="802" x2="235" y2="802" stroke="#1f6fb4" stroke-width="4"/>
+<text x="241" y="806" font-size="12" fill="#111">I²C</text>
+<line x1="306" y1="802" x2="328" y2="802" stroke="#e07b00" stroke-width="4"/>
+<text x="334" y="806" font-size="12" fill="#111">SPI</text>
+<line x1="399" y1="802" x2="421" y2="802" stroke="#2a9d3a" stroke-width="4"/>
+<text x="427" y="806" font-size="12" fill="#111">UART</text>
+<line x1="505" y1="802" x2="527" y2="802" stroke="#8a3fb8" stroke-width="4"/>
+<text x="533" y="806" font-size="12" fill="#111">PWM 輸出</text>
+<line x1="637" y1="802" x2="659" y2="802" stroke="#0f8c8c" stroke-width="4"/>
+<text x="665" y="806" font-size="12" fill="#111">類比輸入</text>
+<line x1="743" y1="802" x2="765" y2="802" stroke="#5a5a5a" stroke-width="4"/>
+<text x="771" y="806" font-size="12" fill="#111">GPIO</text>
+<line x1="849" y1="802" x2="871" y2="802" stroke="#999999" stroke-width="4"/>
+<text x="877" y="806" font-size="12" fill="#111">未設定或不用</text>
+<line x1="981" y1="802" x2="1003" y2="802" stroke="#b00000" stroke-width="4"/>
+<text x="1009" y="806" font-size="12" fill="#111">不可接（✕）</text>
+<text x="40" y="836" font-size="12" fill="#b00000">不可接的五支：D14 在重置時決定是否進燒錄模式，也是相機 LDO 的致能；D12 是 upgrade 鍵，拉低它等於按著 upgrade；</text>
+<text x="40" y="856" font-size="12" fill="#b00000">D13 接板上白色補光燈的驅動電晶體；D16、D17 是 LOG UART，接板上的 USB 序列埠（燒錄、開機訊息、SERIAL0）。</text>
+<text x="40" y="880" font-size="12" fill="#333">方形焊墊是每組的第 1 腳，在 microSD 端；腳號往 USB-C 端增加。模組一律接 3.3 V，RTL8735B 的 I/O 是 3.3 V。</text>
+<text x="40" y="904" font-size="12" fill="#333">USB-C：右邊的 CNA1 經 CH340N 接 LOG UART（燒錄、SERIAL0），左邊的 CNA2 接晶片自己的 USB。</text>
+<text x="40" y="928" font-size="11" fill="#555">排針位置依 ideashatch/HUB-8735 870a7e08de7a 的 Gerber 與元件位置圖，各腳的接法依同一提交的原理圖與模組規格書；圖是自行繪製。</text>
+</svg>

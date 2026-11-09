@@ -1,35 +1,34 @@
-# 從零開始：在 HUB 8735 ultra 上跑 ArduPilot
+# Getting started: ArduPilot on the HUB 8735 ultra
 
-English: [GETTING_STARTED.en.md](GETTING_STARTED.en.md)
+[繁體中文](GETTING_STARTED.zh-TW.md)
 
-照這一頁從頭做一次，最後會在地面站上看到開發板的姿態。每一步最後都寫了「成功時會看到」。對不上就先停下來，開 issue 說卡在哪一步。
+Work through this page once from the top, and at the end you will see the board's attitude in a ground station. Each step ends with what you see when it works. If what you see does not match, stop at that step and open an issue saying where you are stuck.
 
-**還沒飛過，請勿用於飛行。** 這一頁只做到地面站連得上，全程不要接馬達、電調和電池。
+This page goes as far as a connected ground station, with no motors, ESCs or battery at any point.
 
-## 你需要
+## What you need
 
-- **開發板**：一塊 HUB 8735 ultra，加一條**能傳資料**的 USB-C 線。只能充電的線接上之後，電腦不會出現序列埠。
-- **感測器模組**：最少兩顆，GY-BMI160（IMU）和 BMP280（氣壓計）。羅盤 GY-271（QMC5883L）可以之後再接。另外準備杜邦線或焊接工具。
-- **電腦**：一台 Windows，裝好 WSL 的 Ubuntu 22.04。建置在 WSL 裡做，燒錄和地面站在 Windows 那邊。
-- **Wi-Fi 熱點**：電腦和開發板都連同一個，建議用 2.4 GHz。5 GHz 能不能用還沒驗過。要用自己控制的熱點，因為 Wi-Fi 上的 MAVLink 沒有任何驗證。
-- **磁碟和時間**：至少 7 GB 磁碟。從 clone 到建好映像約 13 分鐘：clone 約 3.5 分鐘、裝工具與 SDK 約 5 分鐘、建置約 3.3 分鐘（依網路與電腦而定）。
+- **Board**: one HUB 8735 ultra, and a USB-C cable that **carries data**. With a charge-only cable, no serial port appears on the computer.
+- **Sensor modules**: a GY-BMI160 (IMU) and a BMP280 (barometer). The GY-271 compass (QMC5883L) can wait. You also need jumper wires or soldering tools.
+- **Computer**: a Windows PC with Ubuntu 22.04 in WSL. Building happens in WSL; flashing and the ground station are on the Windows side.
+- **Wi-Fi hotspot**: the computer and the board both join the same one; 2.4 GHz is recommended. Use a hotspot you control: MAVLink over Wi-Fi has no authentication at all, and any device on the subnet can send to the board.
+- **Disk and time**: at least 7 GB of disk. From clone to a built image takes about 13 minutes: clone about 3.5 minutes, tools and SDK about 5 minutes, build about 3.3 minutes (depending on your network and computer).
 
-**為什麼一定要接感測器：**
-- 什麼都不接的話，開機會停在 `Config Error: Baro: unable to initialise driver`。Wi-Fi 會連上熱點，但地面站收不到任何東西。這不是 Wi-Fi 壞了，而是 ArduPilot 找不到氣壓計就不往下走。
-- 只接氣壓計的話，接著會停在 IMU 的 Config Error：地面站應該連得上、會收到這則錯誤，但沒有姿態。這是讀程式的推論，還沒上板驗過。
-- 所以最少要接氣壓計和 IMU。
+Both the barometer and the IMU are needed: with nothing connected, boot stops at `Config Error: Baro: unable to initialise driver`, and although Wi-Fi joins the hotspot, the ground station receives nothing over it.
 
-## 1. 接線
+## 1. Wiring
 
-照 HAL README 的[〈接上感測器〉](README.md#接上感測器)接。
+Wire as in the [Wiring Diagram](hwdef/hub8735ultra/README.md#wiring-diagram) of the HUB 8735 ultra README.
 
-- 模組一律接 3.3 V 和 GND，不要接 5 V：RTL8735B 的 I/O 是 3.3 V。
-- 3.3 V 與 GND：照開發板排針旁絲印標的 3.3 V 和 GND 接。不確定的話，看板商公開的原理圖：ideashatch/HUB-8735 `870a7e08de7a` 的 `HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf`。
-- IMU 照範例擺：元件面朝上，前方是 USB 接頭的另一端。擺法不同的話，最後一步的姿態方向會不對，見〈接上感測器〉的「安裝方向」。
+- Connect every module to 3.3 V and GND: the RTL8735B's I/O is 3.3 V.
+- 3.3 V and GND: use the 3.3 V and GND marked on the silkscreen next to the board's header pins. If unsure, see the schematic the vendor published: `HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf` in ideashatch/HUB-8735 `870a7e08de7a`.
+- Mount the IMU as in the example: component side up, with the front at the end opposite the USB connectors. If you mount it differently, the attitude in the last step will be wrong; see "Mounting orientation" in the same section.
 
-## 2. 在 WSL 裡取得原始碼
+When it works: every module's VCC goes to 3.3V (JA2.1) and its GND to a GND pin, and each signal wire goes to the pin in the table of the wiring diagram. The board is not powered yet.
 
-開 WSL 的 Ubuntu 終端機，**在 WSL 自己的家目錄裡 clone**：
+## 2. Get the source in WSL
+
+Open a WSL Ubuntu terminal and **clone into WSL's own home directory**:
 
 ```bash
 cd ~
@@ -37,18 +36,20 @@ git clone https://github.com/rainwu0/ArduPilot-RTL8735B.git
 cd ArduPilot-RTL8735B
 ```
 
-感測器的設定（疊加檔）放在[範例庫](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/tree/v0.1.0/examples/bmi160-bmp280-qmc5883l)，也 clone 到家目錄，建置時會用到：
+The sensor settings (the overlay) are in the [examples repository](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/tree/v0.1.0/examples/bmi160-bmp280-qmc5883l). Clone it into your home directory too; the build uses it:
 
 ```bash
 git clone --branch v0.1.0 https://github.com/rainwu0/ArduPilot-Hub8735Ultra.git ~/ArduPilot-Hub8735Ultra
 ```
 
-- 不要 clone 到 `/mnt/c` 底下，也不要用 Windows 的 Git：前者建置會很慢，後者會把換行改掉，腳本會壞。
-- 不要加 `--recurse-submodules`：ArduPilot 的子模組很多，用不到。下一步只裝三個，建置時會再自己下載 `gtest`、`littlefs` 兩個，所以建置時也要連網。
+- Use the git in WSL and clone into WSL's home directory: under `/mnt/c` the build is very slow, and Windows Git changes the line endings, which breaks the scripts.
+- Clone without `--recurse-submodules`: ArduPilot has many submodules you do not need. The next step installs only three; the build downloads two more by itself, `gtest` and `littlefs`, so you also need a network connection while building.
 
-## 3. 安裝工具與 SDK
+When it works: `ls ~/ArduPilot-Hub8735Ultra/examples/bmi160-bmp280-qmc5883l/overlay.dat` prints the path of the overlay, and `pwd` shows `/home/<your WSL user name>/ArduPilot-RTL8735B`, not a path under `/mnt/c`.
 
-在 `~/ArduPilot-RTL8735B` 裡執行：
+## 3. Install the tools and the SDK
+
+In `~/ArduPilot-RTL8735B`, run:
 
 ```bash
 Tools/environment_install/install-rtl8735b-prereqs-ubuntu.sh
@@ -58,37 +59,37 @@ export PATH="$HOME/ambpro2_sdk/tools/asdk-10.3.0/linux/newlib/bin:$PATH"
 git submodule update --init --recursive modules/waf modules/mavlink modules/DroneCAN
 ```
 
-- 第一行會用 `sudo` 裝套件，要輸入 WSL 的密碼。
-- SDK 和工具鏈會放在旁邊的 `~/ambpro2_sdk`，解開後約 1.8 GB。
-- 開新的終端機時要重做幾行設定，見第 4 步的最後。
+- The first line installs packages with `sudo`, so it asks for your WSL password.
+- The SDK and the toolchain go next door, in `~/ambpro2_sdk`, about 1.8 GB unpacked.
+- When you open a new terminal, a few settings have to be redone; see the end of step 4.
 
-成功時：`arm-none-eabi-gcc --version` 的第一行有 `Realtek ASDK`。沒有的話，就是 PATH 沒設好，或用到了系統套件的編譯器，那個不能用。PATH 沒設時，下一步的 configure 會印出 `Could not find the program ['arm-none-eabi-ar']`。
+When it works: the first line of `arm-none-eabi-gcc --version` contains `Realtek ASDK`. If it does not, PATH is not set correctly, or the compiler from the system packages is being used, and that one does not build this port. Without PATH set, the configure that follows prints `Could not find the program ['arm-none-eabi-ar']`.
 
-## 4. Wi-Fi 設定檔
+## 4. Wi-Fi settings file
 
-在 WSL 的家目錄建一個檔案，例如 `~/wifi.txt`，內容兩行：
+In your WSL home directory, create a file, for example `~/wifi.txt`, with two lines:
 
+```text
+ssid=your-hotspot-name
+password=your-hotspot-password
 ```
-ssid=你的熱點名稱
-password=你的熱點密碼
-```
 
-- 等號後面的內容會原樣使用。**不要加引號，等號前後和行尾也不要多打空白**，不然引號和空白會變成名稱或密碼的一部分。名稱中間的空白沒關係。
-- 打錯引號或空白時，建置**不會**有任何警告。要到第 7 步看開機訊息的 `SSID length N` 才發現得了：N 是熱點名稱的位元組數，英數字一個算 1，中文一個字算 3。
-- 密碼要 8–63 個字元，或 64 個十六進位字元，而且只能用可列印的 ASCII（英數字、符號與空白），不能有中文等其他字元；開放網路就把 `password=` 後面留空。長度或字元不對時，建置會失敗並說明原因。
-- 這個檔案不要放進任何 git 儲存庫，可以 `chmod 600 ~/wifi.txt`。
+- Everything after the equals sign is used exactly as written: **quotes, and extra spaces around the equals sign or at the end of a line, become part of the name or password**. Spaces inside the name are fine.
+- A stray quote or space gives **no** warning at build time. You only find out in step 7, from `SSID length N` in the ground station's messages: N is the number of bytes in the hotspot name, 1 for each letter or digit and 3 for each Chinese character.
+- The password is 8–63 characters, or 64 hexadecimal characters, of printable ASCII only (letters, digits, symbols and spaces); for an open network, leave `password=` empty. If the length or the characters are wrong, the build fails and says why.
+- Keep this file outside every git repository; you can `chmod 600 ~/wifi.txt`.
 
-在建置之前告訴建置系統它在哪裡：
+Before building, tell the build system where it is:
 
 ```bash
 export RTL8735B_WIFI_CONFIG=~/wifi.txt
 ```
 
-設定檔在建置時才讀。改了內容，直接重新建置就好，不用重新 configure。
+The settings file is read at build time. After changing it, just build again; there is no need to configure again.
 
-帳密會編進韌體：建出來的映像不要分享，回報問題時也不要附上。
+The credentials are compiled into the firmware, and anyone who has the image may be able to read them. For an image to share or to attach to an issue, build another one without `RTL8735B_WIFI_CONFIG`.
 
-**之後每次開新的終端機，先做這四行再建置：**
+**Every time you open a new terminal, run these four lines before building:**
 
 ```bash
 cd ~/ArduPilot-RTL8735B
@@ -97,100 +98,98 @@ export PATH="$HOME/ambpro2_sdk/tools/asdk-10.3.0/linux/newlib/bin:$PATH"
 export RTL8735B_WIFI_CONFIG=~/wifi.txt
 ```
 
-漏了最後一行，建出來的映像會沒有 Wi-Fi。
+If you leave out the last line, the image you build has no Wi-Fi.
 
-## 5. 建置
+When it works: `ls -l $RTL8735B_WIFI_CONFIG` lists your settings file, with `-rw-------` at the start if you ran `chmod 600`.
+
+## 5. Build
 
 ```bash
 ./waf configure --board hub8735ultra --extra-hwdef ~/ArduPilot-Hub8735Ultra/examples/bmi160-bmp280-qmc5883l/overlay.dat
 ./waf copter
 ```
 
-成功時：
+When it works:
 
-- 開頭附近有 `Wi-Fi STA: 帳密取自 <你的設定檔路徑>`；
-- 最後一行是 `'copter' finished successfully`，映像在 `build/hub8735ultra/sdk_build/flash_ntz.bin`。
+- near the start there is `Wi-Fi STA: 帳密取自 <path to your settings file>` ("credentials taken from …");
+- the last line is `'copter' finished successfully`, and the image is `build/hub8735ultra/sdk_build/flash_ntz.bin`.
 
-中途會捲過很多 `warning:`，還有 `sed: can't read ...`、`JSON header - entry : fail` 這幾行。這些都來自 SDK，不影響結果，以最後一行為準。
+Lots of `warning:` lines scroll past on the way, along with `sed: can't read ...` and `JSON header - entry : fail`. They all come from the SDK and do not affect the result; go by the last line.
 
-**如果看到的是 `Wi-Fi STA: 未設定`**：建置雖然成功了，但映像裡沒有 Wi-Fi。通常是設定檔路徑寫錯，或這個終端機沒有 `export`。修好之後再跑一次 `./waf copter`。
+**If you see `Wi-Fi STA: 未設定` ("not set") instead**: the build still succeeded, but the image has no Wi-Fi. Usually the path to the settings file is wrong, or this terminal did not run the `export`. Fix it and run `./waf copter` again.
 
-把映像和燒錄工具複製到 Windows。`<你>` 換成你的 Windows 帳號名稱，不知道的話在 WSL 執行 `ls /mnt/c/Users` 就看得到：
+Copy the image and the flashing tool to Windows. Replace `<you>` with your Windows user name; if you do not know it, run `ls /mnt/c/Users` in WSL to see it:
 
 ```bash
-cp build/hub8735ultra/sdk_build/flash_ntz.bin /mnt/c/Users/<你>/Downloads/
-cp "../ambpro2_sdk/tools/Pro2_PG_tool _v1.3.0.zip" /mnt/c/Users/<你>/Downloads/
+cp build/hub8735ultra/sdk_build/flash_ntz.bin /mnt/c/Users/<you>/Downloads/
+cp "../ambpro2_sdk/tools/Pro2_PG_tool _v1.3.0.zip" /mnt/c/Users/<you>/Downloads/
 ```
 
-燒錄工具的檔名裡有一個空白，所以要加引號。
+The flashing tool's file name contains a space, hence the quotes.
 
-## 6. 燒錄（在 Windows）
+## 6. Flash (on Windows)
 
-1. **解開燒錄工具**：在 Windows 解開 `Downloads` 裡的 `Pro2_PG_tool _v1.3.0.zip`。`uartfwburn.exe` 在解開後的子資料夾 `Pro2_PG_tool _v1.3.0\` 裡（沒有這層子資料夾的話，就在解開的資料夾裡找），在 `uartfwburn.exe` 所在的資料夾開 PowerShell。
-2. **接上開發板，找出 COM 埠**：開發板上有兩個 USB-C，只有一個接到 USB 轉序列晶片 CH340。接上之後，裝置管理員的「連接埠 (COM 和 LPT)」會出現 `USB-SERIAL CH340 (COMx)`，那個就是要用的口，記下 COM 編號。接另一個口不會出現 `USB-SERIAL CH340`。
-   - 換了口還是沒出現，就換一條線。
-   - 驅動沒有自動裝的話，到晶片廠商 WCH（沁恒）的網站下載 CH340 驅動。
-3. **關掉會佔用序列埠的程式**：所有開著這個 COM 埠的程式都要關掉，例如終端機、地面站。
-4. **進燒錄模式**：按住 upgrade 鍵，短按一下 reset 鍵，再放開 upgrade 鍵。
-5. **馬上燒錄**（`COMx` 換成你的編號）：
+1. **Unpack the flashing tool**: on Windows, unpack `Pro2_PG_tool _v1.3.0.zip` in `Downloads`. `uartfwburn.exe` is in the unpacked subfolder `Pro2_PG_tool _v1.3.0\` (if there is no such subfolder, look for it in the unpacked folder itself); open PowerShell in the folder that holds `uartfwburn.exe`.
+2. **Connect the board and find the COM port**: the board has two USB-C ports, and only one of them goes to the CH340 USB-to-serial chip. When you plug that one in, `USB-SERIAL CH340 (COMx)` appears under "Ports (COM & LPT)" in Device Manager; that is the port to use, so note its COM number. The other port does not show `USB-SERIAL CH340`.
+   - If it still does not appear after you try the other port, try another cable.
+   - If the driver did not install by itself, download the CH340 driver from the website of the chip maker, WCH.
+3. **Close programs that hold the serial port**: close every program that has this COM port open, such as terminals and ground stations.
+4. **Enter download mode**: hold the upgrade button, press the reset button briefly, then release the upgrade button.
+5. **Flash right away** (replace `COMx` with your number):
 
    ```powershell
-   .\uartfwburn.exe -p COMx -f C:\Users\<你>\Downloads\flash_ntz.bin -b 2000000 -U
+   .\uartfwburn.exe -p COMx -f C:\Users\<you>\Downloads\flash_ntz.bin -b 2000000 -U
    ```
 
-成功時：先看到 `programing done.`（工具自己的拼法），最後一行是 `download success`。燒完之後按一下 reset 開機。
+When it works: first you see `programing done.` (the tool's own spelling), and the last line is `download success`. After flashing, press reset once to boot. Keep USB connected until `download success`.
 
-失敗時：
-- `uart COMx open fail`：剛進燒錄模式時常見，過幾秒再執行同一個指令就好，不用重按鍵。
-- `ping fail` 或 `ucfg fail`：多半是進燒錄模式之後隔太久，重做第 4、5 步。
+If it fails:
 
-燒錄期間不要拔 USB。
+- `uart COMx open fail`: common right after entering download mode. Wait a few seconds and run the same command again; there is no need to press the buttons again.
+- `ping fail` or `ucfg fail`: most likely too much time passed after entering download mode; redo steps 4 and 5.
 
-## 7. 看開機訊息
+## 7. Check the boot and Wi-Fi
 
-1. 用任一個序列終端機程式（例如 PuTTY、Tera Term）開**同一個 COM 埠**，設定 115200、8N1。
-2. **先開好終端機，再按 reset**，不然會漏掉開機訊息。
+When the board boots, the HAL hands this COM port to MAVLink (SERIAL0) early on: a serial terminal shows only the first few boot lines, followed by binary data. Watch the boot from the ground station's messages instead.
 
-成功時大約會依序看到：
+1. Connect a ground station to the board's COM port at 115200 baud. In Mission Planner, choose `COMx` and `115200` at the top right and press Connect.
+2. Once it is connected, press reset. The board restarts, and the ground station's messages (the Messages tab in Mission Planner) show, in order:
 
-```
-== RAM Start ==
-Storage: flash id ..., using 0xf80000-0xfa0000
-WIFI initialized
-WiFi: joining (SSID length N)
-WiFi: up, local 192.168.x.x:14555
-```
+   ```text
+   WiFi: joining (SSID length N)
+   WiFi: up, local 192.168.x.x:14555
+   ```
 
-- `SSID length N` 的 N 要等於你的熱點名稱的位元組數（英數字一個算 1，中文一個字算 3）。對不上，就是設定檔裡多了引號或空白。
-- `WiFi: up` 大約在開機後 5 秒出現。它後面的 IP 就是開發板的位址，記下來。
-- 有接羅盤的話，約 17 秒時會多一行 `QMC5883L found on bus 1 ...`；沒接羅盤就不會出現。
-- **回報問題要貼開機訊息時，先遮掉 `set ssid [...]` 那一行**：SDK 會在那裡印出你的熱點名稱。
+- N in `SSID length N` must equal the number of bytes in your hotspot name (1 for each letter or digit, 3 for each Chinese character). If it does not, the settings file has an extra quote or space.
+- The IP after `WiFi: up` is the board's address; note it down.
+- These lines go only to a ground station that is already connected: connect it before pressing reset, and if you missed them, press reset again. You can also find the board's IP in the hotspot's list of devices; the Windows mobile hotspot, for example, lists the connected devices.
 
-不對的時候：
-- **每 5 秒重印一次 `Config Error: Baro: unable to initialise driver`**：找不到氣壓計。檢查氣壓計的接線和 3.3 V，再按 reset 重開。v0.1.0 開機偶爾會無故出現這則錯誤，v0.1.1 已修正；用 v0.1.0 時先按 reset 重開一次試試。
-- **出現 `WiFi: no STA credentials`**：映像裡沒有 Wi-Fi 帳密，回第 5 步確認有 `帳密取自`。
-- **一直沒有 `WiFi: up`**：檢查熱點名稱和密碼；熱點最好是 2.4 GHz。
+If something is wrong:
 
-## 8. 連地面站
+- **`Config Error: Baro: unable to initialise driver` appears every 5 seconds**: the barometer was not found. Check the barometer's wiring and 3.3 V, then press reset.
+- **`WiFi: no STA credentials in this image; WiFi MAVLink port disabled` appears**: the image has no Wi-Fi credentials; go back to step 5 and check for `帳密取自`.
+- **`WiFi: join failed (…)` appears**: the board cannot join the hotspot and will retry by itself. Check the hotspot name and password; a 2.4 GHz hotspot is best.
 
-1. 電腦連上同一個熱點。序列埠的終端機可以繼續開著，不影響 Wi-Fi。
-2. 開發板還沒找到地面站時，會把心跳廣播到 UDP 14550，地面站軟體聽這個埠就收得到：
-   - **QGroundControl**：預設就會聽 UDP 14550，打開等它自己連上。
-   - **Mission Planner**：右上角的連線方式選 UDP，按 Connect，埠填 14550。
-3. Windows 第一次收 UDP 時，防火牆可能會詢問，選「私人網路」允許。如果這個熱點在 Windows 被歸為「公用網路」，就要允許「公用網路」，或在 Windows 的網路設定把這個熱點改成「私人」。
+The status of SERIAL0 is in [Feature status](docs/feature-status.md).
 
-（這兩個地面站的操作步驟，還沒照這一頁實測過。）
+## 8. Connect a ground station
 
-成功時：
+1. Connect the computer to the same hotspot. If the ground station is still connected to the COM port, disconnect it first (Disconnect in Mission Planner).
+2. Until the board finds a ground station, it broadcasts heartbeats to UDP 14550, so ground station software listening on that port picks them up:
+   - **QGroundControl**: listens on UDP 14550 by default; open it and wait for it to connect.
+   - **Mission Planner**: choose UDP as the connection type at the top right, press Connect, and enter 14550 as the port.
+3. The first time Windows receives UDP, the firewall may ask; allow it on "Private networks". If Windows has put this hotspot under "Public networks", allow it on "Public networks" instead, or change this hotspot to "Private" in the Windows network settings.
 
-- 序列埠多出一行 `WiFi: ground station <電腦的 IP>:14550`；
-- 地面站下載參數，約 900 多筆；
-- 開發板放平時 roll、pitch 接近 0；把前端（USB 接頭的另一端）抬起約 45°，pitch 變成約 +40°。
+When it works:
 
-**同一個熱點上如果有別的飛控，地面站可能連到別台。** 最簡單的做法是同一個熱點上只開這一塊開發板；地面站看得到連線來源時，確認它是第 7 步記下的 IP。
+- the ground station downloads the parameters, a little over 900 of them;
+- with the board level, roll and pitch are close to 0; lift the front (the end opposite the USB connectors) by about 45° and pitch becomes about +40°.
 
-## 接下來
+**If there are other flight controllers on the same hotspot, the ground station may connect to one of them.** The simplest way around this is to have only this board on the hotspot; if your ground station shows where the connection comes from, check that it is the IP you noted in step 7.
 
-- 每一項功能做到哪裡：[〈功能狀態〉](README.md#功能狀態)；每次上板的紀錄：[BOARD_TESTS.md](BOARD_TESTS.md)。
-- 想換成自己的感測器或腳位：[〈自訂板〉](README.md#自訂板)。
-- 卡住了、或照做成功了，都歡迎開 issue，選「上板結果」範本。
+## What next
+
+- How far each feature works: [Feature status](docs/feature-status.md); the record of each board test: [BOARD_TESTS.md](BOARD_TESTS.md) (in Chinese).
+- To use your own sensors or pins: [Describe your own board](docs/custom-boards.md).
+- All the building and flashing options: [Build the firmware](docs/building.md), [Flash the firmware](docs/flashing.md).
+- Stuck, or it all worked: either way, please open an issue and pick the "Board test report / 上板結果" template.

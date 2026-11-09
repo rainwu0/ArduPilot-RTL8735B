@@ -10,6 +10,10 @@
 
 ## [Unreleased]
 
+### 新增（Added）
+
+- 開發板的應用程式介面：`rtl8735b_app_arming_blocked`，回傳非 0 時一般解鎖被拒。見[開發板的應用程式](docs/board-applications.zh-TW.md)。
+
 ## [0.2.3] - 2026-11-15
 
 ### 新增（Added）

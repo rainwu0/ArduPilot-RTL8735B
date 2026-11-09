@@ -10,6 +10,10 @@ The status of each feature in a given version is what that version's feature sta
 
 ## [Unreleased]
 
+### Added
+
+- Board application interface: `rtl8735b_app_arming_blocked`; while it returns non-zero, a normal arm is refused. See [Board applications](docs/board-applications.md).
+
 ## [0.2.3] - 2026-11-15
 
 ### Added

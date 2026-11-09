@@ -6,7 +6,7 @@ The board's microSD card is read and written through FatFs (`libraries/AP_Filesy
 
 ## Settings
 
-- The board type `rtl8735b-empty` turns it on (`define HAL_RTL8735B_SDCARD_ENABLED 1` in its hwdef), and so do `hub8735ultra` and `amb82-mini`, which include it.
+- The board type `rtl8735b-empty` turns it on (`define HAL_RTL8735B_SDCARD_ENABLED 1` in its hwdef), and so do `hub8735ultra` and `amb82-mini`, which include it, and `hub8735ultra-expansion`, which includes `hub8735ultra`.
 - A custom board without an SD card slot turns it off with `undef HAL_RTL8735B_SDCARD_ENABLED` in its overlay.
 
 ## Cards and mounting

@@ -8,7 +8,7 @@ How the HAL uses the chip's Wi-Fi: the default hotspot, the settings file, the M
 
 Without a settings file, the board joins a default hotspot in station (STA) mode: SSID `ardupilot`, password `ardupilot1`, the same as the defaults in the code of ArduPilot's ESP32 HAL (`libraries/AP_HAL_ESP32/WiFiDriver.cpp` in ArduPilot `9f648ccabc`). Open a hotspot with that name and password on a phone or computer, and connect the ground station to the same hotspot.
 
-- The board type `rtl8735b-empty` sets these values as `WIFI_SSID_STATION` and `WIFI_PWD` in its `hwdef.dat`; `hub8735ultra` and `amb82-mini` include it.
+- The board type `rtl8735b-empty` sets these values as `WIFI_SSID_STATION` and `WIFI_PWD` in its `hwdef.dat`; `hub8735ultra` and `amb82-mini` include it, and `hub8735ultra-expansion` includes `hub8735ultra`.
 - To use your own hotspot, give a settings file (below), or `undef` and `define` `WIFI_SSID_STATION` and `WIFI_PWD` again in an overlay. The settings file takes precedence over the overlay.
 - With `WIFI_SSID_STATION` set to `""` or not defined, and no settings file, Wi-Fi is off.
 - These values are public: anyone nearby can open a hotspot with that name and password for the board to join, or join the hotspot you opened and see and send MAVLink.

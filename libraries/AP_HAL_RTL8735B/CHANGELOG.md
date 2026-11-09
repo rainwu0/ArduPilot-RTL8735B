@@ -18,6 +18,12 @@ Compatible with v0.2.1: existing overlays, commands and parameters keep working;
 - When Wi-Fi cannot join, the retries no longer send STATUSTEXT each time: the ground station receives joining once, and `WiFi: join failed (…)` the first time, when the error code changes, and at most once every 30 s after that; the rest only goes to the console. After the board has joined, a later link loss starts the count again. See [Messages](docs/wifi.md#messages).
 - Documentation: [Wi-Fi](docs/wifi.md) has a *Default hotspot* section, and Getting started can use the default hotspot instead of a settings file.
 
+### Added
+
+- The board type `hub8735ultra-expansion`: the HUB 8735 ultra on an expansion board with a BMI160, a BMP280 and a QMC5883L, battery voltage on analog pin 2 and ESC current on analog pin 9, SERIAL3 receive-only for ESC telemetry, battery monitoring and GPS on SERIAL1 as defaults in `hwdef.dat`, and DShot300 in `defaults.parm`. See [its README](hwdef/hub8735ultra-expansion/README.md).
+- `Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param`: parameters for a 3.5-inch quad X with a 4-in-1 Bluejay ESC on DShot300 and a 2S battery.
+- Documentation: the README of `hub8735ultra-expansion`, with the expansion board's connectors, the sensor modules, a wiring diagram, a picture and a video of the T5 quadcopter, and its parameters.
+
 ## [0.2.1] - 2026-11-10
 
 Compatible with v0.2.0: existing overlays, commands and parameters keep working; the changes need a new build and flash.

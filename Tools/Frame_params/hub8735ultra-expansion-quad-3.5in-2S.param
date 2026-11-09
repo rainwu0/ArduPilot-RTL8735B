@@ -1,0 +1,70 @@
+#NOTE: 3.5 inch quad X, 4-in-1 Bluejay ESC on DShot300, 2S battery, board hub8735ultra-expansion (ArduCopter)
+# 3.5 吋四軸 X、4 合 1 Bluejay 電調（DShot300）、2S 電池，飛控是 HUB 8735 ultra 加擴充板（板型 hub8735ultra-expansion）。
+# 用同樣零件組裝時，在地面站載入這份。板型已設好的（電池監測與腳位、GPS 的序列埠、DShot、電調型號）在板型的 hwdef.dat 與 defaults.parm，這裡不重複。
+# 不含各機的校正值（加速度計、陀螺儀、羅盤、氣壓計、AHRS_TRIM、電壓倍率的實測值）、遙控方式、機身編號與網路設定。
+#
+# 載入後、第一次裝槳飛行之前：
+# 1. 拆掉螺旋槳，用地面站的馬達測試（Motor Test）確認每顆馬達的位置與轉向都符合 ArduPilot 的四軸 X 配置；
+# 2. 照板型 README 確認安裝方向。下面的 AHRS_ORIENTATION、COMPASS_ORIENT 是這台機的擺法，
+#    和板型 hwdef 裡 IMU 那列假設的擺法（擴充板元件面朝上、microSD 那端朝機頭）不同；
+# 馬達位置或方向錯了，解鎖起飛就會翻覆。
+
+# 機架：四軸 X
+FRAME_CLASS 1
+FRAME_TYPE 1
+
+# 馬達輸出：輸出 2 給 4 號馬達、輸出 4 給 2 號。擴充板 J4 的第 1–4 腳就是輸出 1–4、接電調的 M1–M4；
+# 2、4 號對調來自這組 4 合 1 電調的焊點排法，不是擴充板的線路。電調或接法不同時，以拆槳後的馬達測試為準
+SERVO1_FUNCTION 33
+SERVO2_FUNCTION 36
+SERVO3_FUNCTION 35
+SERVO4_FUNCTION 34
+SERVO1_MIN 1000
+SERVO1_MAX 2000
+SERVO1_TRIM 1000
+SERVO2_MIN 1000
+SERVO2_MAX 2000
+SERVO2_TRIM 1000
+SERVO3_MIN 1000
+SERVO3_MAX 2000
+SERVO3_TRIM 1000
+SERVO4_MIN 1000
+SERVO4_MAX 2000
+SERVO4_TRIM 1000
+
+# 電池：2S
+BATT_LOW_VOLT 7.2
+BATT_CRT_VOLT 7.0
+BATT_FS_LOW_ACT 1
+BATT_FS_CRT_ACT 1
+BATT_ARM_VOLT 7.3
+BATT_CAPACITY 550
+MOT_BAT_VOLT_MAX 8.4
+MOT_BAT_VOLT_MIN 6.6
+
+# 推力曲線與懸停油門
+MOT_THST_EXPO 0.43
+MOT_THST_HOVER 0.2
+
+# 濾波
+ATC_RAT_PIT_FLTD 50.5
+ATC_RAT_PIT_FLTT 50.5
+ATC_RAT_RLL_FLTD 50.5
+ATC_RAT_RLL_FLTT 50.5
+ATC_RAT_YAW_FLTD 0
+ATC_RAT_YAW_FLTE 2
+ATC_RAT_YAW_FLTT 50.5
+INS_ACCEL_FILTER 10
+INS_GYRO_FILTER 101
+
+# 這台沒有 GPS
+GPS1_TYPE 0
+
+# 失效保護：只放和 ArduPilot 預設不同的三項，不論用哪種遙控方式，斷線就降落或繼續降落
+FS_GCS_ENABLE 5
+FS_OPTIONS 8
+FS_THR_ENABLE 3
+
+# 安裝方向：照這台的擺法；擺法不同時要改，裝好後照板型 README 確認
+AHRS_ORIENTATION 12
+COMPASS_ORIENT 8

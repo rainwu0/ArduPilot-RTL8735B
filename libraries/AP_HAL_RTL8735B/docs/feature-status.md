@@ -60,4 +60,4 @@ With the board type `hub8735ultra` and no barometer, boot stops at `Config Error
 | Flash layout `realtek-ota` (default) | Works (T1, T2) | See [Flash layout](flash-layout.md) |
 | Flash layouts `sdk-d1b6426`, `arduino-default` | Needs: one try on a board | See [Flash layout](flash-layout.md) |
 
-The status of each board: [HUB 8735 ultra](../hwdef/hub8735ultra/README.md#status), [AMB82-mini](../hwdef/amb82-mini/README.md#status), [rtl8735b-empty](../hwdef/rtl8735b-empty/README.md#status).
+The status of each board: [HUB 8735 ultra](../hwdef/hub8735ultra/README.md#status), [HUB 8735 ultra on its expansion board](../hwdef/hub8735ultra-expansion/README.md#status), [AMB82-mini](../hwdef/amb82-mini/README.md#status), [rtl8735b-empty](../hwdef/rtl8735b-empty/README.md#status).

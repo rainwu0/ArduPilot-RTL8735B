@@ -8,7 +8,7 @@ Why the port behaves as it does, where that differs from ArduPilot on other plat
 
 ArduPilot sets up the MAVLink channel on SERIAL0, the console, before the vehicle code starts (`setup_console` in `AP_Vehicle::setup`, `libraries/AP_Vehicle/AP_Vehicle.cpp`). Copter then initializes the barometer, and only after that creates the MAVLink channels on the other SERIALn ports, Wi-Fi among them (`init_ardupilot` in `ArduCopter/system.cpp`).
 
-If no barometer is found, boot stops at `Config Error: Baro: unable to initialise driver` before the Wi-Fi channel exists. Wi-Fi still joins the hotspot, but neither UDP nor TCP sends or receives MAVLink; the error itself reaches a ground station on SERIAL0. The board types have no sensors of their own, so a ground station connects over Wi-Fi only once an overlay adds at least a barometer. See [Wi-Fi](wifi.md) and [Describe your own board](custom-boards.md).
+If no barometer is found, boot stops at `Config Error: Baro: unable to initialise driver` before the Wi-Fi channel exists. Wi-Fi still joins the hotspot, but neither UDP nor TCP sends or receives MAVLink; the error itself reaches a ground station on SERIAL0. Apart from `hub8735ultra-expansion`, the board types have no sensors of their own, so on them a ground station connects over Wi-Fi only once an overlay adds at least a barometer. See [Wi-Fi](wifi.md) and [Describe your own board](custom-boards.md).
 
 ## SERIAL0 carries MAVLink, not text
 

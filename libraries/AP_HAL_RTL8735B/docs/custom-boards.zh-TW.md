@@ -11,12 +11,12 @@
 ./waf copter
 ```
 
-- 從最接近的板型開始（[`hub8735ultra`](../hwdef/hub8735ultra/README.zh-TW.md)、[`amb82-mini`](../hwdef/amb82-mini/README.zh-TW.md) 或 [`rtl8735b-empty`](../hwdef/rtl8735b-empty/README.zh-TW.md)），疊加檔只寫不同的部分。
+- 從最接近的板型開始（[`hub8735ultra`](../hwdef/hub8735ultra/README.zh-TW.md)、[`hub8735ultra-expansion`](../hwdef/hub8735ultra-expansion/README.zh-TW.md)、[`amb82-mini`](../hwdef/amb82-mini/README.zh-TW.md) 或 [`rtl8735b-empty`](../hwdef/rtl8735b-empty/README.zh-TW.md)），疊加檔只寫不同的部分。
 - 疊加檔不是板型，所以 `./waf list_boards` 不會多出新的板子。
 
 ## 加上感測器
 
-板型都沒有感測器。沒有氣壓計時，開機停在 `Config Error: Baro: unable to initialise driver`，Wi-Fi 也不會有 MAVLink（[原因](design.zh-TW.md#wi-fi-mavlink-要等氣壓計)）。
+除了 `hub8735ultra-expansion`，板型都沒有感測器。沒有氣壓計時，開機停在 `Config Error: Baro: unable to initialise driver`，Wi-Fi 也不會有 MAVLink（[原因](design.zh-TW.md#wi-fi-mavlink-要等氣壓計)）。
 
 感測器、安裝方向與預設參數寫在疊加檔，寫法和 ArduPilot 其他平台的 hwdef 相同，例如 ArduPilot `9f648ccabc` 的 `libraries/AP_HAL_ESP32/hwdef/esp32diy/hwdef.dat`。HUB 8735 ultra 上 SPI 接 BMI160、I²C 接 BMP280 與 QMC5883L、實際能用的疊加檔，是範例庫的 [`examples/bmi160-bmp280-qmc5883l/overlay.dat`](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/blob/v0.1.0/examples/bmi160-bmp280-qmc5883l/overlay.dat)（rainwu0/ArduPilot-Hub8735Ultra `v0.1.0`）。用其他感測器時，複製一份，改 `IMU`、`BARO`、`COMPASS` 三行。
 

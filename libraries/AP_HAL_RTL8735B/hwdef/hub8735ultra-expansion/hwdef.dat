@@ -1,0 +1,41 @@
+# HUB 8735 ultra 疊在擴充板上：擴充板有 IMU、氣壓計、羅盤三個感測器模組與一個外接 I²C 座。
+# 開發板的腳位照 hub8735ultra；擴充板的接點與模組見本資料夾的 README。
+# 三個感測器那幾列改寫自 rainwu0/ArduPilot-Hub8735Ultra 0c18d8c51a 的 examples/bmi160-bmp280-qmc5883l/overlay.dat。
+include ../hub8735ultra/hwdef.dat
+
+undef HAL_RTL8735B_BOARD_NAME
+define HAL_RTL8735B_BOARD_NAME "hub8735ultra-expansion"
+
+# IMU：BMI160 在 SPI 匯流排 1（D18–D21，CS 是 D21＝PF8 的 bmi160 裝置）。
+# 方向是擴充板元件面朝上、microSD 那端朝機頭時；模組擺法不同時要改這一列的方向，檢查方法見 README
+IMU BMI160 SPI:bmi160 ROTATION_ROLL_180_YAW_270
+
+# 氣壓計 BMP280（CSB 接高選 I²C，SDO 接低選位址 0x76）與羅盤 QMC5883L（0x0D）在 I²C 匯流排 1（D0＝PF2 SDA、D1＝PF1 SCL）
+BARO BMP280 I2C:1:0x76
+# 只寫裝了的羅盤：搜尋沒接東西的位址會讓 HAL 重設氣壓計共用的 I²C 控制器
+COMPASS QMC5883L I2C:1:0x0D true ROTATION_NONE
+
+# 擴充板的外接 I²C 座走第二條匯流排（D3＝PE4 SDA、D4＝PE3 SCL；SDK 的 I2C2），座上有 10 kΩ 上拉
+RTL8735B_I2CBUS 2 2 PIN_E4 PIN_E3 400000 external
+
+# 電調接頭：UART0（SERIAL3）只收電調遙測（D10＝PA3），TX 腳 D9＝PA2 改當類比輸入 9，讀電調的電流輸出（BATT_CURR_PIN 9）
+undef HAL_RTL8735B_SERIAL3_TX_PIN
+define HAL_RTL8735B_SERIAL3_TX_PIN PIN_NC
+RTL8735B_ADC 9 PIN_A2
+define DEFAULT_SERIAL3_PROTOCOL SerialProtocol_ESCTelemetry
+
+# 電池監測：類比電壓與電流（BATT_MONITOR 4）。電壓從 J3 經 100 kΩ／20 kΩ 分壓接 D2（類比輸入 2），倍率是標稱值，
+# 各機用電錶校正 BATT_VOLT_MULT；電流是電調的電流輸出（12.75 mV/A）經 J5 接 D9（類比輸入 9），零點 BATT_AMP_OFFSET 各機自己校
+define HAL_BATT_MONITOR_DEFAULT 4
+define HAL_BATT_VOLT_PIN 2
+define HAL_BATT_VOLT_SCALE 6.0
+define HAL_BATT_CURR_PIN 9
+define HAL_BATT_CURR_SCALE 78.43
+
+# J10 給 GPS（SERIAL1）
+undef DEFAULT_SERIAL1_PROTOCOL
+define DEFAULT_SERIAL1_PROTOCOL SerialProtocol_GPS
+
+# 預設參數：這個資料夾的 defaults.parm（DShot300 與電調型號，沒有對應的 hwdef 巨集）；ROMFS 的路徑以儲存庫根目錄為基準
+ROMFS defaults.parm libraries/AP_HAL_RTL8735B/hwdef/hub8735ultra-expansion/defaults.parm
+define HAL_PARAM_DEFAULTS_PATH "@ROMFS/defaults.parm"

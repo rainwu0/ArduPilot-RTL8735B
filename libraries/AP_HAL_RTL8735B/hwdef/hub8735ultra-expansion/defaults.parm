@@ -1,0 +1,8 @@
+# Defaults set by the expansion board wiring (board hub8735ultra-expansion).
+# 只放擴充板的接線決定、又沒有 hwdef 巨集可用的值；電池監測與 SERIAL1 的預設在 hwdef.dat。
+# 機架、電池門檻、安裝方向、校正、失效保護不放在這裡。
+
+# 馬達輸出 1–4（J4）：DShot300；電調型號值是 BLHeli_S／Bluejay
+MOT_PWM_TYPE 5
+SERVO_DSHOT_ESC 2
+SERVO_BLH_AUTO 1

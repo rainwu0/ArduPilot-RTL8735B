@@ -10,7 +10,7 @@ about: Something goes wrong in building, flashing or on the board / 建置、燒
 ### Environment / 環境
 
 - Board / 開發板: <!-- HUB 8735 ultra / AMB82-mini / other 其他 -->
-- Board type / 板型: <!-- hub8735ultra / amb82-mini / custom 自訂, with the overlay attached 附上疊加檔 -->
+- Board type / 板型: <!-- hub8735ultra / hub8735ultra-expansion / amb82-mini / custom 自訂, with the overlay attached 附上疊加檔 -->
 - Commit of this repository / 本儲存庫的提交: <!-- git rev-parse --short HEAD -->
 - `FLASH_LAYOUT`: <!-- default if unchanged / 沒改就寫預設 -->
 - First line of `arm-none-eabi-gcc --version` / 的第一行:

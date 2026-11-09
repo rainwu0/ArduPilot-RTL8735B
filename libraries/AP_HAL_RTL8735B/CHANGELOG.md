@@ -10,6 +10,8 @@ The status of each feature in a given version is what that version's feature sta
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-10
+
 Compatible with v0.2.0: existing overlays, commands and parameters keep working; the changes need a new build and flash.
 
 ### Changed
@@ -108,7 +110,8 @@ Compared with the public commits before this version number:
 
 - The old `HAL_RTL8735B_*` pin and bus `define`s (`HAL_RTL8735B_I2C1_*`, `HAL_RTL8735B_SPI1_*`, `HAL_RTL8735B_RCOUT_*` and others); use the keywords above. Overlays that still use them build without errors, but the settings have no effect.
 
-[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/tree/v0.1.0

@@ -29,5 +29,6 @@ These are documented behaviors of the port, listed in the security limits of [Wi
 - MAVLink over Wi-Fi has no authentication. Over UDP, while there is no ground station, or after it has sent nothing for more than 3 seconds, any source that sends to the board's port is taken as the new ground station, and its RC override is accepted. Over TCP, once the ground station has sent nothing for more than 3 seconds, a new connection from any host on the subnet replaces it.
 - With no ground station, the HEARTBEAT is broadcast to the whole subnet.
 - The Wi-Fi credentials are compiled into the image as a constant array; anyone who has the image may be able to read them.
+- Without a settings file, the board joins the [default hotspot](/libraries/AP_HAL_RTL8735B/docs/wifi.md#default-hotspot).
 
 A way to go beyond these, for example reading the credentials without the image file, or affecting the board from outside the subnet, is reported privately as above. A request to change one of these behaviors, for example to add authentication, is a public [issue](https://github.com/rainwu0/ArduPilot-RTL8735B/issues).

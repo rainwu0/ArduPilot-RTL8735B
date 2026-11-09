@@ -21,7 +21,7 @@ This repository is [ArduPilot](https://github.com/ArduPilot/ardupilot) with a ha
 ## Security
 
 - MAVLink over Wi-Fi, UDP or TCP, has no authentication: any device on the same subnet can send to the board and be taken as its ground station. See the security limits in [Wi-Fi][wifi].
-- The Wi-Fi credentials are compiled into the firmware image, and anyone who has the image may be able to read them.
+- The Wi-Fi credentials from a settings file are compiled into the firmware image, and anyone who has the image may be able to read them. Without a settings file, the board joins the [default hotspot][wifi-default] (`ardupilot`, `ardupilot1`).
 - Security problems are reported privately, as described in [SECURITY](SECURITY.md).
 
 ## Background
@@ -70,7 +70,7 @@ The details, including where to clone in WSL and the Wi-Fi settings file, are in
 | RC receiver, GPS | Needs: one try with the device |
 | ESC telemetry, DShot150, DShot600, other PWM outputs | Needs: one try with ESCs |
 | SD card and logs | Needs: one try with a card |
-| MAVLink on the USB serial port, Wi-Fi TCP, `--upload` | Needs: one try on a board |
+| MAVLink on the USB serial port, Wi-Fi TCP, the default Wi-Fi hotspot, `--upload` | Needs: one try on a board |
 | AMB82-mini | Needs: one try on a board |
 | Firmware update over Wi-Fi | None |
 
@@ -95,6 +95,7 @@ GPL-3.0, see [COPYING.txt](/COPYING.txt). Copyright belongs to the authors of ea
 [flash]: /libraries/AP_HAL_RTL8735B/docs/flashing.md
 [custom]: /libraries/AP_HAL_RTL8735B/docs/custom-boards.md
 [wifi]: /libraries/AP_HAL_RTL8735B/docs/wifi.md
+[wifi-default]: /libraries/AP_HAL_RTL8735B/docs/wifi.md#default-hotspot
 [motors]: /libraries/AP_HAL_RTL8735B/docs/motor-outputs.md
 [app]: /libraries/AP_HAL_RTL8735B/docs/board-applications.md
 [boards]: /libraries/AP_HAL_RTL8735B/hwdef/

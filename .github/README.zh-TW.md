@@ -21,7 +21,7 @@ ArduPilot 在 Realtek RTL8735B SoC 上的非官方移植。文件有繁體中文
 ## 安全
 
 - Wi-Fi 上的 MAVLink，不論 UDP 或 TCP，都沒有任何驗證：同一網段的任何裝置都送得到開發板，也可能被當成它的地面站。見 [Wi-Fi][wifi] 的安全上的限制。
-- Wi-Fi 帳密會編進韌體映像，拿到映像的人可能讀得出來。
+- 設定檔裡的 Wi-Fi 帳密會編進韌體映像，拿到映像的人可能讀得出來。沒有設定檔時，開發板連[預設熱點][wifi-default]（`ardupilot`、`ardupilot1`）。
 - 安全問題私下回報，方法見 [SECURITY](SECURITY.zh-TW.md)。
 
 ## 背景
@@ -70,7 +70,7 @@ git submodule update --init --recursive modules/waf modules/mavlink modules/Dron
 | 遙控接收機、GPS | 要補：接上驗一次 |
 | 電調遙測、DShot150、DShot600、其他 PWM 輸出 | 要補：接電調驗一次 |
 | SD 卡與記錄檔 | 要補：接卡驗一次 |
-| USB 序列埠上的 MAVLink、Wi-Fi TCP、`--upload` | 要補：上板驗一次 |
+| USB 序列埠上的 MAVLink、Wi-Fi TCP、預設 Wi-Fi 熱點、`--upload` | 要補：上板驗一次 |
 | AMB82-mini | 要補：上板驗一次 |
 | 經 Wi-Fi 更新韌體 | 沒有 |
 
@@ -95,6 +95,7 @@ GPL-3.0，見 [COPYING.txt](/COPYING.txt)。著作權屬於各檔的作者：Ard
 [flash]: /libraries/AP_HAL_RTL8735B/docs/flashing.zh-TW.md
 [custom]: /libraries/AP_HAL_RTL8735B/docs/custom-boards.zh-TW.md
 [wifi]: /libraries/AP_HAL_RTL8735B/docs/wifi.zh-TW.md
+[wifi-default]: /libraries/AP_HAL_RTL8735B/docs/wifi.zh-TW.md#預設熱點
 [motors]: /libraries/AP_HAL_RTL8735B/docs/motor-outputs.zh-TW.md
 [app]: /libraries/AP_HAL_RTL8735B/docs/board-applications.zh-TW.md
 [boards]: /libraries/AP_HAL_RTL8735B/hwdef/

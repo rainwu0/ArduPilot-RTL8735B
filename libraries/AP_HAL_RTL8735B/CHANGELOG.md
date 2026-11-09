@@ -23,6 +23,7 @@ Compatible with v0.2.1: existing overlays, commands and parameters keep working;
 - The board type `hub8735ultra-expansion`: the HUB 8735 ultra on an expansion board with a BMI160, a BMP280 and a QMC5883L, battery voltage on analog pin 2 and ESC current on analog pin 9, SERIAL3 receive-only for ESC telemetry, battery monitoring and GPS on SERIAL1 as defaults in `hwdef.dat`, and DShot300 in `defaults.parm`. See [its README](hwdef/hub8735ultra-expansion/README.md).
 - `Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param`: parameters for a 3.5-inch quad X with a 4-in-1 Bluejay ESC on DShot300 and a 2S battery.
 - Documentation: the README of `hub8735ultra-expansion`, with the expansion board's connectors, the sensor modules, a wiring diagram, a picture and a video of the T5 quadcopter, and its parameters.
+- Board application interface: `rtl8735b_app_arming_blocked`; while it returns non-zero, a normal arm is refused. See [Board applications](docs/board-applications.md).
 
 ## [0.2.1] - 2026-11-10
 

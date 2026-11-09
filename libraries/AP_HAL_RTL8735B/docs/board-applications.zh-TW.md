@@ -19,13 +19,16 @@ env RTL8735B_APP_DIR <目錄>
 
 ## 韌體呼叫的函式
 
-`rtl8735b_app_init` 一定要定義：沒有定義時連結失敗（`undefined reference to rtl8735b_app_init`），所以少了應用程式不會悄悄變成什麼都不做。另外兩個是選用的，沒有定義時韌體用空函式。
+`rtl8735b_app_init` 一定要定義：沒有定義時連結失敗（`undefined reference to rtl8735b_app_init`），所以少了應用程式不會悄悄變成什麼都不做。另外三個是選用的，沒有定義時韌體用空函式，`rtl8735b_app_arming_blocked` 回傳 0。
 
 | 函式 | 呼叫時機 | 限制 |
 |---|---|---|
 | `rtl8735b_app_init` | 每次開機一次：建立 ArduPilot 的 task 之後、啟動排程器之前；ArduPilot 一行都還沒執行 | 只建立 task；可以 `printf`、直接以 SDK 讀寫 Flash；要排程器才會完成的事都不能等 |
 | `rtl8735b_app_after_setup` | 每次開機一次：在 ArduPilot 的主 task 中，`setup()` 完成之後、第一次主迴圈之前 | 只建立 task 或設定變數；阻塞會讓主迴圈延後開始 |
+| `rtl8735b_app_arming_blocked` | 未解鎖時，在主 task 的解鎖檢查與狀態回報中呼叫；回傳非 0 就擋解鎖 | 只讀變數：不阻塞、不拿鎖 |
 | `rtl8735b_app_before_reset` | 韌體自己要重置之前（`Scheduler::reboot()`，例如地面站的重開機指令、要重開才生效的參數）；呼叫時輸出已經安全，返回後就重置 | 可能在任何 task 中呼叫：不阻塞、不拿鎖、不印字 |
+
+`rtl8735b_app_arming_blocked` 回傳非 0 時，HAL 回報安全開關未解除。Copter 不論 `ARMING_SKIPCHK` 怎麼設，一般解鎖都會被拒（顯示 `Safety Switch`），只有強制解鎖不經這項檢查。其他載具由解鎖前的安全開關檢查擋住；`ARMING_SKIPCHK` 略過這項檢查或強制解鎖時不擋。擋住期間，Copter 的馬達測試也會被拒，地面站顯示馬達輸出未啟用。它可能從不同的 task 被呼叫，只回傳一次就能讀完的變數（例如 `volatile uint8_t`）。沒有應用程式時回傳 0。
 
 `rtl8735b_app_before_reset` 給兼作開機模式腳的 GPIO 用。重置時 PA5 的電位決定是否進入燒錄模式。應用程式拿 PA5 當輸出時（HUB 8735 ultra 的 D14，`variant.h` 標為 Sensor power on），在這裡把它放回開機時的狀態；否則韌體重開後可能停在燒錄模式、不啟動。它只涵蓋韌體自己的重開機：看門狗與當機的重置不經過這裡；應用程式自己呼叫 SDK 的 `sys_reset()` 時，自己先處理這些腳。
 

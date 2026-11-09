@@ -60,4 +60,4 @@ HAL 各項功能的現況。各開發板的現況在各板子 README 的〈規�
 | Flash 版面 `realtek-ota`（預設） | 能用（T1、T2） | 見 [Flash 版面](flash-layout.zh-TW.md) |
 | Flash 版面 `sdk-d1b6426`、`arduino-default` | 要補：上板驗一次 | 見 [Flash 版面](flash-layout.zh-TW.md) |
 
-各開發板的現況：[HUB 8735 ultra](../hwdef/hub8735ultra/README.zh-TW.md#現況)、[AMB82-mini](../hwdef/amb82-mini/README.zh-TW.md#現況)、[rtl8735b-empty](../hwdef/rtl8735b-empty/README.zh-TW.md#現況)。
+各開發板的現況：[HUB 8735 ultra](../hwdef/hub8735ultra/README.zh-TW.md#現況)、[HUB 8735 ultra 加擴充板](../hwdef/hub8735ultra-expansion/README.zh-TW.md#現況)、[AMB82-mini](../hwdef/amb82-mini/README.zh-TW.md#現況)、[rtl8735b-empty](../hwdef/rtl8735b-empty/README.zh-TW.md#現況)。

@@ -11,7 +11,7 @@ How to adapt a board type to your own board, sensors and wiring with an overlay:
 ./waf copter
 ```
 
-- Start from the board type closest to your board ([`hub8735ultra`](../hwdef/hub8735ultra/README.md), [`amb82-mini`](../hwdef/amb82-mini/README.md) or [`rtl8735b-empty`](../hwdef/rtl8735b-empty/README.md)). The overlay holds only what differs.
+- Start from the board type closest to your board ([`hub8735ultra`](../hwdef/hub8735ultra/README.md), [`hub8735ultra-expansion`](../hwdef/hub8735ultra-expansion/README.md), [`amb82-mini`](../hwdef/amb82-mini/README.md) or [`rtl8735b-empty`](../hwdef/rtl8735b-empty/README.md)). The overlay holds only what differs.
 - An overlay is not a board type, so `./waf list_boards` shows no new board.
 
 ## Add sensors

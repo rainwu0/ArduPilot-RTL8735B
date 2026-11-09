@@ -88,6 +88,9 @@ WiFiDriver::WiFiDriver(Protocol protocol, uint16_t local_port, uint16_t gcs_port
     _fd(-1),
     _listen_fd(-1),
     _sta_started(false),
+    _join_failing(false),
+    _join_failure_code(0),
+    _join_failure_report_ms(0),
     _retry_at_ms(0),
     _last_link_check_ms(0),
     _broadcast_address(0),
@@ -520,10 +523,19 @@ uint32_t WiFiDriver::_link_step(uint32_t now_ms)
         const StaCredentials sta = sta_credentials();
         // 連線的經過以 STATUSTEXT 送地面站：SERIAL0 接手 LOG UART 之後 printf 不送出。
         // 只送 SSID 的長度，不送 SSID 與密碼；用板型預設熱點時另外標明。
+        // 重試中（上一次失敗後）只印在主控台，不每秒洗地面站的訊息欄。
         if (sta.board_default) {
-            RTL8735B::report_info("WiFi: joining the board's default hotspot (SSID length %u)", (unsigned)sta.ssid_len);
+            if (_join_failing) {
+                ::printf("WiFi: joining the board's default hotspot (SSID length %u)\n", (unsigned)sta.ssid_len);
+            } else {
+                RTL8735B::report_info("WiFi: joining the board's default hotspot (SSID length %u)", (unsigned)sta.ssid_len);
+            }
         } else {
-            RTL8735B::report_info("WiFi: joining (SSID length %u)", (unsigned)sta.ssid_len);
+            if (_join_failing) {
+                ::printf("WiFi: joining (SSID length %u)\n", (unsigned)sta.ssid_len);
+            } else {
+                RTL8735B::report_info("WiFi: joining (SSID length %u)", (unsigned)sta.ssid_len);
+            }
         }
         const int join = rtl8735b_wifi_join(sta.ssid, sta.ssid_len, sta.password, sta.password_len);
         bool opened = false;
@@ -537,13 +549,23 @@ uint32_t WiFiDriver::_link_step(uint32_t now_ms)
             _join_failures.fetch_add(1);
             _close_sockets();
             rtl8735b_wifi_leave();
-            RTL8735B::report_warning("WiFi: join failed (%d)", join);
+            // 第一次、錯誤碼改變時與每 FAILURE_REPORT_MS 送 STATUSTEXT；其餘只印在主控台
+            if (!_join_failing || join != _join_failure_code ||
+                now_ms - _join_failure_report_ms >= FAILURE_REPORT_MS) {
+                RTL8735B::report_warning("WiFi: join failed (%d)", join);
+                _join_failure_report_ms = now_ms;
+            } else {
+                ::printf("WiFi: join failed (%d)\n", join);
+            }
+            _join_failing = true;
+            _join_failure_code = join;
             _set_state(LinkState::WAIT_RETRY, now_ms);
             return 10;
         }
         _gcs_known.store(false);
         _clear_tx();
         _last_link_check_ms = now_ms;
+        _join_failing = false;
         // 開發板的位址：地面站接 COM 埠（SERIAL0）就讀得到，使用者照這個 IP 分辨同一個熱點上的開發板
         const uint32_t local = _local_address.load();
         RTL8735B::report_info("WiFi: up, local %u.%u.%u.%u:%u",

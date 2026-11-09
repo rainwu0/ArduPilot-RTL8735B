@@ -88,6 +88,7 @@ public:
     static constexpr uint32_t TX_BUFFER_SIZE = 16384;
     static constexpr uint32_t PEER_TIMEOUT_MS = 3000;     // 換地面站的條件
     static constexpr uint32_t RETRY_DELAY_MS = 1000;
+    static constexpr uint32_t FAILURE_REPORT_MS = 30000;  // 同樣的連線失敗以 STATUSTEXT 重報的最短間隔
     static constexpr uint32_t LINK_CHECK_INTERVAL_MS = 100;
     static constexpr uint32_t TX_STALL_MS = 500;          // 緩衝區開頭的不完整訊框超過此時間就丟一個位元組重新對齊
     static constexpr uint8_t MAX_DATAGRAMS_PER_STEP = 16;
@@ -153,6 +154,10 @@ private:
     int _fd;          // UDP socket，或 TCP 的地面站連線
     int _listen_fd;   // TCP listen socket
     bool _sta_started;
+    // 連線失敗的 STATUSTEXT 節流：一輪重試（到連上為止）裡第一次、錯誤碼改變時與每 FAILURE_REPORT_MS 才送
+    bool _join_failing;
+    int _join_failure_code;
+    uint32_t _join_failure_report_ms;
     uint32_t _retry_at_ms;
     uint32_t _last_link_check_ms;
     uint32_t _broadcast_address;

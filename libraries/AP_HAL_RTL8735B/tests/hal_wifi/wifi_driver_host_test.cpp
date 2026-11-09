@@ -210,6 +210,65 @@ void test_without_credentials_joins_default_hotspot()
     assert(fake_statustext().find(WIFI_PWD) == std::string::npos);
 }
 
+size_t count_of(const std::string &text, const std::string &needle)
+{
+    size_t n = 0;
+    for (size_t at = text.find(needle); at != std::string::npos; at = text.find(needle, at + 1)) {
+        n++;
+    }
+    return n;
+}
+
+// 熱點不在或密碼錯時每秒重試一次：地面站只在第一次、錯誤碼改變時與每 FAILURE_REPORT_MS 收到警告，
+// joining 只在一輪重試的第一次送；其餘只印在主控台。連上後重新計算。
+void test_join_retries_do_not_flood_statustext()
+{
+    FakeNet fake;
+    reset(fake);
+    WiFiDriver d(WiFiDriver::Protocol::UDP, kLocalPort, kGcsPort);
+    d.begin(57600);
+    d._link_step(0);   // STARTING -> CONNECTING
+    fake.join_result = RTL8735B_WIFI_ERR_JOIN;
+    fake_statustext().clear();
+    const std::string console = capture_stdout([&]() {
+        // 第 0 秒起每秒重試，共 61 次（0–60 秒）
+        for (uint32_t t = 0; t <= 60000; t += WiFiDriver::RETRY_DELAY_MS) {
+            d._link_step(t);
+            assert(d.status().state == LinkState::WAIT_RETRY);
+        }
+    });
+    assert(d.status().join_failures == 61);
+    assert(WiFiDriver::FAILURE_REPORT_MS == 30000);
+    assert(count_of(fake_statustext(), "[6] WiFi: joining") == 1);
+    // 0、30、60 秒各一次
+    assert(count_of(fake_statustext(), "[4] WiFi: join failed (") == 3);
+    // 主控台照舊每次都印
+    assert(count_of(console, "WiFi: joining") == 61);
+    assert(count_of(console, "WiFi: join failed (") == 61);
+
+    // 錯誤碼改變時立即送
+    fake_statustext().clear();
+    fake.join_result = RTL8735B_WIFI_ERR_START;
+    d._link_step(61000);
+    assert(fake_statustext() == "[4] WiFi: join failed (" + std::to_string(RTL8735B_WIFI_ERR_START) + ")\n");
+
+    // 連上送 up；之後斷線再失敗，又從第一次算起
+    fake_statustext().clear();
+    fake.join_result = RTL8735B_WIFI_OK;
+    d._link_step(62000);
+    assert(d.status().state == LinkState::UP);
+    assert(count_of(fake_statustext(), "[6] WiFi: up, local ") == 1);
+    fake.associated = 0;
+    d._link_step(62000 + WiFiDriver::LINK_CHECK_INTERVAL_MS);
+    assert(d.status().state == LinkState::WAIT_RETRY);
+    fake.associated = 1;
+    fake.join_result = RTL8735B_WIFI_ERR_JOIN;
+    fake_statustext().clear();
+    d._link_step(70000);
+    assert(count_of(fake_statustext(), "[6] WiFi: joining") == 1);
+    assert(count_of(fake_statustext(), "[4] WiFi: join failed (") == 1);
+}
+
 void test_begin_creates_one_task_and_buffers()
 {
     FakeNet fake;
@@ -1170,6 +1229,7 @@ int main()
     }
     test_begin_creates_one_task_and_buffers();
     test_start_and_join_failures_retry();
+    test_join_retries_do_not_flood_statustext();
     test_discovery_broadcasts_only_heartbeats();
     test_gcs_learning_unicast_and_rx();
     test_foreign_sources_and_gcs_timeout();

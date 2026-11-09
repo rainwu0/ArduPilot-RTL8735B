@@ -8,7 +8,7 @@
 
 ArduPilot 在載具程式開始之前，先建立 SERIAL0（主控台）的 MAVLink 通道（`libraries/AP_Vehicle/AP_Vehicle.cpp` 中 `AP_Vehicle::setup` 的 `setup_console`）。接著 Copter 初始化氣壓計，之後才建立 Wi-Fi 等其他 SERIALn 的 MAVLink 通道（`ArduCopter/system.cpp` 的 `init_ardupilot`）。
 
-找不到氣壓計時，開機在 Wi-Fi 通道建立之前就停在 `Config Error: Baro: unable to initialise driver`。Wi-Fi 仍會連上熱點，但 UDP 與 TCP 都不會送出或接收 MAVLink；這個錯誤本身送到 SERIAL0 上的地面站。板型本身都沒有感測器，所以要等疊加檔至少加上氣壓計，地面站才連得上 Wi-Fi。見 [Wi-Fi](wifi.zh-TW.md) 與[描述自己的開發板](custom-boards.zh-TW.md)。
+找不到氣壓計時，開機在 Wi-Fi 通道建立之前就停在 `Config Error: Baro: unable to initialise driver`。Wi-Fi 仍會連上熱點，但 UDP 與 TCP 都不會送出或接收 MAVLink；這個錯誤本身送到 SERIAL0 上的地面站。除了 `hub8735ultra-expansion`，板型本身都沒有感測器，所以要等疊加檔至少加上氣壓計，地面站才連得上 Wi-Fi。見 [Wi-Fi](wifi.zh-TW.md) 與[描述自己的開發板](custom-boards.zh-TW.md)。
 
 ## SERIAL0 只送 MAVLink，不送文字
 

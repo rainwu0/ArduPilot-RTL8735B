@@ -16,7 +16,7 @@ How to adapt a board type to your own board, sensors and wiring with an overlay:
 
 ## Add sensors
 
-The board types have no sensors. Without a barometer, boot stops at `Config Error: Baro: unable to initialise driver`, and Wi-Fi carries no MAVLink either ([why](design.md#wi-fi-mavlink-waits-for-the-barometer)).
+Apart from `hub8735ultra-expansion`, the board types have no sensors. Without a barometer, boot stops at `Config Error: Baro: unable to initialise driver`, and Wi-Fi carries no MAVLink either ([why](design.md#wi-fi-mavlink-waits-for-the-barometer)).
 
 Sensors, their mounting orientation and default parameters go in the overlay, with the same syntax as hwdef on other ArduPilot platforms, for example `libraries/AP_HAL_ESP32/hwdef/esp32diy/hwdef.dat` in ArduPilot `9f648ccabc`. A working overlay for a BMI160 on SPI and a BMP280 and QMC5883L on I²C, on the HUB 8735 ultra, is [`examples/bmi160-bmp280-qmc5883l/overlay.dat`](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/blob/v0.1.0/examples/bmi160-bmp280-qmc5883l/overlay.dat) in the examples repository (rainwu0/ArduPilot-Hub8735Ultra `v0.1.0`). For other sensors, copy it and change the `IMU`, `BARO` and `COMPASS` lines.
 

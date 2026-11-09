@@ -27,7 +27,7 @@ This repository is [ArduPilot](https://github.com/ArduPilot/ardupilot) with a ha
 ## Background
 
 - ArduPilot master `9f648ccabc` (2026-09-25) plus a HAL for the RTL8735B, with ArduPilot's full history kept. The HAL is in `libraries/AP_HAL_RTL8735B/`; changes to ArduPilot's shared code are listed in the [HAL README][hal].
-- Board types: `hub8735ultra` for the HUB 8735 ultra from ideasHatch ([vendor resources](https://github.com/ideashatch/HUB-8735)), where all development and board tests happen; `amb82-mini`; and `rtl8735b-empty`, the settings both include. Each has a README under [`hwdef/`][boards].
+- Board types: `hub8735ultra` for the HUB 8735 ultra from ideasHatch ([vendor resources](https://github.com/ideashatch/HUB-8735)), where all development and board tests happen; `hub8735ultra-expansion`, the HUB 8735 ultra on its expansion board with an IMU, a barometer and a compass; `amb82-mini`; and `rtl8735b-empty`, the settings the others include. Each has a README under [`hwdef/`][boards].
 - The board types have no sensors. Sensors, their mounting and default parameters go in an overlay hwdef. Ready-made overlays with wiring and parameters are in the [examples repository][examples].
 
 ## Install
@@ -62,7 +62,7 @@ The details, including where to clone in WSL and the Wi-Fi settings file, are in
 
 | Item | Status |
 |---|---|
-| Flying a quadcopter: HUB 8735 ultra with an expansion board, ground station over Wi-Fi, DShot300 | Works (T5) |
+| Flying a quadcopter: HUB 8735 ultra with an expansion board ([`hub8735ultra-expansion`][expansion]), ground station over Wi-Fi, DShot300 | Works (T5) |
 | HUB 8735 ultra with a BMI160, a BMP280 and a GY-271 (QMC5883L) wired as in the examples repository, ground station over Wi-Fi (UDP) | Works (T2) |
 | Parameters in flash | Works (T2, T5) |
 | Battery voltage and current | Needs: calibration |
@@ -100,6 +100,7 @@ GPL-3.0, see [COPYING.txt](/COPYING.txt). Copyright belongs to the authors of ea
 [app]: /libraries/AP_HAL_RTL8735B/docs/board-applications.md
 [boards]: /libraries/AP_HAL_RTL8735B/hwdef/
 [hub]: /libraries/AP_HAL_RTL8735B/hwdef/hub8735ultra/README.md
+[expansion]: /libraries/AP_HAL_RTL8735B/hwdef/hub8735ultra-expansion/README.md
 [tests]: /libraries/AP_HAL_RTL8735B/tests/README.md
 [tests-board]: /libraries/AP_HAL_RTL8735B/BOARD_TESTS.md
 [examples]: https://github.com/rainwu0/ArduPilot-Hub8735Ultra

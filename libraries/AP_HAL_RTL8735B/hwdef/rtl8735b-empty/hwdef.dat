@@ -63,8 +63,12 @@ define HAL_RTL8735B_SERIAL9_UART_ID 255
 define HAL_RTL8735B_SERIAL9_TX_PIN 0
 define HAL_RTL8735B_SERIAL9_RX_PIN 0
 define HAL_RTL8735B_SERIAL9_ENABLED 0
-define AP_BARO_PROBE_EXTERNAL_I2C_BUSES 0
-define AP_AIRSPEED_ENABLED 0
+# 外接 I²C 氣壓計的搜尋與空速計照 ArduPilot 預設編進韌體，接上後設參數就能用：氣壓計設 BARO_PROBE_EXT（預設 0，
+# 不搜尋），空速計設 ARSPD_TYPE。空速計預設不啟用（Plane 不預設 MS4525），沒接時不會報空速計不健康。
+# 外接 I²C 羅盤的自動搜尋（AP_COMPASS_PROBING_ENABLED）不打開：它在 hwdef 的 COMPASS 列之前執行，會以驅動
+# 預設的方向搶先登錄同位址的羅盤（例如 QMC5883L 是 ROTATION_ROLL_180），蓋掉疊加檔寫的方向。
+# 沒有寫 COMPASS 列的疊加檔可自行 define AP_COMPASS_PROBING_ENABLED 1
+define HAL_AIRSPEED_TYPE_DEFAULT 0
 # 板上 microSD（FatFs）：MAVLink FTP 讀寫卡上的檔案；檔案系統記錄跟著編進韌體，但記錄後端預設仍不開
 # （HAL_LOGGING_BACKENDS_DEFAULT 0），沒插卡不會擋解鎖。沒有 SD 卡座的自訂板以 undef HAL_RTL8735B_SDCARD_ENABLED 關掉
 define HAL_RTL8735B_SDCARD_ENABLED 1

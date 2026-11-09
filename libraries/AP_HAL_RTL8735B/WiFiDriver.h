@@ -22,7 +22,8 @@ namespace RTL8735B {
   - 連線、DHCP、收發都在獨立的 APM_WIFI task（_link_step）；主迴圈呼叫的 UART API 只碰環形緩衝區與
     短暫持有的 mutex，不呼叫任何網路或 SDK 函式，所以不會因為 Wi-Fi 未連線、重連或送不出而阻塞。
   - 斷線（與 AP 失聯或位址消失）時關閉 socket，RETRY_DELAY_MS 後重新連線，不限次數。
-  - 沒有建置時注入的帳密（rtl8735b_wifi_ssid_len 為 0）時不啟動 Wi-Fi，is_initialized() 為 false。
+  - 沒有建置時注入的帳密（rtl8735b_wifi_ssid_len 為 0）時連板型 hwdef 的預設熱點（WIFI_SSID_STATION、
+    WIFI_PWD）；兩者都沒有時不啟動 Wi-Fi，is_initialized() 為 false。
 
   UDP：
   - 本機綁定 local_port；還沒有地面站時，只把 HEARTBEAT 廣播到子網路廣播位址的 gcs_port，其他訊息丟棄
@@ -87,6 +88,7 @@ public:
     static constexpr uint32_t TX_BUFFER_SIZE = 16384;
     static constexpr uint32_t PEER_TIMEOUT_MS = 3000;     // 換地面站的條件
     static constexpr uint32_t RETRY_DELAY_MS = 1000;
+    static constexpr uint32_t FAILURE_REPORT_MS = 30000;  // 同樣的連線失敗以 STATUSTEXT 重報的最短間隔
     static constexpr uint32_t LINK_CHECK_INTERVAL_MS = 100;
     static constexpr uint32_t TX_STALL_MS = 500;          // 緩衝區開頭的不完整訊框超過此時間就丟一個位元組重新對齊
     static constexpr uint8_t MAX_DATAGRAMS_PER_STEP = 16;
@@ -152,6 +154,10 @@ private:
     int _fd;          // UDP socket，或 TCP 的地面站連線
     int _listen_fd;   // TCP listen socket
     bool _sta_started;
+    // 連線失敗的 STATUSTEXT 節流：一輪重試（到連上為止）裡第一次、錯誤碼改變時與每 FAILURE_REPORT_MS 才送
+    bool _join_failing;
+    int _join_failure_code;
+    uint32_t _join_failure_report_ms;
     uint32_t _retry_at_ms;
     uint32_t _last_link_check_ms;
     uint32_t _broadcast_address;

@@ -10,6 +10,14 @@
 
 ## [Unreleased]
 
+和 v0.2.1 相容：原本的疊加檔、指令與參數照舊能用；改動要重新建置、燒錄才有。
+
+### 變更（Changed）
+
+- **沒有 Wi-Fi 設定檔時，三個板型改連預設熱點**：SSID `ardupilot`、密碼 `ardupilot1`；原本是 Wi-Fi 不啟用。地面站收到 `WiFi: joining the board's default hotspot (SSID length N)`；沒設 `RTL8735B_WIFI_CONFIG` 時，建置訊息寫明連預設熱點。見[預設熱點](docs/wifi.zh-TW.md#預設熱點)。
+- Wi-Fi 連不上時，重試不再每次都送 STATUSTEXT：地面站收到一次 joining；`WiFi: join failed (…)` 在第一次、錯誤碼改變時送，之後至少相隔 30 秒才再送一次，其餘只印在主控台。連上之後再斷線，又從第一次算起。見[訊息](docs/wifi.zh-TW.md#訊息)。
+- 文件：[Wi-Fi](docs/wifi.zh-TW.md) 加〈預設熱點〉一節，〈從零開始〉可以用預設熱點，不用設定檔。
+
 ## [0.2.1] - 2026-11-10
 
 和 v0.2.0 相容：原本的疊加檔、指令與參數照舊能用；改動要重新建置、燒錄才有。

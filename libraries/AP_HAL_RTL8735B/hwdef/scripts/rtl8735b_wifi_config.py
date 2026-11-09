@@ -3,7 +3,7 @@
 '''
 由本機、不進版本管理的 Wi-Fi STA 設定檔產生 wifi_credentials.c，放在建置目錄。
 AP_HAL_RTL8735B 的 WiFiDriver 讀取其中的位元組陣列；檔案未指定或不存在時產生 SSID 長度 0 的版本，
-建置照常成功、執行時 Wi-Fi 不啟用。設定檔格式（UTF-8，可有 BOM）：
+建置照常成功，執行時改連板型 hwdef 的預設熱點（WIFI_SSID_STATION、WIFI_PWD）。設定檔格式（UTF-8，可有 BOM）：
 
     # 註解與空行略過；等號後到行尾（不含換行）的內容原樣使用，不去除空白
     ssid=<1–32 bytes>
@@ -114,7 +114,7 @@ def generate(config_path, out_path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('rtl8735b_wifi_config.py')
-    parser.add_argument('--config', default=None, help='本機 Wi-Fi STA 設定檔；省略或不存在時停用 Wi-Fi')
+    parser.add_argument('--config', default=None, help='本機 Wi-Fi STA 設定檔；省略或不存在時用板型的預設熱點')
     parser.add_argument('out', help='輸出的 C 原始碼路徑')
     args = parser.parse_args()
     try:

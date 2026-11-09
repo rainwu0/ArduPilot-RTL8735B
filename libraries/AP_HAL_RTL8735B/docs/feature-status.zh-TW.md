@@ -31,6 +31,8 @@ HAL 各項功能的現況。各開發板的現況在各板子 README 的〈規�
 | UART 只收的埠 | 要補：上板驗一次 | TX 腳寫 `PIN_NC` |
 | UART 反相、半雙工 | 沒有 | 見[設計說明](design.zh-TW.md#序列埠沒有反相) |
 | Wi-Fi MAVLink（UDP） | 能用（T2、T5） | STA 模式 |
+| 預設熱點（沒有設定檔） | 要補：上板驗一次 | SSID `ardupilot`、密碼 `ardupilot1`，見 [Wi-Fi](wifi.zh-TW.md#預設熱點) |
+| 重試連線時的 Wi-Fi 訊息 | 要補：上板驗一次 | joining 只送一次，`WiFi: join failed` 要錯誤碼改變，或至少相隔 30 秒才再送，見 [Wi-Fi](wifi.zh-TW.md#訊息) |
 | Wi-Fi 送出重試與湊包 | 要補：上板驗一次 | 見 [Wi-Fi](wifi.zh-TW.md) |
 | Wi-Fi MAVLink（TCP） | 要補：上板驗一次 | 建置時選擇，與 UDP 二選一 |
 | 主控台 MAVLink（SERIAL0） | 要補：上板驗一次 | LOG UART，經開發板的 USB 序列埠，115200 baud；接手後 SDK 與 HAL 的 printf 文字不送出，HAL 的執行期訊息（含 Wi-Fi 的 IP）走 STATUSTEXT。晶片自己的 USB 不做。見 HUB 8735 ultra README 的 [UART 對應](../hwdef/hub8735ultra/README.zh-TW.md#uart-對應) |

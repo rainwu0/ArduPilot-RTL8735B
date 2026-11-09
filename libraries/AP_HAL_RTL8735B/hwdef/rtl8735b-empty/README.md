@@ -81,6 +81,8 @@ SERIAL4 defaults to RC input (`DEFAULT_SERIAL4_PROTOCOL SerialProtocol_RCIN`), w
 
 Wi-Fi is SERIAL2 (`HAL_RTL8735B_WIFI_SERIAL 2`), with MAVLink2 over UDP: local port 14555, and HEARTBEAT broadcasts to port 14550 until a ground station is known. See [Wi-Fi](../../docs/wifi.md).
 
+Without a Wi-Fi settings file, the board joins the default hotspot that this board type sets: `WIFI_SSID_STATION` `"ardupilot"`, `WIFI_PWD` `"ardupilot1"` ([Default hotspot](../../docs/wifi.md#default-hotspot)).
+
 ## GPIOs
 
 | Logical number | Chip pin | Direction |

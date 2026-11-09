@@ -133,6 +133,17 @@ class DefaultBoardTest(unittest.TestCase):
                 self.assertIsNone(re.search(r'^#define %s\b' % name, self.header, re.M))
         self.assertEqual(count(self.header, 'HAL_AIRSPEED_TYPE_DEFAULT'), 0)
 
+    def test_default_hotspot(self):
+        # 建置時沒有 RTL8735B_WIFI_CONFIG 設定檔時連的公開預設熱點（同 AP_HAL_ESP32 station 模式的預設值）；
+        # 疊加檔 undef 後重新 define 就換掉
+        self.assertIn('#define WIFI_SSID_STATION "ardupilot"', self.header)
+        self.assertIn('#define WIFI_PWD "ardupilot1"', self.header)
+        header = generate(['undef WIFI_SSID_STATION', 'define WIFI_SSID_STATION "my-hotspot"',
+                           'undef WIFI_PWD', 'define WIFI_PWD "my-password"'])
+        self.assertIn('#define WIFI_SSID_STATION "my-hotspot"', header)
+        self.assertIn('#define WIFI_PWD "my-password"', header)
+        self.assertNotIn('"ardupilot"', header)
+
     def test_old_macros_are_gone(self):
         # 不留舊名稱的相容別名：每個值只有一個來源
         for old in (r'HAL_RTL8735B_I2C1_\w+', r'HAL_RTL8735B_SPI1_\w+', 'HAL_RTL8735B_BMI160_CS_PIN',

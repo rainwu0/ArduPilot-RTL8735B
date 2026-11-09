@@ -11,7 +11,7 @@
 - **開發板**：一塊 HUB 8735 ultra，加一條**能傳資料**的 USB-C 線。只能充電的線接上之後，電腦不會出現序列埠。
 - **感測器模組**：GY-BMI160（IMU）和 BMP280（氣壓計）各一。羅盤 GY-271（QMC5883L）可以之後再接。另外準備杜邦線或焊接工具。
 - **電腦**：一台 Windows，裝好 WSL 的 Ubuntu 22.04。建置在 WSL 裡做，燒錄和地面站在 Windows 那邊。
-- **Wi-Fi 熱點**：電腦和開發板都連同一個，建議用 2.4 GHz。用自己控制的熱點：Wi-Fi 上的 MAVLink 沒有任何驗證，同一網段的裝置都送得到開發板。
+- **Wi-Fi 熱點**：電腦和開發板都連同一個，建議用 2.4 GHz。可以用手機開預設熱點（名稱 `ardupilot`、密碼 `ardupilot1`），或用自己的熱點，見第 4 步。Wi-Fi 上的 MAVLink 沒有任何驗證，連得上這個熱點的裝置都送得到開發板。
 - **磁碟和時間**：至少 7 GB 磁碟。從 clone 到建好映像約 13 分鐘：clone 約 3.5 分鐘、裝工具與 SDK 約 5 分鐘、建置約 3.3 分鐘（依網路與電腦而定）。
 
 氣壓計與 IMU 都要接：什麼都不接時，開機停在 `Config Error: Baro: unable to initialise driver`，Wi-Fi 會連上熱點，但地面站經 Wi-Fi 收不到任何東西。
@@ -65,9 +65,16 @@ git submodule update --init --recursive modules/waf modules/mavlink modules/Dron
 
 成功時：`arm-none-eabi-gcc --version` 的第一行有 `Realtek ASDK`。沒有的話，就是 PATH 沒設好，或用到了系統套件的編譯器，那個建不出本移植。PATH 沒設時，下一步的 configure 會印出 `Could not find the program ['arm-none-eabi-ar']`。
 
-## 4. Wi-Fi 設定檔
+## 4. Wi-Fi
 
-在 WSL 的家目錄建一個檔案，例如 `~/wifi.txt`，內容兩行：
+開發板以 station 模式連到一個熱點，電腦也連同一個。兩種做法選一種：
+
+- **[預設熱點](docs/wifi.zh-TW.md#預設熱點)**：不用設定檔。用手機或電腦開一個熱點，名稱 `ardupilot`、密碼 `ardupilot1`。
+- **自己的熱點**：寫一個設定檔，建置時指給建置系統，做法在下面。
+
+用預設熱點的話，這一步只要做最後的「每次開新的終端機」那三行。
+
+設定檔：在 WSL 的家目錄建一個檔案，例如 `~/wifi.txt`，內容兩行：
 
 ```text
 ssid=你的熱點名稱
@@ -87,20 +94,25 @@ export RTL8735B_WIFI_CONFIG=~/wifi.txt
 
 設定檔在建置時才讀。改了內容，直接重新建置就好，不用重新 configure。
 
-帳密會編進韌體，拿到映像的人可能讀得出來。要分享或附在 issue 的映像，不設 `RTL8735B_WIFI_CONFIG` 另外建一份。
+用設定檔時，帳密會編進韌體，拿到映像的人可能讀得出來。要分享或附在 issue 的映像，不設 `RTL8735B_WIFI_CONFIG` 另外建一份。
 
-**之後每次開新的終端機，先做這四行再建置：**
+**之後每次開新的終端機，先做這三行再建置：**
 
 ```bash
 cd ~/ArduPilot-RTL8735B
 source ~/.venv-rtl8735b/bin/activate
 export PATH="$HOME/ambpro2_sdk/tools/asdk-10.3.0/linux/newlib/bin:$PATH"
+```
+
+用自己的熱點時，再加這一行：
+
+```bash
 export RTL8735B_WIFI_CONFIG=~/wifi.txt
 ```
 
-漏了最後一行，建出來的映像會沒有 Wi-Fi。
+漏了這一行，建出來的映像會連預設熱點 `ardupilot`，不會連你的熱點。
 
-成功時：`ls -l $RTL8735B_WIFI_CONFIG` 列出你的設定檔；做過 `chmod 600` 的話，開頭是 `-rw-------`。
+成功時：用自己的熱點時，`ls -l $RTL8735B_WIFI_CONFIG` 列出你的設定檔，做過 `chmod 600` 的話開頭是 `-rw-------`；用預設熱點時，`echo $RTL8735B_WIFI_CONFIG` 印出空行。
 
 ## 5. 建置
 
@@ -111,12 +123,12 @@ export RTL8735B_WIFI_CONFIG=~/wifi.txt
 
 成功時：
 
-- 開頭附近有 `Wi-Fi STA: 帳密取自 <你的設定檔路徑>`；
+- 開頭附近有 Wi-Fi 那一行：用自己的熱點時是 `Wi-Fi STA: 帳密取自 <你的設定檔路徑>`；用預設熱點時是 `Wi-Fi STA: 未設定（RTL8735B_WIFI_CONFIG=未指定），開發板連板型的預設熱點…`；
 - 最後一行是 `'copter' finished successfully`，映像在 `build/hub8735ultra/sdk_build/flash_ntz.bin`。
 
 中途會捲過很多 `warning:`，還有 `sed: can't read ...`、`JSON header - entry : fail` 這幾行。這些都來自 SDK，不影響結果，以最後一行為準。
 
-**如果看到的是 `Wi-Fi STA: 未設定`**：建置雖然成功了，但映像裡沒有 Wi-Fi。通常是設定檔路徑寫錯，或這個終端機沒有 `export`。修好之後再跑一次 `./waf copter`。
+**用自己的熱點卻看到 `Wi-Fi STA: 未設定`**：映像會連預設熱點，不會連你的熱點。通常是設定檔路徑寫錯，或這個終端機沒有 `export`。修好之後再跑一次 `./waf copter`。
 
 把映像和燒錄工具複製到 Windows。`<你>` 換成你的 Windows 帳號名稱，不知道的話在 WSL 執行 `ls /mnt/c/Users` 就看得到：
 
@@ -156,21 +168,21 @@ cp "../ambpro2_sdk/tools/Pro2_PG_tool _v1.3.0.zip" /mnt/c/Users/<你>/Downloads/
 2. 連上之後按一下 reset。開發板重開，地面站的訊息（Mission Planner 的 Messages 分頁）依序出現：
 
    ```text
-   WiFi: joining (SSID length N)
+   WiFi: joining the board's default hotspot (SSID length 9)
    WiFi: up, local 192.168.x.x:14555
    ```
 
-- `SSID length N` 的 N 要等於你的熱點名稱的位元組數（英數字一個算 1，中文一個字算 3）。對不上，就是設定檔裡多了引號或空白。
+- 第一行是用預設熱點時的樣子。用自己的熱點時是 `WiFi: joining (SSID length N)`：N 要等於你的熱點名稱的位元組數（英數字一個算 1，中文一個字算 3），對不上就是設定檔裡多了引號或空白。
 - `WiFi: up` 後面的 IP 就是開發板的位址，記下來。
 - 這幾行只送給當時已經連上的地面站：地面站要在按 reset 之前接好，錯過了就再按一次 reset。也可以在熱點的裝置清單看開發板的 IP，例如 Windows 的行動熱點會列出連上的裝置。
 
 不對的時候：
 
 - **每 5 秒出現一次 `Config Error: Baro: unable to initialise driver`**：找不到氣壓計。檢查氣壓計的接線和 3.3 V，再按 reset 重開。
-- **出現 `WiFi: no STA credentials in this image; WiFi MAVLink port disabled`**：映像裡沒有 Wi-Fi 帳密，回第 5 步確認有 `帳密取自`。
-- **出現 `WiFi: join failed (…)`**：開發板連不上熱點，之後會自動重試。檢查熱點名稱和密碼；熱點最好是 2.4 GHz。
+- **出現 `WiFi: no STA credentials in this image; WiFi MAVLink port disabled`**：這個映像的 Wi-Fi 是關掉的：沒有設定檔，而且疊加檔把 `WIFI_SSID_STATION` 設成了 `""` 或 undef 了它。
+- **出現 `WiFi: join failed (…)`**：開發板連不上熱點。它每次失敗後等 1 秒自動重試，同樣的失敗至少相隔 30 秒才再顯示一則。檢查熱點有沒有開、名稱和密碼（預設熱點是 `ardupilot`、`ardupilot1`）；熱點最好是 2.4 GHz。
 
-SERIAL0 的現況見[功能狀態](docs/feature-status.zh-TW.md)。
+SERIAL0 與預設熱點的現況見[功能狀態](docs/feature-status.zh-TW.md)。
 
 ## 8. 連地面站
 

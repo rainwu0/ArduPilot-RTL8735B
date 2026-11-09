@@ -18,7 +18,40 @@
 
 using namespace RTL8735B;
 
+// 建置時沒有帳密（沒有 RTL8735B_WIFI_CONFIG 設定檔）時連的預設熱點，由板型 hwdef 定義；名稱同 AP_HAL_ESP32
+// station 模式（ArduPilot 9f648ccabc 的 libraries/AP_HAL_ESP32/WiFiDriver.cpp）。沒有定義或 SSID 為 "" 時
+// Wi-Fi 不啟用。長度上限同 rtl8735b_wifi_join（wifi_shim.c）：SSID 32 bytes，密碼空白或 8–64 字元。
+#ifndef WIFI_SSID_STATION
+#define WIFI_SSID_STATION ""
+#endif
+#ifndef WIFI_PWD
+#define WIFI_PWD ""
+#endif
+static_assert(sizeof(WIFI_SSID_STATION) - 1 <= 32, "WIFI_SSID_STATION longer than 32 bytes");
+static_assert(sizeof(WIFI_PWD) - 1 == 0 || (sizeof(WIFI_PWD) - 1 >= 8 && sizeof(WIFI_PWD) - 1 <= 64),
+              "WIFI_PWD must be empty or 8-64 characters");
+
 namespace {
+
+struct StaCredentials {
+    const uint8_t *ssid;
+    uint8_t ssid_len;
+    const uint8_t *password;
+    uint8_t password_len;
+    bool board_default;
+};
+
+// 建置時的帳密優先；沒有時用板型的預設熱點
+StaCredentials sta_credentials()
+{
+    if (rtl8735b_wifi_ssid_len != 0) {
+        return {rtl8735b_wifi_ssid, rtl8735b_wifi_ssid_len, rtl8735b_wifi_password, rtl8735b_wifi_password_len, false};
+    }
+    static const char ssid[] = WIFI_SSID_STATION;
+    static const char password[] = WIFI_PWD;
+    return {reinterpret_cast<const uint8_t *>(ssid), uint8_t(sizeof(ssid) - 1),
+            reinterpret_cast<const uint8_t *>(password), uint8_t(sizeof(password) - 1), true};
+}
 
 // MAVLink 協定常數（modules/mavlink 產生的標頭同值）；HAL 不引入整個 GCS_MAVLink。
 constexpr uint8_t MAVLINK2_STX = 253;
@@ -55,6 +88,9 @@ WiFiDriver::WiFiDriver(Protocol protocol, uint16_t local_port, uint16_t gcs_port
     _fd(-1),
     _listen_fd(-1),
     _sta_started(false),
+    _join_failing(false),
+    _join_failure_code(0),
+    _join_failure_report_ms(0),
     _retry_at_ms(0),
     _last_link_check_ms(0),
     _broadcast_address(0),
@@ -118,7 +154,7 @@ void WiFiDriver::_begin(uint32_t baud, uint16_t rx_space, uint16_t tx_space)
     WITH_SEMAPHORE(_read_mutex);
     WITH_SEMAPHORE(_write_mutex);
 
-    if (rtl8735b_wifi_ssid_len == 0) {
+    if (sta_credentials().ssid_len == 0) {
         _state.store(LinkState::DISABLED);
         if (!_disabled_reported) {
             RTL8735B::report_warning("WiFi: no STA credentials in this image; WiFi MAVLink port disabled");
@@ -484,10 +520,24 @@ uint32_t WiFiDriver::_link_step(uint32_t now_ms)
 
     case LinkState::CONNECTING: {
         _join_attempts.fetch_add(1);
-        // 連線的經過以 STATUSTEXT 送地面站：SERIAL0 接手 LOG UART 之後 printf 不送出
-        RTL8735B::report_info("WiFi: joining (SSID length %u)", (unsigned)rtl8735b_wifi_ssid_len);
-        const int join = rtl8735b_wifi_join(rtl8735b_wifi_ssid, rtl8735b_wifi_ssid_len,
-                                             rtl8735b_wifi_password, rtl8735b_wifi_password_len);
+        const StaCredentials sta = sta_credentials();
+        // 連線的經過以 STATUSTEXT 送地面站：SERIAL0 接手 LOG UART 之後 printf 不送出。
+        // 只送 SSID 的長度，不送 SSID 與密碼；用板型預設熱點時另外標明。
+        // 重試中（上一次失敗後）只印在主控台，不每秒洗地面站的訊息欄。
+        if (sta.board_default) {
+            if (_join_failing) {
+                ::printf("WiFi: joining the board's default hotspot (SSID length %u)\n", (unsigned)sta.ssid_len);
+            } else {
+                RTL8735B::report_info("WiFi: joining the board's default hotspot (SSID length %u)", (unsigned)sta.ssid_len);
+            }
+        } else {
+            if (_join_failing) {
+                ::printf("WiFi: joining (SSID length %u)\n", (unsigned)sta.ssid_len);
+            } else {
+                RTL8735B::report_info("WiFi: joining (SSID length %u)", (unsigned)sta.ssid_len);
+            }
+        }
+        const int join = rtl8735b_wifi_join(sta.ssid, sta.ssid_len, sta.password, sta.password_len);
         bool opened = false;
         if (join == RTL8735B_WIFI_OK) {
             _refresh_address();
@@ -499,13 +549,23 @@ uint32_t WiFiDriver::_link_step(uint32_t now_ms)
             _join_failures.fetch_add(1);
             _close_sockets();
             rtl8735b_wifi_leave();
-            RTL8735B::report_warning("WiFi: join failed (%d)", join);
+            // 第一次、錯誤碼改變時與每 FAILURE_REPORT_MS 送 STATUSTEXT；其餘只印在主控台
+            if (!_join_failing || join != _join_failure_code ||
+                now_ms - _join_failure_report_ms >= FAILURE_REPORT_MS) {
+                RTL8735B::report_warning("WiFi: join failed (%d)", join);
+                _join_failure_report_ms = now_ms;
+            } else {
+                ::printf("WiFi: join failed (%d)\n", join);
+            }
+            _join_failing = true;
+            _join_failure_code = join;
             _set_state(LinkState::WAIT_RETRY, now_ms);
             return 10;
         }
         _gcs_known.store(false);
         _clear_tx();
         _last_link_check_ms = now_ms;
+        _join_failing = false;
         // 開發板的位址：地面站接 COM 埠（SERIAL0）就讀得到，使用者照這個 IP 分辨同一個熱點上的開發板
         const uint32_t local = _local_address.load();
         RTL8735B::report_info("WiFi: up, local %u.%u.%u.%u:%u",

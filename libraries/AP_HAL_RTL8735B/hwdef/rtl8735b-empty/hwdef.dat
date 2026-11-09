@@ -34,6 +34,11 @@ define HAL_RTL8735B_SERIAL2_ENABLED 0
 define HAL_RTL8735B_WIFI_SERIAL 2
 define HAL_RTL8735B_WIFI_UDP_LOCAL_PORT 14555
 define HAL_RTL8735B_WIFI_UDP_GCS_PORT 14550
+# 建置時沒有 RTL8735B_WIFI_CONFIG 設定檔時，開發板以 station 模式連到這個公開的預設熱點（名稱與 AP_HAL_ESP32
+# station 模式的 WIFI_SSID_STATION、WIFI_PWD 相同，值也相同）。這組值任何人都知道；換成自己的熱點時，疊加檔先
+# undef 再重新 define，或改用設定檔。WIFI_SSID_STATION 設成 "" 時 Wi-Fi 不啟用
+define WIFI_SSID_STATION "ardupilot"
+define WIFI_PWD "ardupilot1"
 define DEFAULT_SERIAL2_PROTOCOL SerialProtocol_MAVLink2
 define HAL_RTL8735B_SERIAL3_UART_ID 0
 define HAL_RTL8735B_SERIAL3_TX_PIN PIN_A2

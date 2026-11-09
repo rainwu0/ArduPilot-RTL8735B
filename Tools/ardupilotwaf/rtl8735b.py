@@ -91,7 +91,8 @@ def generate_hwdef_h(env):
 
 def generate_wifi_credentials(bld):
     '''Wi-Fi STA 帳密在建置時（不是 configure 時）由環境變數 RTL8735B_WIFI_CONFIG 指向的本機檔案產生，
-    不進 waf 的設定快取與編譯命令列；未設定或檔案不存在時產生停用版本，建置照常成功'''
+    不進 waf 的設定快取與編譯命令列；未設定或檔案不存在時產生空的帳密，建置照常成功，
+    開發板改連板型 hwdef 的預設熱點（WIFI_SSID_STATION、WIFI_PWD；WiFiDriver.cpp）'''
     config = os.environ.get('RTL8735B_WIFI_CONFIG') or None
     out = bld.bldnode.make_node('rtl8735b/wifi_credentials.c').abspath()
     try:
@@ -101,7 +102,8 @@ def generate_wifi_credentials(bld):
     if status == 'configured':
         print('Wi-Fi STA: 帳密取自 %s' % config)
     else:
-        print('Wi-Fi STA: 未設定（RTL8735B_WIFI_CONFIG=%s），映像中的 Wi-Fi 不啟用' % (config or '未指定'))
+        print('Wi-Fi STA: 未設定（RTL8735B_WIFI_CONFIG=%s），開發板連板型的預設熱點'
+              '（hwdef 的 WIFI_SSID_STATION；為 "" 時 Wi-Fi 不啟用）' % (config or '未指定'))
     return out
 
 

@@ -11,7 +11,7 @@ This page goes as far as a connected ground station, with no motors, ESCs or bat
 - **Board**: one HUB 8735 ultra, and a USB-C cable that **carries data**. With a charge-only cable, no serial port appears on the computer.
 - **Sensor modules**: a GY-BMI160 (IMU) and a BMP280 (barometer). The GY-271 compass (QMC5883L) can wait. You also need jumper wires or soldering tools.
 - **Computer**: a Windows PC with Ubuntu 22.04 in WSL. Building happens in WSL; flashing and the ground station are on the Windows side.
-- **Wi-Fi hotspot**: the computer and the board both join the same one; 2.4 GHz is recommended. Use a hotspot you control: MAVLink over Wi-Fi has no authentication at all, and any device on the subnet can send to the board.
+- **Wi-Fi hotspot**: the computer and the board both join the same one; 2.4 GHz is recommended. You can open the default hotspot on a phone (name `ardupilot`, password `ardupilot1`) or use your own hotspot, see step 4. MAVLink over Wi-Fi has no authentication at all: any device that can join the hotspot can send to the board.
 - **Disk and time**: at least 7 GB of disk. From clone to a built image takes about 13 minutes: clone about 3.5 minutes, tools and SDK about 5 minutes, build about 3.3 minutes (depending on your network and computer).
 
 Both the barometer and the IMU are needed: with nothing connected, boot stops at `Config Error: Baro: unable to initialise driver`, and although Wi-Fi joins the hotspot, the ground station receives nothing over it.
@@ -65,9 +65,16 @@ git submodule update --init --recursive modules/waf modules/mavlink modules/Dron
 
 When it works: the first line of `arm-none-eabi-gcc --version` contains `Realtek ASDK`. If it does not, PATH is not set correctly, or the compiler from the system packages is being used, and that one does not build this port. Without PATH set, the configure that follows prints `Could not find the program ['arm-none-eabi-ar']`.
 
-## 4. Wi-Fi settings file
+## 4. Wi-Fi
 
-In your WSL home directory, create a file, for example `~/wifi.txt`, with two lines:
+The board joins a hotspot in station mode, and the computer joins the same one. Pick one of two ways:
+
+- **[Default hotspot](docs/wifi.md#default-hotspot)**: no settings file. Open a hotspot on a phone or computer named `ardupilot` with the password `ardupilot1`.
+- **Your own hotspot**: write a settings file and point the build system at it, as below.
+
+With the default hotspot, the only part of this step you need is the three lines for every new terminal at the end.
+
+Settings file: in your WSL home directory, create a file, for example `~/wifi.txt`, with two lines:
 
 ```text
 ssid=your-hotspot-name
@@ -87,20 +94,25 @@ export RTL8735B_WIFI_CONFIG=~/wifi.txt
 
 The settings file is read at build time. After changing it, just build again; there is no need to configure again.
 
-The credentials are compiled into the firmware, and anyone who has the image may be able to read them. For an image to share or to attach to an issue, build another one without `RTL8735B_WIFI_CONFIG`.
+With a settings file, the credentials are compiled into the firmware, and anyone who has the image may be able to read them. For an image to share or to attach to an issue, build another one without `RTL8735B_WIFI_CONFIG`.
 
-**Every time you open a new terminal, run these four lines before building:**
+**Every time you open a new terminal, run these three lines before building:**
 
 ```bash
 cd ~/ArduPilot-RTL8735B
 source ~/.venv-rtl8735b/bin/activate
 export PATH="$HOME/ambpro2_sdk/tools/asdk-10.3.0/linux/newlib/bin:$PATH"
+```
+
+With your own hotspot, add this line too:
+
+```bash
 export RTL8735B_WIFI_CONFIG=~/wifi.txt
 ```
 
-If you leave out the last line, the image you build has no Wi-Fi.
+If you leave it out, the image you build joins the default hotspot `ardupilot`, not yours.
 
-When it works: `ls -l $RTL8735B_WIFI_CONFIG` lists your settings file, with `-rw-------` at the start if you ran `chmod 600`.
+When it works: with your own hotspot, `ls -l $RTL8735B_WIFI_CONFIG` lists your settings file, with `-rw-------` at the start if you ran `chmod 600`; with the default hotspot, `echo $RTL8735B_WIFI_CONFIG` prints an empty line.
 
 ## 5. Build
 
@@ -111,12 +123,12 @@ When it works: `ls -l $RTL8735B_WIFI_CONFIG` lists your settings file, with `-rw
 
 When it works:
 
-- near the start there is `Wi-Fi STA: 帳密取自 <path to your settings file>` ("credentials taken from …");
+- near the start there is a Wi-Fi line: with your own hotspot it is `Wi-Fi STA: 帳密取自 <path to your settings file>` ("credentials taken from …"); with the default hotspot it is `Wi-Fi STA: 未設定（RTL8735B_WIFI_CONFIG=未指定），開發板連板型的預設熱點…` ("not set; the board joins the board type's default hotspot");
 - the last line is `'copter' finished successfully`, and the image is `build/hub8735ultra/sdk_build/flash_ntz.bin`.
 
 Lots of `warning:` lines scroll past on the way, along with `sed: can't read ...` and `JSON header - entry : fail`. They all come from the SDK and do not affect the result; go by the last line.
 
-**If you see `Wi-Fi STA: 未設定` ("not set") instead**: the build still succeeded, but the image has no Wi-Fi. Usually the path to the settings file is wrong, or this terminal did not run the `export`. Fix it and run `./waf copter` again.
+**If you use your own hotspot but see `Wi-Fi STA: 未設定` ("not set")**: the image joins the default hotspot, not yours. Usually the path to the settings file is wrong, or this terminal did not run the `export`. Fix it and run `./waf copter` again.
 
 Copy the image and the flashing tool to Windows. Replace `<you>` with your Windows user name; if you do not know it, run `ls /mnt/c/Users` in WSL to see it:
 
@@ -156,21 +168,21 @@ When the board boots, the HAL hands this COM port to MAVLink (SERIAL0) early on:
 2. Once it is connected, press reset. The board restarts, and the ground station's messages (the Messages tab in Mission Planner) show, in order:
 
    ```text
-   WiFi: joining (SSID length N)
+   WiFi: joining the board's default hotspot (SSID length 9)
    WiFi: up, local 192.168.x.x:14555
    ```
 
-- N in `SSID length N` must equal the number of bytes in your hotspot name (1 for each letter or digit, 3 for each Chinese character). If it does not, the settings file has an extra quote or space.
+- The first line is what the default hotspot shows. With your own hotspot it is `WiFi: joining (SSID length N)`: N must equal the number of bytes in your hotspot name (1 for each letter or digit, 3 for each Chinese character), and if it does not, the settings file has an extra quote or space.
 - The IP after `WiFi: up` is the board's address; note it down.
 - These lines go only to a ground station that is already connected: connect it before pressing reset, and if you missed them, press reset again. You can also find the board's IP in the hotspot's list of devices; the Windows mobile hotspot, for example, lists the connected devices.
 
 If something is wrong:
 
 - **`Config Error: Baro: unable to initialise driver` appears every 5 seconds**: the barometer was not found. Check the barometer's wiring and 3.3 V, then press reset.
-- **`WiFi: no STA credentials in this image; WiFi MAVLink port disabled` appears**: the image has no Wi-Fi credentials; go back to step 5 and check for `帳密取自`.
-- **`WiFi: join failed (…)` appears**: the board cannot join the hotspot and will retry by itself. Check the hotspot name and password; a 2.4 GHz hotspot is best.
+- **`WiFi: no STA credentials in this image; WiFi MAVLink port disabled` appears**: Wi-Fi is turned off in this image: there is no settings file, and an overlay set `WIFI_SSID_STATION` to `""` or undefined it.
+- **`WiFi: join failed (…)` appears**: the board cannot join the hotspot. It tries again 1 s after each failure, and shows the same failure again at most once every 30 seconds. Check that the hotspot is on, and its name and password (the default hotspot is `ardupilot`, `ardupilot1`); a 2.4 GHz hotspot is best.
 
-The status of SERIAL0 is in [Feature status](docs/feature-status.md).
+The status of SERIAL0 and of the default hotspot is in [Feature status](docs/feature-status.md).
 
 ## 8. Connect a ground station
 

@@ -18,10 +18,10 @@ using namespace RTL8735B;
 AnalogIn::Source::Source(uint8_t pin) :
     _pin(ANALOG_INPUT_NONE),
     _valid(false),
-    _latest(NAN),
+    _latest(0),
+    _value(0),
     _sum(0),
-    _count(0),
-    _has_sample(false)
+    _count(0)
 {
     if (pin != ANALOG_INPUT_NONE && !_bind(pin)) {
         _pin = ANALOG_INPUT_NONE;
@@ -38,7 +38,7 @@ static constexpr float ADC_CODE_MAX = 4095.0f;
 
 static float raw_to_volts(float raw)
 {
-    return raw * (ADC_FULL_SCALE_VOLTS / ADC_CODE_MAX);   // NaN 照樣傳下去
+    return raw * (ADC_FULL_SCALE_VOLTS / ADC_CODE_MAX);
 }
 
 // 上層（電池、RSSI、空速、測距等類比 backend）以 set_pin() 的結果判斷可用與否，
@@ -64,21 +64,26 @@ bool AnalogIn::Source::_bind(uint8_t pin)
     _semaphore.take_blocking();
     _pin = pin;
     _valid = true;
-    _latest = NAN;
+    _latest = 0;
+    _value = 0;
     _sum = 0;
     _count = 0;
-    _has_sample = false;
     _semaphore.give();
     return true;
 }
 
+// 兩次讀之間有新取樣就回它們的平均，沒有就回上一次的平均；還沒有取樣時是 0，不回 NaN。
+// 比照 AP_HAL_ChibiOS 的 AnalogSource::read_average（ArduPilot 9f648ccabc AnalogIn.cpp:118-131）：
+// 上層綁腳後緊接著讀（AP_BattMonitor_Analog::read()），NaN 進到 constrain_float 會記成內部錯誤
 float AnalogIn::Source::read_average()
 {
     _semaphore.take_blocking();
-    const float value = !_has_sample ? NAN :
-        (_count == 0 ? _latest : (float)_sum / (float)_count);
-    _sum = 0;
-    _count = 0;
+    if (_count != 0) {
+        _value = (float)_sum / (float)_count;
+        _sum = 0;
+        _count = 0;
+    }
+    const float value = _value;
     _semaphore.give();
     return value;
 }
@@ -114,7 +119,6 @@ void AnalogIn::Source::add_sample(uint8_t pin, uint16_t sample)
         _latest = (float)sample;
         _sum += sample;
         _count++;
-        _has_sample = true;
         if (_count >= 254U) {
             _sum >>= 1;
             _count >>= 1;

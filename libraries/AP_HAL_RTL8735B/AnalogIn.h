@@ -32,14 +32,14 @@ private:
         void add_sample(uint8_t pin, uint16_t sample);   // 讀取期間換了腳就丟掉這筆
 
     private:
-        bool _bind(uint8_t pin);   // 綁定板型 hwdef 列出的類比腳，並清掉累計的取樣
+        bool _bind(uint8_t pin);   // 綁定板型 hwdef 列出的類比腳，取樣與平均清成 0
 
         uint8_t _pin;
         bool _valid;
-        float _latest;
+        float _latest;   // 最近一次取樣；還沒有取樣時是 0
+        float _value;    // 上一次 read_average() 的平均；還沒有取樣時是 0
         uint32_t _sum;
         uint16_t _count;
-        bool _has_sample;
         Semaphore _semaphore;
     };
 

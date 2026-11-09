@@ -60,6 +60,8 @@ The HAL reports the Wi-Fi connection as STATUSTEXT. Before Wi-Fi is up, they rea
 | `WiFi: link lost (…), reconnecting` | The board was connected and lost the hotspot; it joins again by itself |
 | `WiFi: no STA credentials in this image; WiFi MAVLink port disabled` | There is no settings file and `WIFI_SSID_STATION` is `""` or not defined: Wi-Fi is off |
 
+When the hotspot is not there or the password is wrong, the board tries again 1 s after each failure. The ground station receives joining once, and `WiFi: join failed (…)` the first time, when the error code changes, and at most once every 30 s after that; the rest only goes to the console. On joining it receives `WiFi: up, local <IP>:<port>`, and after a later link loss the count starts again.
+
 ## Security limits
 
 - Credentials: compiled into the image, see *Settings file*. Images for sharing, or for attaching to an issue, can be built without `RTL8735B_WIFI_CONFIG`; such an image has only the values of the [default hotspot](#default-hotspot).

@@ -60,6 +60,8 @@ HAL 以 STATUSTEXT 回報 Wi-Fi 的連線。Wi-Fi 還沒連上之前，只有其
 | `WiFi: link lost (…), reconnecting` | 已連上的熱點斷了；開發板會自己重新連 |
 | `WiFi: no STA credentials in this image; WiFi MAVLink port disabled` | 沒有設定檔，而且 `WIFI_SSID_STATION` 是 `""` 或沒有定義：Wi-Fi 不啟用 |
 
+熱點不在或密碼錯時，每次失敗後等 1 秒再試。地面站收到一次 joining；`WiFi: join failed (…)` 在第一次、錯誤碼改變時送，之後至少相隔 30 秒才再送一次，其餘只印在主控台。連上時送 `WiFi: up, local <IP>:<埠>`，之後再斷線又從第一次算起。
+
 ## 安全上的限制
 
 - 帳密：編進映像，見〈設定檔〉。要分享或附在 issue 的映像，可以不設 `RTL8735B_WIFI_CONFIG` 建置；這樣的映像只有[預設熱點](#預設熱點)那組值。

@@ -6,12 +6,13 @@
 
 Unofficial ArduPilot port to the Realtek RTL8735B SoC. Docs in Traditional Chinese and English.
 
-This repository is [ArduPilot](https://github.com/ArduPilot/ardupilot) with a hardware abstraction layer (HAL) for the Realtek RTL8735B. It is maintained by one person and is unrelated to both the ArduPilot development team and Realtek.
+This repository is [ArduPilot](https://github.com/ArduPilot/ardupilot) with a hardware abstraction layer (HAL) for the Realtek RTL8735B. A HUB 8735 ultra on an expansion board with an IMU, a barometer and a compass has flown a 3.5-inch quadcopter with an earlier development version of this HAL, controlled from a ground station over Wi-Fi (T5). To start, follow [Getting started][start]. It is maintained by one person and is unrelated to both the ArduPilot development team and Realtek.
 
 ## Table of Contents
 
 - [Security](#security)
 - [Background](#background)
+- [The project is made up of](#the-project-is-made-up-of)
 - [Install](#install)
 - [Usage](#usage)
 - [Status](#status)
@@ -28,7 +29,17 @@ This repository is [ArduPilot](https://github.com/ArduPilot/ardupilot) with a ha
 
 - ArduPilot master `9f648ccabc` (2026-09-25) plus a HAL for the RTL8735B, with ArduPilot's full history kept. The HAL is in `libraries/AP_HAL_RTL8735B/`; changes to ArduPilot's shared code are listed in the [HAL README][hal].
 - Board types: `hub8735ultra` for the HUB 8735 ultra from ideasHatch ([vendor resources](https://github.com/ideashatch/HUB-8735)), where all development and board tests happen; `hub8735ultra-expansion`, the HUB 8735 ultra on its expansion board with an IMU, a barometer and a compass; `amb82-mini`; and `rtl8735b-empty`, the settings the others include. Each has a README under [`hwdef/`][boards].
-- Apart from `hub8735ultra-expansion`, the board types have no sensors. Sensors, their mounting and default parameters go in an overlay hwdef. Ready-made overlays with wiring and parameters are in the [examples repository][examples].
+- Apart from `hub8735ultra-expansion`, the board types have no sensors. Sensors, their mounting and default parameters go in an overlay hwdef, see [Describe your own board][custom].
+
+## The project is made up of
+
+- ArduPilot master `9f648ccabc`, with its full history: [ArduPilot](https://github.com/ArduPilot/ardupilot)
+- The RTL8735B HAL: [code](/libraries/AP_HAL_RTL8735B/), [documentation][hal]
+- Board types `hub8735ultra`, `hub8735ultra-expansion`, `amb82-mini` and `rtl8735b-empty`: [`hwdef/`][boards]
+- Parameters for the T5 quadcopter: [`Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param`](/Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param)
+- Update over Wi-Fi: the board application [`app/ota`](/libraries/AP_HAL_RTL8735B/app/ota/), `Tools/scripts/rtl8735b_ota_sign.py` and `Tools/scripts/rtl8735b_ota_send.py`: [documentation](/libraries/AP_HAL_RTL8735B/docs/flashing.md#update-over-wi-fi)
+- Build and test scripts: `Tools/ardupilotwaf/rtl8735b.py`, `Tools/environment_install/install-rtl8735b-prereqs-ubuntu.sh`, `Tools/scripts/rtl8735b_get_sdk.sh` and `Tools/scripts/rtl8735b_test.sh`: [host tests][tests] (in Chinese)
+- GitHub Actions: host tests and commit checks on pushes to `main` and on pull requests (`rtl8735b_test.yml`), and a cross build run by hand (`rtl8735b_build.yml`)
 
 ## Install
 
@@ -51,6 +62,7 @@ The details, including where to clone in WSL and the Wi-Fi settings file, are in
 ## Usage
 
 - **First time**: follow [Getting started][start] step by step, from wiring two sensor modules, building and flashing, to a ground station showing the board's attitude.
+- The hardware of the T5 quadcopter: the [`hub8735ultra-expansion` README][expansion].
 - Flash an image: [Flash the firmware][flash].
 - Write an overlay for your own board, sensors, pins and buses: [Describe your own board][custom].
 - Connect a ground station over Wi-Fi ([Wi-Fi][wifi]) or through the board's USB serial port (SERIAL0 in the [HUB 8735 ultra README][hub]).
@@ -63,7 +75,8 @@ The details, including where to clone in WSL and the Wi-Fi settings file, are in
 | Item | Status |
 |---|---|
 | Flying a quadcopter: HUB 8735 ultra with an expansion board ([`hub8735ultra-expansion`][expansion]), ground station over Wi-Fi, DShot300 | Works (T5) |
-| HUB 8735 ultra with a BMI160, a BMP280 and a GY-271 (QMC5883L) wired as in the examples repository, ground station over Wi-Fi (UDP) | Works (T2) |
+| Firmware built from this repository, on the expansion board | Needs: one try on a board |
+| HUB 8735 ultra with a BMI160, a BMP280 and a GY-271 (QMC5883L) wired as in the [HUB 8735 ultra README][hub], ground station over Wi-Fi (UDP) | Works (T2) |
 | Parameters in flash | Works (T2, T5) |
 | Battery voltage and current | Needs: calibration |
 | Compass | Needs: orientation check and calibration |
@@ -103,4 +116,3 @@ GPL-3.0, see [COPYING.txt](/COPYING.txt). Copyright belongs to the authors of ea
 [expansion]: /libraries/AP_HAL_RTL8735B/hwdef/hub8735ultra-expansion/README.md
 [tests]: /libraries/AP_HAL_RTL8735B/tests/README.md
 [tests-board]: /libraries/AP_HAL_RTL8735B/BOARD_TESTS.md
-[examples]: https://github.com/rainwu0/ArduPilot-Hub8735Ultra

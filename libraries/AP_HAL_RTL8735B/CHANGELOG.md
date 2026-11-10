@@ -19,6 +19,7 @@ Compatible with v0.2.1: existing overlays, commands and parameters keep working;
 - Documentation: [Wi-Fi](docs/wifi.md) has a *Default hotspot* section, and Getting started can use the default hotspot instead of a settings file.
 - Getting started and the HUB 8735 ultra README build the three sensor modules with the board type `hub8735ultra-expansion`, instead of `hub8735ultra` with the overlay from the examples repository, which is no longer cloned. [Describe your own board](docs/custom-boards.md) points at the sensor lines of `hub8735ultra-expansion`.
 - Documentation: the home page lists what the project is made up of, and its status table has a row for firmware built from this repository on the expansion board. *What next* in Getting started leads to the expansion board README and ArduPilot's First Flight.
+- Documentation: [Building the expansion board](hwdef/hub8735ultra-expansion/perfboard.md), how to build the expansion board by hand on a perfboard: the parts, the development board's pins, where each part goes, the 85 wires in 4 layers, the soldering steps and the checks before plugging in the development board, with a figure of the parts side and of each solder layer. The expansion board README links to it.
 
 ### Added
 

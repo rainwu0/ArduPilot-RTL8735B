@@ -43,11 +43,11 @@
 
 ## 購買
 
-擴充板照〈接腳〉的表手焊，沒有販售。HUB 8735 ultra 見[它的 README](../hub8735ultra/README.zh-TW.md#購買)。
+擴充板照[擴充板手焊說明](perfboard.zh-TW.md)手焊，沒有販售。HUB 8735 ultra 見[它的 README](../hub8735ultra/README.zh-TW.md#購買)。
 
 ## 接腳
 
-擴充板的接點是固定的，插在上面的感測器模組可以換，下面兩者分開列表。
+擴充板的接點是固定的，插在上面的感測器模組可以換，下面兩者分開列表。每個零件放在哪些孔、每條線怎麼走，見[擴充板手焊說明](perfboard.zh-TW.md)。
 
 開發板的腳寫 D 編號，括號是晶片腳，例如 D19（PF6），和 [HUB 8735 ultra 的接腳](../hub8735ultra/README.zh-TW.md#接腳)相同。
 

@@ -43,11 +43,11 @@ The status of the development board's other features is in [its Status](../hub87
 
 ## Where to Buy
 
-The expansion board is built by hand from the tables under *Pinout*; it is not sold. The HUB 8735 ultra is in [its README](../hub8735ultra/README.md#where-to-buy).
+The expansion board is built by hand, as in [Building the expansion board](perfboard.md); it is not sold. The HUB 8735 ultra is in [its README](../hub8735ultra/README.md#where-to-buy).
 
 ## Pinout
 
-The expansion board's connectors are fixed; the sensor modules plugged into it can be changed. The tables below are separate for the two.
+The expansion board's connectors are fixed; the sensor modules plugged into it can be changed. The tables below are separate for the two. Which holes each part goes in and the route of every wire are in [Building the expansion board](perfboard.md).
 
 Pins of the development board are written as D numbers with the chip pin in brackets, for example D19 (PF6), as in the [HUB 8735 ultra pinout](../hub8735ultra/README.md#pinout).
 

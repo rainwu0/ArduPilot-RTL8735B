@@ -19,6 +19,7 @@
 - 文件：[Wi-Fi](docs/wifi.zh-TW.md) 加〈預設熱點〉一節，〈從零開始〉可以用預設熱點，不用設定檔。
 - 〈從零開始〉與 HUB 8735 ultra 的 README 改用板型 `hub8735ultra-expansion` 建置三個感測器模組，不再用 `hub8735ultra` 加範例庫的疊加檔，也不再 clone 範例庫。[描述自己的開發板](docs/custom-boards.zh-TW.md)改指向 `hub8735ultra-expansion` 的感測器寫法。
 - 文件：首頁加〈本專案的組成〉，現況表加「公開版韌體在擴充板上」一列；〈從零開始〉的〈接下來〉接到擴充板 README 與 ArduPilot 的 First Flight。
+- 文件：[擴充板手焊說明](hwdef/hub8735ultra-expansion/perfboard.zh-TW.md)，在洞洞板上手焊擴充板：零件、開發板每支腳接什麼、每個零件的位置、分 4 層的 85 條線、焊接步驟，以及插開發板之前的檢查，附零件面與每一層焊接面的圖。擴充板 README 連過去。
 
 ### 新增（Added）
 

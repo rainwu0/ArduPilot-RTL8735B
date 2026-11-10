@@ -89,7 +89,7 @@ Buses:
 
 ## Wiring Diagram
 
-The board type itself has no sensors. Without a barometer, boot stops at `Config Error: Baro: unable to initialise driver`, and Wi-Fi then carries no MAVLink either. With the wiring below, all three sensors are detected after boot, a ground station on Wi-Fi receives heartbeats and parameters, parameters are kept across reboots, and the attitude follows the board when its front or back end is lifted (T2 in [BOARD_TESTS.md](../../BOARD_TESTS.md), in Chinese).
+The board type itself has no sensors. Without a barometer, boot stops at `Config Error: Baro: unable to initialise driver`, and Wi-Fi then carries no MAVLink either. With the wiring below, and these sensor lines in an overlay on `hub8735ultra`, all three sensors are detected after boot, a ground station on Wi-Fi receives heartbeats and parameters, parameters are kept across reboots, and the attitude follows the board when its front or back end is lifted (T2 in [BOARD_TESTS.md](../../BOARD_TESTS.md), in Chinese).
 
 | Sensor | Module | Connect to |
 |---|---|---|
@@ -98,20 +98,20 @@ The board type itself has no sensors. Without a barometer, boot stops at `Config
 | Compass | GY-271 (QMC5883L) | I²C bus 1: shares D0 and D1 with the BMP280 |
 
 - The three modules connect to 3.3V (JA2.1) and GND. Pin names on the modules vary by maker; the silkscreen on the module you have is what counts.
-- The board type [`hub8735ultra-expansion`](../hub8735ultra-expansion/README.md) has the same three sensors on an expansion board, with no overlay.
-- The overlay for this wiring is in the examples repository: [`examples/bmi160-bmp280-qmc5883l/overlay.dat`](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/blob/v0.1.0/examples/bmi160-bmp280-qmc5883l/overlay.dat) (rainwu0/ArduPilot-Hub8735Ultra `v0.1.0`); the example's README has the wiring drawing, parameters and checks.
+- The board type [`hub8735ultra-expansion`](../hub8735ultra-expansion/README.md) has these three sensors on these pins. This wiring is built with it, without an overlay:
 
 ```bash
-git clone --branch v0.1.0 https://github.com/rainwu0/ArduPilot-Hub8735Ultra.git ~/ArduPilot-Hub8735Ultra
-./waf configure --board hub8735ultra --extra-hwdef ~/ArduPilot-Hub8735Ultra/examples/bmi160-bmp280-qmc5883l/overlay.dat
+./waf configure --board hub8735ultra-expansion
 ./waf copter
 ```
 
+- That board type also sets a battery monitor on D2 and D9 and a GPS on SERIAL1 (D8, D15). With nothing connected there, `BATT_MONITOR` and `GPS1_TYPE` are set to 0 in the ground station, followed by a reboot.
+
 Mounting orientation:
 
-- The IMU's `ROTATION_*` is found by testing; the silkscreen on the module is not enough. A GY-BMI160 with the component side up and `ROTATION_NONE` makes a level board read as upside down. The value in the example overlay is what was measured on the example board: component side up, and the front is the end opposite the USB connectors.
+- The IMU's `ROTATION_*` is found by testing; the silkscreen on the module is not enough. A GY-BMI160 with the component side up and `ROTATION_NONE` makes a level board read as upside down. The value in `hub8735ultra-expansion`, `ROTATION_ROLL_180_YAW_270`, was measured with the module component side up and the front at the end opposite the USB connectors.
 - With a different mounting, test again: lifting the front of the board makes pitch positive, and with the board level, roll and pitch are close to 0.
-- If the whole board is turned on the frame, the parameter `AHRS_ORIENTATION` covers it without changing the overlay. An external compass's orientation is set with the parameter `COMPASS_ORIENT`.
+- If the whole board is turned on the frame, the parameter `AHRS_ORIENTATION` covers it without a new build. An external compass's orientation is set with the parameter `COMPASS_ORIENT`.
 
 Other sensors, pins and buses: [Describe your own board](../../docs/custom-boards.md).
 

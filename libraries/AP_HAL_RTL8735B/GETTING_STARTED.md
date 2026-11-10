@@ -22,7 +22,7 @@ Wire as in the [Wiring Diagram](hwdef/hub8735ultra/README.md#wiring-diagram) of 
 
 - Connect every module to 3.3 V and GND: the RTL8735B's I/O is 3.3 V.
 - 3.3 V and GND: use the 3.3 V and GND marked on the silkscreen next to the board's header pins. If unsure, see the schematic the vendor published: `HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf` in ideashatch/HUB-8735 `870a7e08de7a`.
-- Mount the IMU as in the example: component side up, with the front at the end opposite the USB connectors. If you mount it differently, the attitude in the last step will be wrong; see "Mounting orientation" in the same section.
+- Mount the IMU component side up, with the front at the end opposite the USB connectors. If you mount it differently, the attitude in the last step will be wrong; see "Mounting orientation" in the same section.
 
 When it works: every module's VCC goes to 3.3V (JA2.1) and its GND to a GND pin, and each signal wire goes to the pin in the table of the wiring diagram. The board is not powered yet.
 
@@ -36,16 +36,10 @@ git clone https://github.com/rainwu0/ArduPilot-RTL8735B.git
 cd ArduPilot-RTL8735B
 ```
 
-The sensor settings (the overlay) are in the [examples repository](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/tree/v0.1.0/examples/bmi160-bmp280-qmc5883l). Clone it into your home directory too; the build uses it:
-
-```bash
-git clone --branch v0.1.0 https://github.com/rainwu0/ArduPilot-Hub8735Ultra.git ~/ArduPilot-Hub8735Ultra
-```
-
 - Use the git in WSL and clone into WSL's home directory: under `/mnt/c` the build is very slow, and Windows Git changes the line endings, which breaks the scripts.
 - Clone without `--recurse-submodules`: ArduPilot has many submodules you do not need. The next step installs only three; the build downloads two more by itself, `gtest` and `littlefs`, so you also need a network connection while building.
 
-When it works: `ls ~/ArduPilot-Hub8735Ultra/examples/bmi160-bmp280-qmc5883l/overlay.dat` prints the path of the overlay, and `pwd` shows `/home/<your WSL user name>/ArduPilot-RTL8735B`, not a path under `/mnt/c`.
+When it works: `pwd` shows `/home/<your WSL user name>/ArduPilot-RTL8735B`, not a path under `/mnt/c`.
 
 ## 3. Install the tools and the SDK
 
@@ -117,14 +111,14 @@ When it works: with your own hotspot, `ls -l $RTL8735B_WIFI_CONFIG` lists your s
 ## 5. Build
 
 ```bash
-./waf configure --board hub8735ultra --extra-hwdef ~/ArduPilot-Hub8735Ultra/examples/bmi160-bmp280-qmc5883l/overlay.dat
+./waf configure --board hub8735ultra-expansion
 ./waf copter
 ```
 
 When it works:
 
 - near the start there is a Wi-Fi line: with your own hotspot it is `Wi-Fi STA: 帳密取自 <path to your settings file>` ("credentials taken from …"); with the default hotspot it is `Wi-Fi STA: 未設定（RTL8735B_WIFI_CONFIG=未指定），開發板連板型的預設熱點…` ("not set; the board joins the board type's default hotspot");
-- the last line is `'copter' finished successfully`, and the image is `build/hub8735ultra/sdk_build/flash_ntz.bin`.
+- the last line is `'copter' finished successfully`, and the image is `build/hub8735ultra-expansion/sdk_build/flash_ntz.bin`.
 
 Lots of `warning:` lines scroll past on the way, along with `sed: can't read ...` and `JSON header - entry : fail`. They all come from the SDK and do not affect the result; go by the last line.
 
@@ -133,7 +127,7 @@ Lots of `warning:` lines scroll past on the way, along with `sed: can't read ...
 Copy the image and the flashing tool to Windows. Replace `<you>` with your Windows user name; if you do not know it, run `ls /mnt/c/Users` in WSL to see it:
 
 ```bash
-cp build/hub8735ultra/sdk_build/flash_ntz.bin /mnt/c/Users/<you>/Downloads/
+cp build/hub8735ultra-expansion/sdk_build/flash_ntz.bin /mnt/c/Users/<you>/Downloads/
 cp "../ambpro2_sdk/tools/Pro2_PG_tool _v1.3.0.zip" /mnt/c/Users/<you>/Downloads/
 ```
 
@@ -197,10 +191,13 @@ When it works:
 - the ground station downloads the parameters, a little over 900 of them;
 - with the board level, roll and pitch are close to 0; lift the front (the end opposite the USB connectors) by about 45° and pitch becomes about +40°.
 
+The board type also sets a battery monitor on D2 and D9 and a GPS on SERIAL1 (D8, D15). With nothing connected there, set `BATT_MONITOR` and `GPS1_TYPE` to 0 in the ground station's parameters, then reboot the board.
+
 **If there are other flight controllers on the same hotspot, the ground station may connect to one of them.** The simplest way around this is to have only this board on the hotspot; if your ground station shows where the connection comes from, check that it is the IP you noted in step 7.
 
 ## What next
 
+- To build the hardware of the T5 quadcopter: the [hub8735ultra-expansion README](hwdef/hub8735ultra-expansion/README.md), up to [Set by you](hwdef/hub8735ultra-expansion/README.md#set-by-you); then ArduPilot's [First Flight with Copter](https://ardupilot.org/copter/docs/flying-arducopter.html).
 - How far each feature works: [Feature status](docs/feature-status.md); the record of each board test: [BOARD_TESTS.md](BOARD_TESTS.md) (in Chinese).
 - To use your own sensors or pins: [Describe your own board](docs/custom-boards.md).
 - All the building and flashing options: [Build the firmware](docs/building.md), [Flash the firmware](docs/flashing.md).

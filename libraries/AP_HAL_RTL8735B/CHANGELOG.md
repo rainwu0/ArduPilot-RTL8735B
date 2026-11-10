@@ -10,6 +10,11 @@ The status of each feature in a given version is what that version's feature sta
 
 ## [Unreleased]
 
+### Changed
+
+- Getting started and the HUB 8735 ultra README build the three sensor modules with the board type `hub8735ultra-expansion`, instead of `hub8735ultra` with the overlay from the examples repository, which is no longer cloned. [Describe your own board](docs/custom-boards.md) points at the sensor lines of `hub8735ultra-expansion`.
+- Documentation: the home page lists what the project is made up of, and its status table has a row for firmware built from this repository on the expansion board. *What next* in Getting started leads to the expansion board README and ArduPilot's First Flight.
+
 ## [0.2.4] - 2026-11-15
 
 ### Added

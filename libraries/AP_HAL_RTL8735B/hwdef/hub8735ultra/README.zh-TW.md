@@ -89,7 +89,7 @@ SPK（JA8.8）是音訊輸出，本移植不用。
 
 ## 接線圖
 
-板型本身不含感測器。沒有氣壓計時，開機會停在 `Config Error: Baro: unable to initialise driver`，這時 Wi-Fi 也不會有 MAVLink。照下面的接法，開機後三個感測器都偵測到，Wi-Fi 地面站收得到心跳與參數，參數在重開機後保留，抬起開發板前、後端時姿態跟著動（[BOARD_TESTS.md](../../BOARD_TESTS.md) 的 T2）。
+板型本身不含感測器。沒有氣壓計時，開機會停在 `Config Error: Baro: unable to initialise driver`，這時 Wi-Fi 也不會有 MAVLink。照下面的接法、在 `hub8735ultra` 上以疊加檔寫這三個感測器時，開機後三個感測器都偵測到，Wi-Fi 地面站收得到心跳與參數，參數在重開機後保留，抬起開發板前、後端時姿態跟著動（[BOARD_TESTS.md](../../BOARD_TESTS.md) 的 T2）。
 
 | 感測器 | 模組 | 接到 |
 |---|---|---|
@@ -98,20 +98,20 @@ SPK（JA8.8）是音訊輸出，本移植不用。
 | 羅盤 | GY-271（QMC5883L） | I²C 匯流排 1：和 BMP280 共用 D0、D1 |
 
 - 三個模組接 3.3V（JA2.1）與 GND。模組上的腳名依廠商不同，以手上模組的絲印為準。
-- 板型 [`hub8735ultra-expansion`](../hub8735ultra-expansion/README.zh-TW.md) 把同樣三個感測器裝在擴充板上，不用疊加檔。
-- 這個接法的疊加檔在範例庫：[`examples/bmi160-bmp280-qmc5883l/overlay.dat`](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/blob/v0.1.0/examples/bmi160-bmp280-qmc5883l/overlay.dat)（rainwu0/ArduPilot-Hub8735Ultra `v0.1.0`），範例的 README 有接線圖、參數與檢查方法。
+- 板型 [`hub8735ultra-expansion`](../hub8735ultra-expansion/README.zh-TW.md) 在這些腳位上就是這三個感測器。這個接法用它建置，不用疊加檔：
 
 ```bash
-git clone --branch v0.1.0 https://github.com/rainwu0/ArduPilot-Hub8735Ultra.git ~/ArduPilot-Hub8735Ultra
-./waf configure --board hub8735ultra --extra-hwdef ~/ArduPilot-Hub8735Ultra/examples/bmi160-bmp280-qmc5883l/overlay.dat
+./waf configure --board hub8735ultra-expansion
 ./waf copter
 ```
 
+- 這個板型另外設了 D2、D9 的電池監測與 SERIAL1（D8、D15）的 GPS。這些腳沒接東西時，在地面站把 `BATT_MONITOR` 與 `GPS1_TYPE` 設成 0，再重開。
+
 安裝方向：
 
-- IMU 的 `ROTATION_*` 要實測，不能只看模組的絲印。元件面朝上的 GY-BMI160 配 `ROTATION_NONE` 時，水平放著的開發板被當成上下顛倒。範例疊加檔裡的值是範例開發板實測的結果：元件面朝上，前方是 USB 接頭的另一端。
+- IMU 的 `ROTATION_*` 要實測，不能只看模組的絲印。元件面朝上的 GY-BMI160 配 `ROTATION_NONE` 時，水平放著的開發板被當成上下顛倒。`hub8735ultra-expansion` 的值 `ROTATION_ROLL_180_YAW_270`，是模組元件面朝上、前方在 USB 接頭另一端時實測的結果。
 - 換了擺法要重測：開發板前端抬起時 pitch 變正，水平放著時 roll、pitch 接近 0。
-- 整片開發板在機身上轉了方向時，用參數 `AHRS_ORIENTATION` 調整，不必改疊加檔。外接羅盤的方向用參數 `COMPASS_ORIENT`。
+- 整片開發板在機身上轉了方向時，用參數 `AHRS_ORIENTATION` 調整，不必重新建置。外接羅盤的方向用參數 `COMPASS_ORIENT`。
 
 其他感測器、腳位與匯流排：[描述自己的開發板](../../docs/custom-boards.zh-TW.md)。
 

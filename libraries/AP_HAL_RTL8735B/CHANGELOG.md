@@ -17,6 +17,8 @@ Compatible with v0.2.1: existing overlays, commands and parameters keep working;
 - **Without a Wi-Fi settings file, the three board types now join a default hotspot**, SSID `ardupilot` and password `ardupilot1`; before, Wi-Fi was off. The ground station receives `WiFi: joining the board's default hotspot (SSID length N)`, and the build message for an unset `RTL8735B_WIFI_CONFIG` names the default hotspot. See [Default hotspot](docs/wifi.md#default-hotspot).
 - When Wi-Fi cannot join, the retries no longer send STATUSTEXT each time: the ground station receives joining once, and `WiFi: join failed (…)` the first time, when the error code changes, and at most once every 30 s after that; the rest only goes to the console. After the board has joined, a later link loss starts the count again. See [Messages](docs/wifi.md#messages).
 - Documentation: [Wi-Fi](docs/wifi.md) has a *Default hotspot* section, and Getting started can use the default hotspot instead of a settings file.
+- Getting started and the HUB 8735 ultra README build the three sensor modules with the board type `hub8735ultra-expansion`, instead of `hub8735ultra` with the overlay from the examples repository, which is no longer cloned. [Describe your own board](docs/custom-boards.md) points at the sensor lines of `hub8735ultra-expansion`.
+- Documentation: the home page lists what the project is made up of, and its status table has a row for firmware built from this repository on the expansion board. *What next* in Getting started leads to the expansion board README and ArduPilot's First Flight.
 
 ### Added
 

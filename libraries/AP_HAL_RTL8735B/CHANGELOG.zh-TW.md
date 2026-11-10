@@ -17,6 +17,8 @@
 - **沒有 Wi-Fi 設定檔時，三個板型改連預設熱點**：SSID `ardupilot`、密碼 `ardupilot1`；原本是 Wi-Fi 不啟用。地面站收到 `WiFi: joining the board's default hotspot (SSID length N)`；沒設 `RTL8735B_WIFI_CONFIG` 時，建置訊息寫明連預設熱點。見[預設熱點](docs/wifi.zh-TW.md#預設熱點)。
 - Wi-Fi 連不上時，重試不再每次都送 STATUSTEXT：地面站收到一次 joining；`WiFi: join failed (…)` 在第一次、錯誤碼改變時送，之後至少相隔 30 秒才再送一次，其餘只印在主控台。連上之後再斷線，又從第一次算起。見[訊息](docs/wifi.zh-TW.md#訊息)。
 - 文件：[Wi-Fi](docs/wifi.zh-TW.md) 加〈預設熱點〉一節，〈從零開始〉可以用預設熱點，不用設定檔。
+- 〈從零開始〉與 HUB 8735 ultra 的 README 改用板型 `hub8735ultra-expansion` 建置三個感測器模組，不再用 `hub8735ultra` 加範例庫的疊加檔，也不再 clone 範例庫。[描述自己的開發板](docs/custom-boards.zh-TW.md)改指向 `hub8735ultra-expansion` 的感測器寫法。
+- 文件：首頁加〈本專案的組成〉，現況表加「公開版韌體在擴充板上」一列；〈從零開始〉的〈接下來〉接到擴充板 README 與 ArduPilot 的 First Flight。
 
 ### 新增（Added）
 

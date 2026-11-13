@@ -18,7 +18,7 @@
 
 除了 `hub8735ultra-expansion`，板型都沒有感測器。沒有氣壓計時，開機停在 `Config Error: Baro: unable to initialise driver`，Wi-Fi 也不會有 MAVLink（[原因](design.zh-TW.md#wi-fi-mavlink-要等氣壓計)）。
 
-感測器、安裝方向與預設參數寫在疊加檔，寫法和 ArduPilot 其他平台的 hwdef 相同，例如 ArduPilot `9f648ccabc` 的 `libraries/AP_HAL_ESP32/hwdef/esp32diy/hwdef.dat`。HUB 8735 ultra 上 SPI 接 BMI160、I²C 接 BMP280 與 QMC5883L、實際能用的疊加檔，是範例庫的 [`examples/bmi160-bmp280-qmc5883l/overlay.dat`](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/blob/v0.1.0/examples/bmi160-bmp280-qmc5883l/overlay.dat)（rainwu0/ArduPilot-Hub8735Ultra `v0.1.0`）。用其他感測器時，複製一份，改 `IMU`、`BARO`、`COMPASS` 三行。
+感測器、安裝方向與預設參數寫在疊加檔，寫法和 ArduPilot 其他平台的 hwdef 相同，例如 ArduPilot `9f648ccabc` 的 `libraries/AP_HAL_ESP32/hwdef/esp32diy/hwdef.dat`。HUB 8735 ultra 上 SPI 接 BMI160、I²C 接 BMP280 與 QMC5883L 的寫法，在 [`hwdef/hub8735ultra-expansion/hwdef.dat`](../hwdef/hub8735ultra-expansion/hwdef.dat)。用其他感測器時，把它的 `IMU`、`BARO`、`COMPASS` 三行複製到疊加檔再改。
 
 IMU 的 `ROTATION_*` 要實測決定，不能只看模組上的絲印：開發板放平時 roll、pitch 接近 0，抬起開發板前端時 pitch 為正。整塊開發板在機架上轉了方向時，用參數 `AHRS_ORIENTATION` 調整，不必改疊加檔。
 

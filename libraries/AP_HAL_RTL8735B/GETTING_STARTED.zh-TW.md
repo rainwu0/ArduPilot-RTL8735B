@@ -22,7 +22,7 @@
 
 - 模組一律接 3.3 V 和 GND：RTL8735B 的 I/O 是 3.3 V。
 - 3.3 V 與 GND：照開發板排針旁絲印標的 3.3 V 和 GND 接。不確定的話，看板商公開的原理圖：ideashatch/HUB-8735 `870a7e08de7a` 的 `HUB 8735 ultra toolkit/Hardware/HUB 8735 ultra Schematic.pdf`。
-- IMU 照範例擺：元件面朝上，前方是 USB 接頭的另一端。擺法不同的話，最後一步的姿態方向會不對，見同一節的「安裝方向」。
+- IMU 元件面朝上擺，前方是 USB 接頭的另一端。擺法不同的話，最後一步的姿態方向會不對，見同一節的「安裝方向」。
 
 成功時：每個模組的 VCC 接在 3.3V（JA2.1）、GND 接在一支 GND 腳，每條訊號線接在接線圖表格裡的那支腳。這時開發板還沒通電。
 
@@ -36,16 +36,10 @@ git clone https://github.com/rainwu0/ArduPilot-RTL8735B.git
 cd ArduPilot-RTL8735B
 ```
 
-感測器的設定（疊加檔）放在[範例庫](https://github.com/rainwu0/ArduPilot-Hub8735Ultra/tree/v0.1.0/examples/bmi160-bmp280-qmc5883l)，也 clone 到家目錄，建置時會用到：
-
-```bash
-git clone --branch v0.1.0 https://github.com/rainwu0/ArduPilot-Hub8735Ultra.git ~/ArduPilot-Hub8735Ultra
-```
-
 - 用 WSL 裡的 git，clone 在 WSL 的家目錄：放在 `/mnt/c` 底下建置會很慢，Windows 的 Git 會把換行改掉，腳本會壞。
 - clone 時不加 `--recurse-submodules`：ArduPilot 的子模組很多，用不到。下一步只裝三個，建置時會再自己下載 `gtest`、`littlefs` 兩個，所以建置時也要連網。
 
-成功時：`ls ~/ArduPilot-Hub8735Ultra/examples/bmi160-bmp280-qmc5883l/overlay.dat` 印出疊加檔的路徑，`pwd` 顯示 `/home/<你的 WSL 帳號>/ArduPilot-RTL8735B`，不是 `/mnt/c` 底下的路徑。
+成功時：`pwd` 顯示 `/home/<你的 WSL 帳號>/ArduPilot-RTL8735B`，不是 `/mnt/c` 底下的路徑。
 
 ## 3. 安裝工具與 SDK
 
@@ -117,14 +111,14 @@ export RTL8735B_WIFI_CONFIG=~/wifi.txt
 ## 5. 建置
 
 ```bash
-./waf configure --board hub8735ultra --extra-hwdef ~/ArduPilot-Hub8735Ultra/examples/bmi160-bmp280-qmc5883l/overlay.dat
+./waf configure --board hub8735ultra-expansion
 ./waf copter
 ```
 
 成功時：
 
 - 開頭附近有 Wi-Fi 那一行：用自己的熱點時是 `Wi-Fi STA: 帳密取自 <你的設定檔路徑>`；用預設熱點時是 `Wi-Fi STA: 未設定（RTL8735B_WIFI_CONFIG=未指定），開發板連板型的預設熱點…`；
-- 最後一行是 `'copter' finished successfully`，映像在 `build/hub8735ultra/sdk_build/flash_ntz.bin`。
+- 最後一行是 `'copter' finished successfully`，映像在 `build/hub8735ultra-expansion/sdk_build/flash_ntz.bin`。
 
 中途會捲過很多 `warning:`，還有 `sed: can't read ...`、`JSON header - entry : fail` 這幾行。這些都來自 SDK，不影響結果，以最後一行為準。
 
@@ -133,7 +127,7 @@ export RTL8735B_WIFI_CONFIG=~/wifi.txt
 把映像和燒錄工具複製到 Windows。`<你>` 換成你的 Windows 帳號名稱，不知道的話在 WSL 執行 `ls /mnt/c/Users` 就看得到：
 
 ```bash
-cp build/hub8735ultra/sdk_build/flash_ntz.bin /mnt/c/Users/<你>/Downloads/
+cp build/hub8735ultra-expansion/sdk_build/flash_ntz.bin /mnt/c/Users/<你>/Downloads/
 cp "../ambpro2_sdk/tools/Pro2_PG_tool _v1.3.0.zip" /mnt/c/Users/<你>/Downloads/
 ```
 
@@ -197,10 +191,13 @@ SERIAL0 與預設熱點的現況見[功能狀態](docs/feature-status.zh-TW.md)�
 - 地面站下載參數，約 900 多筆；
 - 開發板放平時 roll、pitch 接近 0；把前端（USB 接頭的另一端）抬起約 45°，pitch 變成約 +40°。
 
+板型另外設了 D2、D9 的電池監測與 SERIAL1（D8、D15）的 GPS。這些腳沒接東西時，在地面站的參數裡把 `BATT_MONITOR` 與 `GPS1_TYPE` 設成 0，再重開開發板。
+
 **同一個熱點上如果有別的飛控，地面站可能連到別台。** 最簡單的做法是同一個熱點上只開這一塊開發板；地面站看得到連線來源時，確認它是第 7 步記下的 IP。
 
 ## 接下來
 
+- 裝成 T5 那台四軸：照 [hub8735ultra-expansion 的 README](hwdef/hub8735ultra-expansion/README.zh-TW.md) 做到[你自己設的](hwdef/hub8735ultra-expansion/README.zh-TW.md#你自己設的)，再照 ArduPilot 的 [First Flight with Copter](https://ardupilot.org/copter/docs/flying-arducopter.html)。
 - 每一項功能做到哪裡：[功能狀態](docs/feature-status.zh-TW.md)；每次上板的紀錄：[BOARD_TESTS.md](BOARD_TESTS.md)。
 - 換成自己的感測器或腳位：[描述自己的開發板](docs/custom-boards.zh-TW.md)。
 - 建置與燒錄的完整選項：[建置韌體](docs/building.zh-TW.md)、[燒錄韌體](docs/flashing.zh-TW.md)。

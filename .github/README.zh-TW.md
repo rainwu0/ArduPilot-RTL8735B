@@ -6,12 +6,13 @@
 
 ArduPilot 在 Realtek RTL8735B SoC 上的非官方移植。文件有繁體中文與英文。
 
-本儲存庫是 [ArduPilot](https://github.com/ArduPilot/ardupilot) 加上 Realtek RTL8735B 的硬體抽象層（HAL）。個人維護，跟 ArduPilot 開發團隊、Realtek 都沒有關係。
+本儲存庫是 [ArduPilot](https://github.com/ArduPilot/ardupilot) 加上 Realtek RTL8735B 的硬體抽象層（HAL）。一塊 HUB 8735 ultra 加上含 IMU、氣壓計與羅盤的擴充板，用本 HAL 較早的開發版，飛過一台由地面站經 Wi-Fi 遙控的 3.5 吋四軸（T5）。從[從零開始][start]開始。個人維護，跟 ArduPilot 開發團隊、Realtek 都沒有關係。
 
 ## 目錄
 
 - [安全](#安全)
 - [背景](#背景)
+- [本專案的組成](#本專案的組成)
 - [安裝](#安裝)
 - [使用](#使用)
 - [狀態](#狀態)
@@ -28,7 +29,17 @@ ArduPilot 在 Realtek RTL8735B SoC 上的非官方移植。文件有繁體中文
 
 - ArduPilot master `9f648ccabc`（2026-09-25）加上 RTL8735B 的 HAL，保留 ArduPilot 的完整歷史。HAL 在 `libraries/AP_HAL_RTL8735B/`；對 ArduPilot 共用程式的修改列在 [HAL README][hal]。
 - 板型：`hub8735ultra`，用於 ideasHatch 的 HUB 8735 ultra（[板商資料](https://github.com/ideashatch/HUB-8735)），開發與上板測試都在這塊上做；`hub8735ultra-expansion`，HUB 8735 ultra 加擴充板，含 IMU、氣壓計與羅盤；`amb82-mini`；`rtl8735b-empty`，其他板型 include 的設定。每個板型在 [`hwdef/`][boards] 下有 README。
-- 除了 `hub8735ultra-expansion`，板型都沒有感測器。感測器、安裝方向與預設參數寫在疊加的 hwdef。附接線與參數的現成疊加檔在[範例庫][examples]。
+- 除了 `hub8735ultra-expansion`，板型都沒有感測器。感測器、安裝方向與預設參數寫在疊加的 hwdef，見[描述自己的開發板][custom]。
+
+## 本專案的組成
+
+- ArduPilot master `9f648ccabc`，保留完整歷史：[ArduPilot](https://github.com/ArduPilot/ardupilot)
+- RTL8735B 的 HAL：[程式](/libraries/AP_HAL_RTL8735B/)、[文件][hal]
+- 板型 `hub8735ultra`、`hub8735ultra-expansion`、`amb82-mini`、`rtl8735b-empty`：[`hwdef/`][boards]
+- T5 那台四軸的參數：[`Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param`](/Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param)
+- 經 Wi-Fi 更新：開發板的應用程式 [`app/ota`](/libraries/AP_HAL_RTL8735B/app/ota/)、`Tools/scripts/rtl8735b_ota_sign.py` 與 `Tools/scripts/rtl8735b_ota_send.py`：[文件](/libraries/AP_HAL_RTL8735B/docs/flashing.zh-TW.md#經-wi-fi-更新)
+- 建置與測試的腳本：`Tools/ardupilotwaf/rtl8735b.py`、`Tools/environment_install/install-rtl8735b-prereqs-ubuntu.sh`、`Tools/scripts/rtl8735b_get_sdk.sh`、`Tools/scripts/rtl8735b_test.sh`：[主機測試][tests]
+- GitHub Actions：推到 `main` 與每個 pull request 時跑主機測試與提交檢查（`rtl8735b_test.yml`），交叉建置手動觸發（`rtl8735b_build.yml`）
 
 ## 安裝
 
@@ -51,6 +62,7 @@ git submodule update --init --recursive modules/waf modules/mavlink modules/Dron
 ## 使用
 
 - **第一次上手**：照[從零開始][start]一步一步做，從接兩個感測器模組、建置、燒錄，到地面站顯示開發板的姿態。
+- T5 那台四軸的硬體：[`hub8735ultra-expansion` 的 README][expansion]。
 - 燒錄映像：[燒錄韌體][flash]。
 - 替自己的開發板、感測器、腳位與匯流排寫疊加檔：[描述自己的開發板][custom]。
 - 經 Wi-Fi（[Wi-Fi][wifi]）或開發板的 USB 序列埠（[HUB 8735 ultra 的 README][hub] 的 SERIAL0）連地面站。
@@ -63,7 +75,8 @@ git submodule update --init --recursive modules/waf modules/mavlink modules/Dron
 | 項目 | 狀態 |
 |---|---|
 | 四軸飛行：HUB 8735 ultra 加擴充板（[`hub8735ultra-expansion`][expansion]），地面站經 Wi-Fi 遙控，DShot300 | 能用（T5） |
-| HUB 8735 ultra 照範例庫接上 BMI160、BMP280、GY-271（QMC5883L），地面站經 Wi-Fi（UDP）連線 | 能用（T2） |
+| 公開版韌體在擴充板上 | 要補：上板驗一次 |
+| HUB 8735 ultra 照 [HUB 8735 ultra 的 README][hub] 接上 BMI160、BMP280、GY-271（QMC5883L），地面站經 Wi-Fi（UDP）連線 | 能用（T2） |
 | 參數存在 Flash | 能用（T2、T5） |
 | 電池電壓與電流 | 要補：校正 |
 | 羅盤 | 要補：確認方向並校正 |
@@ -103,4 +116,3 @@ GPL-3.0，見 [COPYING.txt](/COPYING.txt)。著作權屬於各檔的作者：Ard
 [expansion]: /libraries/AP_HAL_RTL8735B/hwdef/hub8735ultra-expansion/README.zh-TW.md
 [tests]: /libraries/AP_HAL_RTL8735B/tests/README.md
 [tests-board]: /libraries/AP_HAL_RTL8735B/BOARD_TESTS.md
-[examples]: https://github.com/rainwu0/ArduPilot-Hub8735Ultra

@@ -72,7 +72,7 @@ git submodule update --init --recursive modules/waf modules/mavlink modules/Dron
 | SD 卡與記錄檔 | 要補：接卡驗一次 |
 | USB 序列埠上的 MAVLink、Wi-Fi TCP、預設 Wi-Fi 熱點、`--upload` | 要補：上板驗一次 |
 | AMB82-mini | 要補：上板驗一次 |
-| 經 Wi-Fi 更新韌體 | 沒有 |
+| 經 Wi-Fi 更新韌體 | 要補：上板驗一次 |
 
 紀錄在 [BOARD_TESTS.md][tests-board]。HAL 各功能的現況見[功能狀態][status]，各開發板的現況見各自 README 的〈規格〉；每一版改了什麼見 [CHANGELOG][changelog]。
 

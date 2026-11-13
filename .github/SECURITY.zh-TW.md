@@ -24,11 +24,13 @@
 
 ## 已知的限制
 
-下列是本移植已寫明的行為，列在 [Wi-Fi](/libraries/AP_HAL_RTL8735B/docs/wifi.zh-TW.md#安全上的限制) 的安全上的限制：
+下列是本移植已寫明的行為，列在 [Wi-Fi](/libraries/AP_HAL_RTL8735B/docs/wifi.zh-TW.md#安全上的限制) 與[經 Wi-Fi 更新](/libraries/AP_HAL_RTL8735B/docs/flashing.zh-TW.md#安全上的限制)的安全上的限制：
 
 - Wi-Fi 上的 MAVLink 沒有驗證。UDP：還沒有地面站、或地面站超過 3 秒沒送東西時，任何送封包到開發板埠的來源都會被當成新的地面站，它的 RC override 也會被接受。TCP：地面站超過 3 秒沒送東西後，同網段任一主機的新連線就會取代它。
 - 沒有地面站時，HEARTBEAT 廣播到整個子網路。
 - Wi-Fi 帳密以常數陣列編進映像；拿到映像的人可能讀得出來。
 - 沒有設定檔時，開發板連[預設熱點](/libraries/AP_HAL_RTL8735B/docs/wifi.zh-TW.md#預設熱點)。
+- 經 Wi-Fi 更新（開發板的應用程式 `app/ota`）會驗每份映像的簽章，但傳輸是明文 TCP、沒有 nonce：同網段有簽好的 `.ota` 檔、或錄下傳送過程的人，可以在開發板未解鎖時重送，包括較舊的映像。
+- `generate_keys.py` 產生的私鑰簽的映像，每塊以對應公鑰建置的開發板都接受；私鑰不放進儲存庫、不編進韌體。
 
 超出這些的方法，例如不需要映像檔就讀出帳密，或從子網路以外影響開發板，照上面的方法私下回報。要改變其中某個行為的提議，例如加上驗證，開公開的 [issue](https://github.com/rainwu0/ArduPilot-RTL8735B/issues)。

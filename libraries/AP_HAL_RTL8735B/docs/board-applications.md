@@ -19,13 +19,16 @@ env RTL8735B_APP_DIR <directory>
 
 ## Functions the firmware calls
 
-`rtl8735b_app_init` must be defined: if it is not, linking fails (`undefined reference to rtl8735b_app_init`), so a missing application never silently does nothing. The other two are optional; when they are not defined, the firmware uses empty functions.
+`rtl8735b_app_init` must be defined: if it is not, linking fails (`undefined reference to rtl8735b_app_init`), so a missing application never silently does nothing. The other three are optional; when they are not defined, the firmware uses empty functions, and `rtl8735b_app_arming_blocked` returns 0.
 
 | Function | When it is called | Restrictions |
 |---|---|---|
 | `rtl8735b_app_init` | Once per boot: after the ArduPilot task is created and before the scheduler starts; no ArduPilot code has run yet | Only create tasks; `printf` and direct flash access through the SDK are fine; nothing that needs the scheduler to complete can be waited for |
 | `rtl8735b_app_after_setup` | Once per boot: in the ArduPilot main task, after `setup()` finishes and before the first main loop | Only create tasks or set variables; blocking delays the start of the main loop |
+| `rtl8735b_app_arming_blocked` | While disarmed, from the main task's arming checks and status reports; returns non-zero to block arming | Only read variables: no blocking, no locks |
 | `rtl8735b_app_before_reset` | Right before the firmware resets itself (`Scheduler::reboot()`, for example a reboot command from the ground station or a parameter that needs a reboot); the outputs are already safe, and the reset follows when it returns | May be called from any task: no blocking, no locks, no printing |
+
+A non-zero return from `rtl8735b_app_arming_blocked` makes the HAL report the safety switch as not pressed. On Copter a normal arm is then refused with `Safety Switch` whatever `ARMING_SKIPCHK` says; only a forced arm skips the check. On other vehicles the safety switch pre-arm check refuses it, unless `ARMING_SKIPCHK` skips that check or the arm is forced. While it blocks, Copter's motor test is refused too, and the ground station shows the motor outputs as not enabled. It can be called from several tasks, and returns a value read in one go (for example a `volatile uint8_t`). Without an application it returns 0.
 
 `rtl8735b_app_before_reset` is for GPIOs that double as boot-mode pins. The level of PA5 at reset decides whether the chip enters download mode. An application that drives PA5 as an output (D14 on the HUB 8735 ultra, marked Sensor power on in `variant.h`) puts the pin back to its boot-time state here; otherwise the chip may stay in download mode after the firmware reboots and not start. This covers only reboots done by the firmware itself: watchdog and crash resets do not come through here, and an application that calls the SDK's `sys_reset()` itself handles these pins first.
 
@@ -46,6 +49,12 @@ The application's `.c` files also get these definitions, with values from the hw
 - `RTL8735B_FLASH_FW1_ADDR`, `RTL8735B_FLASH_FW1_LEN`, `RTL8735B_FLASH_FW2_ADDR`, `RTL8735B_FLASH_FW2_LEN`: the address and length in bytes of fw1 and fw2 in this image's partition table.
 
 The firmware's own sources do not get them.
+
+The application is also linked with `ota_public_key.c`, which the build generates from the file in `RTL8735B_OTA_PUBLIC_KEY`: `rtl8735b_ota_public_key` (32 bytes) and `rtl8735b_ota_public_key_len` (0 without a key), declared in `app/ota/ota_app.h`.
+
+## `app/ota`
+
+`app/ota` is an application in this repository that updates the firmware over Wi-Fi; see [Update over Wi-Fi](flashing.md#update-over-wi-fi). It defines `rtl8735b_app_init`, `rtl8735b_app_after_setup` and `rtl8735b_app_arming_blocked`. Before its own resets it calls `rtl8735b_app_before_reset`, also from a FreeRTOS timer callback; an application built from a copy of the directory puts its own hardware back there.
 
 ## `examples/AppHost`
 

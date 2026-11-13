@@ -24,7 +24,7 @@
 操作指南：
 
 - [建置韌體](docs/building.zh-TW.md)
-- [燒錄韌體](docs/flashing.zh-TW.md)
+- [燒錄韌體](docs/flashing.zh-TW.md)：經 USB 序列埠，或以開發板的應用程式 `app/ota` 經 Wi-Fi
 - [描述自己的開發板](docs/custom-boards.zh-TW.md)：感測器、腳位、匯流排、序列埠與其他疊加檔設定
 
 參考：
@@ -59,3 +59,5 @@
 本移植有幾處改寫自 ArduPilot 的 ESP32 移植（ArduPilot `9f648ccabc` 的 `libraries/AP_HAL_ESP32` 與 `Tools/ardupilotwaf/esp32.py`）：`Semaphores.cpp`、`Semaphores.h`、`system.cpp`、`hwdef/scripts/rtl8735b_hwdef.py`，以及 `Tools/ardupilotwaf/rtl8735b.py` 中 hwdef 產生與 cmake 設定的部分，各檔檔頭有註明。Scheduler 分成哪些 FreeRTOS task 也依照 ESP32 移植的設計。兩者同為 GPL-3.0-or-later。
 
 SD 卡的檔案系統後端 `libraries/AP_Filesystem/AP_Filesystem_RTL8735B.cpp` 改寫自 ArduPilot `9f648ccabc` 的 `AP_Filesystem_FATFS.cpp`，檔頭有註明。`fatfs/` 的 FatFs 依 ChaN 的 FatFs 授權（BSD 型，見 `fatfs/LICENSE.txt` 與各檔檔頭），可以和 GPL-3.0 一起散布。
+
+開發板的應用程式 `app/ota` 經 `app/ota/ota_monocypher.c`，把 ArduPilot 的 Monocypher 3.1.2（`libraries/AP_CheckFirmware/monocypher.cpp`，BSD-2-Clause 或 CC0-1.0）以 C 再編譯一次。

@@ -30,10 +30,11 @@ run() {
     fi
 }
 
-for t in test_rtl8735b_hwdef_pins test_rtl8735b_flash_layout test_sdk_extract test_rtl8735b_upload; do
+for t in test_rtl8735b_hwdef_pins test_rtl8735b_flash_layout test_sdk_extract test_rtl8735b_upload test_rtl8735b_ota_key test_rtl8735b_ota_tools; do
     run "$t" python3 -W error::ResourceWarning "$tests/$t.py"
 done
 run hal bash "$tests/hal/run.sh"
+run ota_app python3 -m unittest discover -s "$root/libraries/AP_HAL_RTL8735B/app/ota/tests" -p 'test_ota_*.py'
 run hal_wifi bash "$tests/hal_wifi/run.sh"
 if [ "$build" = 1 ]; then
     run build bash -c 'cd "$1" && ./waf configure --board hub8735ultra && ./waf copter' _ "$root"

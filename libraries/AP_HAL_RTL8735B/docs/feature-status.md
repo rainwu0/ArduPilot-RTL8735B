@@ -47,7 +47,8 @@ With the board type `hub8735ultra` and no barometer, boot stops at `Config Error
 | PWM output: brushed | Needs: one try on a board | See [Motor outputs](motor-outputs.md) |
 | PWM output: normal PWM, OneShot, OneShot125 | Needs: one try with an ESC | See [Motor outputs](motor-outputs.md) |
 | Stopping outputs when the main loop stalls | Needs: one try on a board | While armed, outputs stop when the main loop stalls; when it resumes, only freshly written values go out |
-| Battery voltage and current (analog input) | Needs: calibration | 12-bit, 3.3 V full scale; when the chip has ADC factory calibration parameters, readings are first corrected with the SDK's `hal_adc_calc_cali_val`. A battery voltage goes through a divider, with the ratio in `BATT_VOLT_MULT`; the current is set with `BATT_AMP_PERVLT` and `BATT_AMP_OFFSET`. Keep the pin at or below 3.3 V |
+| Battery voltage (analog input) | Needs: calibration | 12-bit, 3.3 V full scale; when the chip has ADC factory calibration parameters, readings are first corrected with the SDK's `hal_adc_calc_cali_val`. A battery voltage goes through a divider, with the ratio in `BATT_VOLT_MULT`. Keep the pin at or below 3.3 V |
+| Battery current (analog input) | Needs: finding why the reading is wrong | Set with `BATT_AMP_PERVLT` and `BATT_AMP_OFFSET`; on `hub8735ultra-expansion`, the ESC current output on D9 |
 | Other analog pins | Needs: one try on a board | Only the analog pins listed in the board hwdef work; on hub8735ultra that is D2. A hwdef can list several (PF0–PF3, PA0–PA3), each sampled on its own |
 | Parameters in flash | Works (T2, T5) | Kept across reboots. Losing power during the erase at the boot after a sector change brings all parameters back to defaults, see [Flash layout](flash-layout.md) |
 | Blocking arming while an erase runs | Needs: one try on a board | A normal arm is refused during the erase, see [Flash layout](flash-layout.md) |

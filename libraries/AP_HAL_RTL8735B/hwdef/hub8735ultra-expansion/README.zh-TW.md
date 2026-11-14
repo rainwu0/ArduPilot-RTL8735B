@@ -30,7 +30,7 @@
 | 這套硬體飛 3.5 吋四軸：BMI160、BMP280、QMC5883L、DShot300、電池電壓、Wi-Fi MAVLink、參數存在 Flash | 能用（T5） |
 | 用這個板型建置的韌體，上板 | 要補：上板驗一次 |
 | 電池電壓 | 要補：用電錶校正 |
-| 電池電流（J5 的電調電流輸出） | 要補：上板量一次，再校正 |
+| 電池電流（J5 的電調電流輸出） | 要補：找出讀值不對的原因 |
 | 羅盤 | 要補：確認方向與校正 |
 | `AHRS_ORIENTATION` 0 對應的板子擺法 | 要補：平放量一次 |
 | 整機參數檔 | 要補：上板驗一次 |
@@ -45,6 +45,21 @@
 ## 購買
 
 擴充板照[擴充板手焊說明](perfboard.zh-TW.md)手焊，沒有販售。HUB 8735 ultra 見[它的 README](../hub8735ultra/README.zh-TW.md#購買)。
+
+T5 那台四軸用的零件：
+
+| 零件 | T5 那台四軸 |
+|---|---|
+| 開發板 | HUB 8735 ultra，裝在這塊擴充板上 |
+| 感測器模組 | GY-BMI160、GY-BMP280、焊 QMC5883L 的 GY-271，見〈感測器模組〉 |
+| 機架 | HSKRC CC35 O4 版，3.5 吋四軸 X |
+| 馬達 | HSKRC 1103 8000 kV |
+| 槳 | GEMFAN D90S-3，三葉 3.5 吋 |
+| 電調 | MicoAir Bluejay-4IN1-33A，4 合 1，韌體 Bluejay |
+| 電池 | TATTU ACE 2S 450 mAh 75C |
+| BEC | JHEMCU，5 V |
+
+含電池重 240.7 g。紀錄是 [BOARD_TESTS.md](../../BOARD_TESTS.md) 的 T5。
 
 ## 接腳
 
@@ -152,7 +167,7 @@ GY-271（羅盤，QST QMC5883L，I²C 位址 0x0D；資料表 QMC5883L 1.0 Table
 | SDA | SDA（16） | I²C SDA，接 D0 |
 | DRDY | — | 本板未接 |
 
-- 模組另印 HW-246。GY-271 這個名字的模組，有焊 HMC5883L（位址 0x1E）的，也有焊 QMC5883L（0x0D）的；這個板型設定的是 QMC5883L。
+- 模組另印 HW-246。GY-271 這個名字的模組，有焊 HMC5883L（位址 0x1E）的，也有焊 QMC5883L（0x0D）的；這個板型設定的是 QMC5883L。焊 QMC5883L 的，開機後在 0x0D 找得到羅盤；焊 HMC5883L 的，找不到羅盤。
 
 ## 接線圖
 
@@ -288,7 +303,7 @@ GY-271（羅盤，QST QMC5883L，I²C 位址 0x0D；資料表 QMC5883L 1.0 Table
 | `BATT_FS_LOW_ACT` | 1 | — | 選項；1 是 Land | |
 | `BATT_FS_CRT_ACT` | 1 | — | 選項；1 是 Land | |
 | `BATT_ARM_VOLT` | 7.3 | V | — | |
-| `BATT_CAPACITY` | 550 | mAh | — | |
+| `BATT_CAPACITY` | 550 | mAh | — | T5 那台四軸的設定值；照自己的電池改 |
 | `MOT_BAT_VOLT_MAX` | 8.4 | V | 6～53 | ArduPilot 建議的每芯 4.2 V，2S |
 | `MOT_BAT_VOLT_MIN` | 6.6 | V | 6～42 | ArduPilot 建議的每芯 3.3 V，2S |
 | `MOT_THST_EXPO` | 0.43 | — | −1.0～1.0 | |
@@ -307,7 +322,12 @@ GY-271（羅盤，QST QMC5883L，I²C 位址 0x0D；資料表 QMC5883L 1.0 Table
 
 ### 你自己設的
 
-每台機都不同，兩個檔都不放：
+每台機都不同，兩個檔都不放。
+
+- 下面六項都做完、馬達測試確認每顆馬達的位置與轉向之前，不裝槳。
+- 電池與 BEC 焊到電調的電池焊點時，核對極性。
+
+六項：
 
 1. 安裝方向：照板子在你的機架上的擺法設 `AHRS_ORIENTATION`、`COMPASS_ORIENT`，用〈接線圖〉的重力測試與轉向測試確認。
 2. 馬達測試，拆掉螺旋槳：用地面站的馬達測試，確認每顆馬達的位置與轉向符合 ArduPilot 的四軸 X。不符時，改 `SERVOn_FUNCTION` 的值或馬達的線。
@@ -324,7 +344,7 @@ GY-271（羅盤，QST QMC5883L，I²C 位址 0x0D；資料表 QMC5883L 1.0 Table
 ```
 
 - 映像是 `build/hub8735ultra-expansion/sdk_build/flash_ntz.bin`。工具、SDK 與 Wi-Fi 設定檔見[建置韌體](../../docs/building.zh-TW.md)。
-- `hwdef.dat` include [`../hub8735ultra/hwdef.dat`](../hub8735ultra/hwdef.dat)，加上三個感測器、D3 與 D4 的 I²C 匯流排 2、SERIAL3 只收、類比腳 9、電池監測與 GPS 的預設，以及 `defaults.parm`。不用疊加檔。
+- `hwdef.dat` include [`../hub8735ultra/hwdef.dat`](../hub8735ultra/hwdef.dat)，加上三個感測器、D3 與 D4 的 I²C 匯流排 2、SERIAL3 只收、類比腳 9、電池監測與 GPS 的預設，以及 `defaults.parm`。不用疊加檔；要經 Wi-Fi 更新時，以疊加檔加上開發板的應用程式，見[為經 Wi-Fi 更新建置](../../docs/building.zh-TW.md#為經-wi-fi-更新建置)。
 - 本庫不提供韌體映像。
 
 ## 燒錄韌體

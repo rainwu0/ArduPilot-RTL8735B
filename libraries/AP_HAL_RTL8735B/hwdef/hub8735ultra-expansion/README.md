@@ -30,7 +30,7 @@ The board's status is under [Status](#status).
 | This hardware flying a 3.5-inch quadcopter: BMI160, BMP280, QMC5883L, DShot300, battery voltage, Wi-Fi MAVLink, parameters in flash | Works (T5) |
 | Firmware built from this board type, on the board | Needs: one try on a board |
 | Battery voltage | Needs: calibration with a meter |
-| Battery current (ESC current output on J5) | Needs: one measurement on a board, then calibration |
+| Battery current (ESC current output on J5) | Needs: finding why the reading is wrong |
 | Compass | Needs: orientation check and calibration |
 | Board mounting that `AHRS_ORIENTATION` 0 corresponds to | Needs: one measurement with the board level |
 | Frame parameter file | Needs: one try on a board |
@@ -45,6 +45,21 @@ The status of the development board's other features is in [its Status](../hub87
 ## Where to Buy
 
 The expansion board is built by hand, as in [Building the expansion board](perfboard.md); it is not sold. The HUB 8735 ultra is in [its README](../hub8735ultra/README.md#where-to-buy).
+
+The T5 quadcopter is built from these parts:
+
+| Part | On the T5 quadcopter |
+|---|---|
+| Development board | HUB 8735 ultra, on this expansion board |
+| Sensor modules | GY-BMI160, GY-BMP280, GY-271 with a QMC5883L, see *Sensor modules* |
+| Frame | HSKRC CC35 O4 version, 3.5-inch quad X |
+| Motors | HSKRC 1103 8000 kV |
+| Propellers | GEMFAN D90S-3, three-blade, 3.5-inch |
+| ESC | MicoAir Bluejay-4IN1-33A, 4-in-1, Bluejay firmware |
+| Battery | TATTU ACE 2S 450 mAh 75C |
+| BEC | JHEMCU, 5 V |
+
+With the battery it weighs 240.7 g. The record is T5 in [BOARD_TESTS.md](../../BOARD_TESTS.md) (in Chinese).
 
 ## Pinout
 
@@ -152,7 +167,7 @@ GY-271 (compass, QST QMC5883L, I²C address 0x0D; datasheet QMC5883L 1.0, Table 
 | SDA | SDA (16) | I²C SDA, to D0 |
 | DRDY | — | Not connected |
 
-- The module is also marked HW-246. GY-271 modules are made with either an HMC5883L (address 0x1E) or a QMC5883L (0x0D); this board type is set up for the QMC5883L.
+- The module is also marked HW-246. GY-271 modules are made with either an HMC5883L (address 0x1E) or a QMC5883L (0x0D); this board type is set up for the QMC5883L. With a QMC5883L the compass is found at 0x0D; with an HMC5883L no compass is found.
 
 ## Wiring Diagram
 
@@ -288,7 +303,7 @@ In `defaults.parm` in this folder:
 | `BATT_FS_LOW_ACT` | 1 | — | List; 1 is Land | |
 | `BATT_FS_CRT_ACT` | 1 | — | List; 1 is Land | |
 | `BATT_ARM_VOLT` | 7.3 | V | — | |
-| `BATT_CAPACITY` | 550 | mAh | — | |
+| `BATT_CAPACITY` | 550 | mAh | — | Setting on the T5 quadcopter; set it for your battery |
 | `MOT_BAT_VOLT_MAX` | 8.4 | V | 6 to 53 | ArduPilot's recommendation, 4.2 V per cell, for 2S |
 | `MOT_BAT_VOLT_MIN` | 6.6 | V | 6 to 42 | ArduPilot's recommendation, 3.3 V per cell, for 2S |
 | `MOT_THST_EXPO` | 0.43 | — | −1.0 to 1.0 | |
@@ -307,7 +322,12 @@ In `defaults.parm` in this folder:
 
 ### Set by you
 
-These differ on each vehicle and are in neither file:
+These differ on each vehicle and are in neither file.
+
+- The propellers stay off until all six items below are done and the motor test has confirmed each motor's position and direction.
+- When the battery and the BEC are soldered to the ESC's battery pads, check their polarity.
+
+The six items:
 
 1. Mounting orientation: `AHRS_ORIENTATION` and `COMPASS_ORIENT` for how the board sits on your frame, checked with the gravity and heading tests under *Wiring Diagram*.
 2. Motor test, with the propellers off: in the ground station's motor test, each motor's position and direction match ArduPilot's quad X. Where they do not, the `SERVOn_FUNCTION` values or the motor wires change.
@@ -324,7 +344,7 @@ These differ on each vehicle and are in neither file:
 ```
 
 - The image is `build/hub8735ultra-expansion/sdk_build/flash_ntz.bin`. Setting up the tools and the SDK, and the Wi-Fi settings file, are in [Build the firmware](../../docs/building.md).
-- `hwdef.dat` includes [`../hub8735ultra/hwdef.dat`](../hub8735ultra/hwdef.dat) and adds the three sensors, I²C bus 2 on D3 and D4, SERIAL3 receive-only, analog pin 9, the battery monitor and GPS defaults, and `defaults.parm`. No overlay is needed.
+- `hwdef.dat` includes [`../hub8735ultra/hwdef.dat`](../hub8735ultra/hwdef.dat) and adds the three sensors, I²C bus 2 on D3 and D4, SERIAL3 receive-only, analog pin 9, the battery monitor and GPS defaults, and `defaults.parm`. No overlay is needed; for update over Wi-Fi, an overlay adds the board application, see [Build for update over Wi-Fi](../../docs/building.md#build-for-update-over-wi-fi).
 - This repository does not provide firmware images.
 
 ## Loading Firmware

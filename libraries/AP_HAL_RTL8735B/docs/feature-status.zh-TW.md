@@ -47,7 +47,8 @@ HAL 各項功能的現況。各開發板的現況在各板子 README 的〈規�
 | PWM 輸出：有刷 | 要補：上板驗一次 | 見[馬達輸出](motor-outputs.zh-TW.md) |
 | PWM 輸出：一般 PWM、OneShot、OneShot125 | 要補：接電調驗一次 | 見[馬達輸出](motor-outputs.zh-TW.md) |
 | 主迴圈停住時停送輸出 | 要補：上板驗一次 | 解鎖中主迴圈停住時停送，恢復後只輸出重新寫入的值 |
-| 電池電壓與電流（類比輸入） | 要補：校正 | 12 位元，滿刻度 3.3 V；晶片有 ADC 出廠校正參數時先以 SDK 的 `hal_adc_calc_cali_val` 校正讀值。電池電壓先經分壓，分壓比設在 `BATT_VOLT_MULT`；電流設在 `BATT_AMP_PERVLT`、`BATT_AMP_OFFSET`。腳上的電壓保持在 3.3 V 以下 |
+| 電池電壓（類比輸入） | 要補：校正 | 12 位元，滿刻度 3.3 V；晶片有 ADC 出廠校正參數時先以 SDK 的 `hal_adc_calc_cali_val` 校正讀值。電池電壓先經分壓，分壓比設在 `BATT_VOLT_MULT`。腳上的電壓保持在 3.3 V 以下 |
+| 電池電流（類比輸入） | 要補：找出讀值不對的原因 | 設在 `BATT_AMP_PERVLT`、`BATT_AMP_OFFSET`；`hub8735ultra-expansion` 上是 D9 的電調電流輸出 |
 | 其他類比腳 | 要補：上板驗一次 | 只有板型 hwdef 列出的類比腳能用，hub8735ultra 是 D2；hwdef 可以列多支（PF0–PF3、PA0–PA3），各自取樣 |
 | 參數存在 Flash | 能用（T2、T5） | 重開機後保留。換扇區後那次開機抹除期間斷電，參數全部回預設，見 [Flash 版面](flash-layout.zh-TW.md) |
 | 執行中抹除時擋解鎖 | 要補：上板驗一次 | 抹除期間一般解鎖被擋，見 [Flash 版面](flash-layout.zh-TW.md) |

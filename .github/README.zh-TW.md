@@ -78,7 +78,8 @@ git submodule update --init --recursive modules/waf modules/mavlink modules/Dron
 | 公開版韌體在擴充板上 | 要補：上板驗一次 |
 | HUB 8735 ultra 照 [HUB 8735 ultra 的 README][hub] 接上 BMI160、BMP280、GY-271（QMC5883L），地面站經 Wi-Fi（UDP）連線 | 能用（T2） |
 | 參數存在 Flash | 能用（T2、T5） |
-| 電池電壓與電流 | 要補：校正 |
+| 電池電壓 | 要補：校正 |
+| 電池電流 | 要補：找出讀值不對的原因 |
 | 羅盤 | 要補：確認方向並校正 |
 | 遙控接收機、GPS | 要補：接上驗一次 |
 | 電調遙測、DShot150、DShot600、其他 PWM 輸出 | 要補：接電調驗一次 |

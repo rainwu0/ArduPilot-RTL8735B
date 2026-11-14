@@ -78,7 +78,8 @@ The details, including where to clone in WSL and the Wi-Fi settings file, are in
 | Firmware built from this repository, on the expansion board | Needs: one try on a board |
 | HUB 8735 ultra with a BMI160, a BMP280 and a GY-271 (QMC5883L) wired as in the [HUB 8735 ultra README][hub], ground station over Wi-Fi (UDP) | Works (T2) |
 | Parameters in flash | Works (T2, T5) |
-| Battery voltage and current | Needs: calibration |
+| Battery voltage | Needs: calibration |
+| Battery current | Needs: finding why the reading is wrong |
 | Compass | Needs: orientation check and calibration |
 | RC receiver, GPS | Needs: one try with the device |
 | ESC telemetry, DShot150, DShot600, other PWM outputs | Needs: one try with ESCs |

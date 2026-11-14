@@ -248,6 +248,16 @@ class Hub8735UltraExpansionTest(unittest.TestCase):
         # BMP280 在匯流排 1 已由 T5 的飛行確認（同一行 BARO，定高要用氣壓計）
         self.assertNotIn('待確認', (HAL / 'hwdef/hub8735ultra-expansion/hwdef.dat').read_text(encoding='utf-8'))
 
+    def test_orientation_comments_state_only_the_flown_mounting(self):
+        # IMU 那一列對應哪種擺法沒有量過，不寫；只寫 T5 飛過的擺法：洞洞板零件面朝上、USB-C 端朝機頭、模組晶片面朝下
+        for path in (HAL / 'hwdef/hub8735ultra-expansion/hwdef.dat',
+                     ROOT / 'Tools/Frame_params/hub8735ultra-expansion-quad-3.5in-2S.param'):
+            text = path.read_text(encoding='utf-8')
+            with self.subTest(path=path.name):
+                self.assertNotIn('microSD', text)
+                self.assertNotIn('元件面朝上', text)
+                self.assertIn('洞洞板零件面朝上、USB-C 端朝機頭、三個模組晶片面朝下', text)
+
     def test_rest_matches_hub8735ultra(self):
         # SPI、PWM、GPIO 與單行的 define（其他序列埠、Wi-Fi、SD 卡等）都照開發板
         for name in ('HAL_RTL8735B_SPI_BUSES', 'HAL_RTL8735B_SPI_DEVICES', 'HAL_RTL8735B_RCOUT_PINS',

@@ -7,7 +7,8 @@ undef HAL_RTL8735B_BOARD_NAME
 define HAL_RTL8735B_BOARD_NAME "hub8735ultra-expansion"
 
 # IMU：BMI160 在 SPI 匯流排 1（D18–D21，CS 是 D21＝PF8 的 bmi160 裝置）。
-# 方向是擴充板元件面朝上、microSD 那端朝機頭時；模組擺法不同時要改這一列的方向，檢查方法見 README
+# T5 那台四軸是洞洞板零件面朝上、USB-C 端朝機頭、三個模組晶片面朝下，用這一列配 AHRS_ORIENTATION 12、COMPASS_ORIENT 8 飛過。
+# 板子在機上的擺法不同時，用 README 的重力測試與轉向測試定 AHRS_ORIENTATION；模組在洞洞板上的擺法不同時，要改這一列的方向
 IMU BMI160 SPI:bmi160 ROTATION_ROLL_180_YAW_270
 
 # 氣壓計 BMP280（CSB 接高選 I²C，SDO 接低選位址 0x76）與羅盤 QMC5883L（0x0D）在 I²C 匯流排 1（D0＝PF2 SDA、D1＝PF1 SCL）

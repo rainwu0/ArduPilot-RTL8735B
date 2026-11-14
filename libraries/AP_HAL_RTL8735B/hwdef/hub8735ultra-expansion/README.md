@@ -32,6 +32,7 @@ The board's status is under [Status](#status).
 | Battery voltage | Needs: calibration with a meter |
 | Battery current (ESC current output on J5) | Needs: one measurement on a board, then calibration |
 | Compass | Needs: orientation check and calibration |
+| Board mounting that `AHRS_ORIENTATION` 0 corresponds to | Needs: one measurement with the board level |
 | Frame parameter file | Needs: one try on a board |
 | Failsafe on ground station link loss | Needs: one rehearsal with the propellers off |
 | ESC telemetry on J5 | Needs: one try with an ESC that has telemetry |
@@ -107,6 +108,8 @@ Pins of the development board are written as D numbers with the chip pin in brac
 
 Chip pin names follow the makers' datasheets, with the chip pin number in brackets; the module pin names are the silkscreen on the module.
 
+All three modules are plugged in chip side down: the side with the printed pin names faces up, and the chips are not visible.
+
 GY-BMI160 (IMU, Bosch BMI160, SPI; datasheet `BST-BMI160-DS000-09`, Table 30):
 
 | Module pin | Chip pin | Use on this board |
@@ -160,11 +163,13 @@ Vector version: [wiring.svg](wiring.svg).
 - This is the wiring of the T5 quadcopter: a 2S LiPo on the battery pads of the MicoAir Bluejay-4IN1-33A, a 5 V BEC from the same pads into J6, the ESC's VBAT into J3 and its current output into J5 pin 1, and J4 pins 1–4 to the ESC's M1–M4. J4 pin 5 is the only ground wire between the expansion board and the ESC.
 - J4 pins 1–4 go straight to the ESC's M1–M4. On the T5 quadcopter, outputs 1–4 drive motors 1, 4, 3 and 2: the frame parameter file sets `SERVO1_FUNCTION` to `SERVO4_FUNCTION` to 33, 36, 35 and 34, as in the diagram.
 - J9, J10, J11 and J14 are not used on the T5 quadcopter.
+- The orientation of the diagram does not show how the board sits on the vehicle; see the mounting orientation below.
 
 Mounting orientation:
 
-- The IMU line in `hwdef.dat` has `ROTATION_ROLL_180_YAW_270`: the expansion board's component side up, with the microSD end towards the front.
-- When the board sits differently on the frame, `AHRS_ORIENTATION` sets it without rebuilding; the external compass's orientation is `COMPASS_ORIENT`. The T5 quadcopter uses `AHRS_ORIENTATION` 12 and `COMPASS_ORIENT` 8 (in the frame parameter file).
+- On the T5 quadcopter, the expansion board sits component side up with the USB-C end towards the front, and the three modules are chip side down. With the IMU line of `hwdef.dat` (`ROTATION_ROLL_180_YAW_270`), it flew with `AHRS_ORIENTATION` 12 and `COMPASS_ORIENT` 8, which are in the frame parameter file.
+- Other mountings are set with the gravity test and the heading test below. `AHRS_ORIENTATION` and the external compass's `COMPASS_ORIENT` change without rebuilding.
+- The gravity test is always done before the propellers go on, also after loading the frame parameter file.
 - Gravity test (IMU orientation). ArduPilot's body frame is X forward, Y right, Z down. With the vehicle still, the ground station's raw accelerometer values (mG) are:
 
   | Position | Expected |

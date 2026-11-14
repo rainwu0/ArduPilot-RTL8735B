@@ -848,10 +848,11 @@
 <text x="1130.0" y="430.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">淡灰色 = 下面幾層，已經焊好的線</text>
 <text x="1130.0" y="450.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">順序：第 1 層貼板，再第 2、3 層；最後第 4 層補 R24</text>
 <text x="1130.0" y="470.0" font-size="11" fill="#c62828" text-anchor="start" font-weight="normal">× = 不可接（D14 開機腳、LOG UART、D12、D13）</text>
-<text x="1130.0" y="510.0" font-size="11" fill="#212121" text-anchor="start" font-weight="bold">跳帽：</text>
-<text x="1130.0" y="528.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">JP1 插上：D2 量電池</text>
-<text x="1130.0" y="546.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">J14：不插（只在量 ADC 時用）</text>
-<text x="1130.0" y="564.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">JP3 插上：D9 讀電調的電流</text>
-<text x="1130.0" y="582.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal"></text>
-<text x="1130.0" y="600.0" font-size="11" fill="#c62828" text-anchor="start" font-weight="bold">J6 接著電源時：USB-C 不插。</text>
+<text x="1130.0" y="490.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">模組：晶片面朝向洞洞板，印腳名的那面朝外</text>
+<text x="1130.0" y="530.0" font-size="11" fill="#212121" text-anchor="start" font-weight="bold">跳帽：</text>
+<text x="1130.0" y="548.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">JP1 插上：D2 量電池</text>
+<text x="1130.0" y="566.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">J14：不插（只在量 ADC 時用）</text>
+<text x="1130.0" y="584.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">JP3 插上：D9 讀電調的電流</text>
+<text x="1130.0" y="602.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal"></text>
+<text x="1130.0" y="620.0" font-size="11" fill="#c62828" text-anchor="start" font-weight="bold">J6 接著電源時：USB-C 不插。</text>
 </svg>

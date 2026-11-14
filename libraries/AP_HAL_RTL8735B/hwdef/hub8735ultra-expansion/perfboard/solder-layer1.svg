@@ -897,10 +897,11 @@
 <text x="1130.0" y="430.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">pale grey = lower layers, already soldered</text>
 <text x="1130.0" y="450.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">order: layer 1 on the board, then 2, then 3; R24 last (4)</text>
 <text x="1130.0" y="470.0" font-size="11" fill="#c62828" text-anchor="start" font-weight="normal">× = do not connect (D14 boot pin, LOG UART, D12, D13)</text>
-<text x="1130.0" y="510.0" font-size="11" fill="#212121" text-anchor="start" font-weight="bold">Jumpers:</text>
-<text x="1130.0" y="528.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">JP1 on: D2 reads the battery</text>
-<text x="1130.0" y="546.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">J14: nothing (ADC tests only)</text>
-<text x="1130.0" y="564.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">JP3 on: D9 reads the ESC current</text>
-<text x="1130.0" y="582.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal"></text>
-<text x="1130.0" y="600.0" font-size="11" fill="#c62828" text-anchor="start" font-weight="bold">J6 powered: never plug in USB.</text>
+<text x="1130.0" y="490.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">modules: chip side toward the perfboard, pin-label side away</text>
+<text x="1130.0" y="530.0" font-size="11" fill="#212121" text-anchor="start" font-weight="bold">Jumpers:</text>
+<text x="1130.0" y="548.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">JP1 on: D2 reads the battery</text>
+<text x="1130.0" y="566.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">J14: nothing (ADC tests only)</text>
+<text x="1130.0" y="584.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">JP3 on: D9 reads the ESC current</text>
+<text x="1130.0" y="602.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal"></text>
+<text x="1130.0" y="620.0" font-size="11" fill="#c62828" text-anchor="start" font-weight="bold">J6 powered: never plug in USB.</text>
 </svg>

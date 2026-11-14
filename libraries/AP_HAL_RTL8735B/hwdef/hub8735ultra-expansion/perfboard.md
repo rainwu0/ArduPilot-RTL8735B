@@ -84,9 +84,16 @@ The three grounds meet only at the development board's header pins: `GND_PWR` = 
 
 ![Parts side: which holes each part goes in](perfboard/parts-side.png)
 
+![A finished expansion board, parts side up with the microSD end at the top: the three modules are chip side down, showing their printed pin names](perfboard/photo-parts-side.jpg)
+
+The photo is the board that later flew on the T5 quadcopter, taken before it was mounted. The figure above is the recommended layout: on the real board JP1 and some resistors sit elsewhere, and some resistors lie flat. The connections follow the wiring table in section 4.
+
 Solder side, one figure per layer (seen from below, so left and right are swapped): [layer 1](perfboard/solder-layer1.png), [layer 2](perfboard/solder-layer2.png), [layer 3](perfboard/solder-layer3.png), [layer 4](perfboard/solder-layer4.png).
 
 - Sockets: left row in column E, right row in column N (9 holes apart), pin 1 in row 4. The modules sit under the development board.
+- All three modules go in **chip side down**: the side with the printed pin names faces up, and the chips are not visible.
+  - GY-BMP280 and GY-271: header on the microSD side, module body toward the USB-C end.
+  - GY-BMI160: only the 7-pin row (VIN to SAO) gets a header, on the right (column L, VIN at the microSD end), body toward the left; the other row of 5 holes stays empty.
 - Headers sit in the outer columns (A, R) and the top rows, each with its resistors next to it in the same row as the development-board pin it goes to, so most signals are short straight wires. Nothing goes in front of the microSD slot (columns G–L, rows 1–3) or past the USB-C end, so the debug USB-C (CNA1) and the microSD slot stay free.
 - Tall parts (pin headers, standing resistors) only where the development board is not above them. A standing resistor next to the development board's edge stands in the outer hole and bends its other lead into the inner one.
 - PWM pull-downs: the wires to R10 and R11 pass over the next channel's solder joint (insulated wire).
@@ -190,7 +197,7 @@ Holes are named column letter + row, as seen from the **parts side** (A–R left
 
 1. Before: unplug USB and power; keep the development board off for now.
 2. Sockets: two full female strips in columns E and N, pin 1 in row 4. Plug the development board in once to check the fit, then take it off again.
-3. Modules: GY-BMP280 in G5–L5, GY-BMI160 in L11–L17, GY-271 in G19–K19; the GY-BMP280 and GY-271 bodies toward the USB-C end, the GY-BMI160 toward the left.
+3. Modules: GY-BMP280 in G5–L5, GY-BMI160 in L11–L17, GY-271 in G19–K19; the GY-BMP280 and GY-271 bodies toward the USB-C end, the GY-BMI160 toward the left. All three chip side down (printed pin names up).
 4. Resistors, capacitors, headers, JP1 and JP3 in the positions of the parts-side figure.
 5. Turn the board over and lay the wires layer by layer, in the order of section 4: all of layer 1 flat on the board, then layer 2 on top of it, then layer 3, each in number order. Insulated wire for anything longer than two holes; a wire listed with "over joints" lies across those joints, which are already soldered by then: do not heat them again once it is on.
 6. Last, R24 (10 kΩ pull-up on J5 pin 2): stand it in A19 (pin 2) and A20 (pin 1), then lay the 2 layer-4 wires in section 4. No other wire runs through A19 or A20.

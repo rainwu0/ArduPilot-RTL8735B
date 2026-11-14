@@ -635,12 +635,12 @@
 <circle cx="855.7" cy="928.7" r="5.2" fill="#90a4ae" stroke="#ffffff" stroke-width="1.4"/>
 <circle cx="822.6" cy="862.6" r="5.2" fill="#00838f" stroke="#ffffff" stroke-width="1.4"/>
 <circle cx="822.6" cy="895.7" r="5.2" fill="#90a4ae" stroke="#ffffff" stroke-width="1.4"/>
-<rect x="527.3" y="414.6" width="95.4" height="16" rx="3" fill="#ffffff" fill-opacity="0.9"/>
-<text x="575.0" y="426.6" font-size="11" fill="#4527a0" text-anchor="middle" font-weight="bold">U2 GY-BMP280</text>
-<rect x="521.6" y="889.2" width="73.8" height="16" rx="3" fill="#ffffff" fill-opacity="0.9"/>
-<text x="558.5" y="901.2" font-size="11" fill="#4527a0" text-anchor="middle" font-weight="bold">U3 GY-271</text>
-<rect x="542.2" y="656.5" width="95.4" height="16" rx="3" fill="#ffffff" fill-opacity="0.9"/>
-<text x="590.0" y="668.5" font-size="11" fill="#4527a0" text-anchor="middle" font-weight="bold">U1 GY-BMI160</text>
+<rect x="489.8" y="414.6" width="170.4" height="16" rx="3" fill="#ffffff" fill-opacity="0.9"/>
+<text x="575.0" y="426.6" font-size="11" fill="#4527a0" text-anchor="middle" font-weight="bold">U2 GY-BMP280（晶片朝下）</text>
+<rect x="484.1" y="889.2" width="148.8" height="16" rx="3" fill="#ffffff" fill-opacity="0.9"/>
+<text x="558.5" y="901.2" font-size="11" fill="#4527a0" text-anchor="middle" font-weight="bold">U3 GY-271（晶片朝下）</text>
+<rect x="504.8" y="604.5" width="170.4" height="16" rx="3" fill="#ffffff" fill-opacity="0.9"/>
+<text x="590.0" y="616.5" font-size="11" fill="#4527a0" text-anchor="middle" font-weight="bold">U1 GY-BMI160（晶片朝下）</text>
 <rect x="286.3" y="227.3" width="16.0" height="49.0" rx="3" fill="none" stroke="#37474f" stroke-width="1.3"/>
 <rect x="319.4" y="227.3" width="49.0" height="16.0" rx="3" fill="none" stroke="#37474f" stroke-width="1.3"/>
 <rect x="319.4" y="260.3" width="49.0" height="16.0" rx="3" fill="none" stroke="#37474f" stroke-width="1.3"/>
@@ -774,10 +774,11 @@
 <text x="1130.0" y="430.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">淡灰色 = 下面幾層，已經焊好的線</text>
 <text x="1130.0" y="450.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">順序：第 1 層貼板，再第 2、3 層；最後第 4 層補 R24</text>
 <text x="1130.0" y="470.0" font-size="11" fill="#c62828" text-anchor="start" font-weight="normal">× = 不可接（D14 開機腳、LOG UART、D12、D13）</text>
-<text x="1130.0" y="510.0" font-size="11" fill="#212121" text-anchor="start" font-weight="bold">跳帽：</text>
-<text x="1130.0" y="528.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">JP1 插上：D2 量電池</text>
-<text x="1130.0" y="546.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">J14：不插（只在量 ADC 時用）</text>
-<text x="1130.0" y="564.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">JP3 插上：D9 讀電調的電流</text>
-<text x="1130.0" y="582.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal"></text>
-<text x="1130.0" y="600.0" font-size="11" fill="#c62828" text-anchor="start" font-weight="bold">J6 接著電源時：USB-C 不插。</text>
+<text x="1130.0" y="490.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">模組：晶片面朝向洞洞板，印腳名的那面朝外</text>
+<text x="1130.0" y="530.0" font-size="11" fill="#212121" text-anchor="start" font-weight="bold">跳帽：</text>
+<text x="1130.0" y="548.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">JP1 插上：D2 量電池</text>
+<text x="1130.0" y="566.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">J14：不插（只在量 ADC 時用）</text>
+<text x="1130.0" y="584.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal">JP3 插上：D9 讀電調的電流</text>
+<text x="1130.0" y="602.0" font-size="11" fill="#212121" text-anchor="start" font-weight="normal"></text>
+<text x="1130.0" y="620.0" font-size="11" fill="#c62828" text-anchor="start" font-weight="bold">J6 接著電源時：USB-C 不插。</text>
 </svg>

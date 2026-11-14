@@ -54,7 +54,7 @@
 經 Wi-Fi 送的每份映像，都照第一份的方式建置：有 `app/ota`、同一把公鑰、同一個 `FLASH_LAYOUT`。然後簽章、送出：
 
 ```bash
-python3 Tools/scripts/rtl8735b_ota_sign.py --private-key ~/mykey_private_key.dat build/<板型>/sdk_build/firmware_ntz.bin copter.ota
+python3 Tools/scripts/rtl8735b_ota_sign.py --private-key ~/ota-keys/mykey_private_key.dat build/<板型>/sdk_build/firmware_ntz.bin copter.ota
 python3 Tools/scripts/rtl8735b_ota_send.py --host <開發板 IP> copter.ota
 python3 Tools/scripts/rtl8735b_ota_send.py --host <開發板 IP> --probe
 ```

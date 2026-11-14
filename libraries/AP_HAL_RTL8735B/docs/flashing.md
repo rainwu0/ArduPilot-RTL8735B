@@ -54,7 +54,7 @@ The first image is built as in [Build for update over Wi-Fi](building.md#build-f
 Each image sent over Wi-Fi is built like the first one: with `app/ota`, the same public key and the same `FLASH_LAYOUT`. Then sign it and send it:
 
 ```bash
-python3 Tools/scripts/rtl8735b_ota_sign.py --private-key ~/mykey_private_key.dat build/<board type>/sdk_build/firmware_ntz.bin copter.ota
+python3 Tools/scripts/rtl8735b_ota_sign.py --private-key ~/ota-keys/mykey_private_key.dat build/<board type>/sdk_build/firmware_ntz.bin copter.ota
 python3 Tools/scripts/rtl8735b_ota_send.py --host <board IP> copter.ota
 python3 Tools/scripts/rtl8735b_ota_send.py --host <board IP> --probe
 ```

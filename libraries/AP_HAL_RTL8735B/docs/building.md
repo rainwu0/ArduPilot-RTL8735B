@@ -51,25 +51,30 @@ export RTL8735B_WIFI_CONFIG=~/wifi.txt
 
 [Update over Wi-Fi](flashing.md#update-over-wi-fi) needs the board application `app/ota` and a public key in the firmware.
 
-1. Generate a key pair with ArduPilot's `Tools/scripts/signing/generate_keys.py`, which needs `pymonocypher` 3.1.3.2:
+1. Generate a key pair outside the repository with ArduPilot's `Tools/scripts/signing/generate_keys.py`, which needs `pymonocypher` 3.1.3.2:
 
    ```bash
    python3 -m pip install pymonocypher==3.1.3.2
-   python3 Tools/scripts/signing/generate_keys.py mykey
+   mkdir -p ~/ota-keys
+   python3 Tools/scripts/signing/generate_keys.py ~/ota-keys/mykey
    ```
 
-   It writes `mykey_private_key.dat` and `mykey_public_key.dat`. The private key signs images on the computer; the firmware holds only the public key.
+   It writes `~/ota-keys/mykey_private_key.dat` and `~/ota-keys/mykey_public_key.dat`. The private key signs images on the computer and stays out of the repository directory; the firmware holds only the public key.
 
-2. Add the application to the overlay:
+2. Write an overlay file outside the repository, for example `~/ota.dat`, with this line:
 
    ```text
    env RTL8735B_APP_DIR libraries/AP_HAL_RTL8735B/app/ota
    ```
 
-3. Point `RTL8735B_OTA_PUBLIC_KEY` at the public key file, then configure and build as below:
+   With an overlay of your own, add the line to it instead.
+
+3. Point `RTL8735B_OTA_PUBLIC_KEY` at the public key file, and give the overlay to configure with `--extra-hwdef`:
 
    ```bash
-   export RTL8735B_OTA_PUBLIC_KEY=~/mykey_public_key.dat
+   export RTL8735B_OTA_PUBLIC_KEY=~/ota-keys/mykey_public_key.dat
+   ./waf configure --board hub8735ultra-expansion --extra-hwdef ~/ota.dat
+   ./waf copter
    ```
 
 - The build prints `OTA 公鑰：取自 <path>` ("public key taken from …").

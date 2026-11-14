@@ -51,25 +51,30 @@ export RTL8735B_WIFI_CONFIG=~/wifi.txt
 
 [經 Wi-Fi 更新](flashing.zh-TW.md#經-wi-fi-更新)要韌體裡有開發板的應用程式 `app/ota` 與公鑰。
 
-1. 用 ArduPilot 的 `Tools/scripts/signing/generate_keys.py` 產生一組金鑰，它需要 `pymonocypher` 3.1.3.2：
+1. 在儲存庫外產生一組金鑰，用 ArduPilot 的 `Tools/scripts/signing/generate_keys.py`，它需要 `pymonocypher` 3.1.3.2：
 
    ```bash
    python3 -m pip install pymonocypher==3.1.3.2
-   python3 Tools/scripts/signing/generate_keys.py mykey
+   mkdir -p ~/ota-keys
+   python3 Tools/scripts/signing/generate_keys.py ~/ota-keys/mykey
    ```
 
-   產生 `mykey_private_key.dat` 與 `mykey_public_key.dat`。私鑰在電腦上簽映像；韌體裡只有公鑰。
+   產生 `~/ota-keys/mykey_private_key.dat` 與 `~/ota-keys/mykey_public_key.dat`。私鑰在電腦上簽映像，不放在儲存庫目錄裡；韌體裡只有公鑰。
 
-2. 疊加檔加上應用程式：
+2. 在儲存庫外寫一個疊加檔，例如 `~/ota.dat`，內容是這一行：
 
    ```text
    env RTL8735B_APP_DIR libraries/AP_HAL_RTL8735B/app/ota
    ```
 
-3. 把 `RTL8735B_OTA_PUBLIC_KEY` 指向公鑰檔，再照下面 configure 與建置：
+   已經有自己的疊加檔時，改把這一行加進那個檔。
+
+3. 把 `RTL8735B_OTA_PUBLIC_KEY` 指向公鑰檔，configure 時以 `--extra-hwdef` 帶上疊加檔：
 
    ```bash
-   export RTL8735B_OTA_PUBLIC_KEY=~/mykey_public_key.dat
+   export RTL8735B_OTA_PUBLIC_KEY=~/ota-keys/mykey_public_key.dat
+   ./waf configure --board hub8735ultra-expansion --extra-hwdef ~/ota.dat
+   ./waf copter
    ```
 
 - 建置印出 `OTA 公鑰：取自 <路徑>`。

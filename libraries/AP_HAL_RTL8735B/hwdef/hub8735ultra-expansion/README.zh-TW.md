@@ -56,8 +56,9 @@ T5 那台四軸用的零件：
 | 馬達 | HSKRC 1103 8000 kV |
 | 槳 | GEMFAN D90S-3，三葉 3.5 吋 |
 | 電調 | MicoAir Bluejay-4IN1-33A，4 合 1，韌體 Bluejay |
+| 電調連接線 | SH1.0-8P，從電調接到 J3、J4 與 J5 第 1 腳，見〈接線圖〉 |
 | 電池 | TATTU ACE 2S 450 mAh 75C |
-| BEC | JHEMCU，5 V |
+| BEC | JHEMCU 54560，5 V |
 
 含電池重 240.7 g。紀錄是 [BOARD_TESTS.md](../../BOARD_TESTS.md) 的 T5。
 
@@ -324,10 +325,10 @@ GY-271（羅盤，QST QMC5883L，I²C 位址 0x0D；資料表 QMC5883L 1.0 Table
 
 每台機都不同，兩個檔都不放。
 
-- 下面六項都做完、馬達測試確認每顆馬達的位置與轉向之前，不裝槳。
-- 電池與 BEC 焊到電調的電池焊點時，核對極性。
+- 下面七項都做完、馬達測試確認每顆馬達的位置與轉向之前，不裝槳。
+- 電池與 BEC 焊到電調的電池焊點時，核對極性，量法見[插開發板之前的檢查](perfboard.zh-TW.md#6-插開發板之前的檢查)第 4 項。
 
-六項：
+七項：
 
 1. 安裝方向：照板子在你的機架上的擺法設 `AHRS_ORIENTATION`、`COMPASS_ORIENT`，用〈接線圖〉的重力測試與轉向測試確認。
 2. 馬達測試，拆掉螺旋槳：用地面站的馬達測試，確認每顆馬達的位置與轉向符合 ArduPilot 的四軸 X。不符時，改 `SERVOn_FUNCTION` 的值或馬達的線。
@@ -335,6 +336,7 @@ GY-271（羅盤，QST QMC5883L，I²C 位址 0x0D；資料表 QMC5883L 1.0 Table
 4. 遙控方式：`RC_OPTIONS` 與 `RCn_OPTION` 開關跟著你的遙控方式設。T5 那台四軸用地面站手把經 Wi-Fi MAVLink 飛，設 `RC_OPTIONS` 33（第 0 位：忽略遙控接收機；第 5 位：解鎖檢查油門為 0 的輸入）、`RC9_OPTION` 81（Disarm）。J11 接遙控接收機時照自己的遙控器設，並在飛之前於地面試過失效保護。
 5. 電池：`BATT_CAPACITY` 設成你的電池容量（mAh）。
 6. 記錄檔：`LOG_BACKEND_TYPE`（位元遮罩；第 0 位是 File，寫到 microSD 卡）。T5 那台四軸飛的時候是 0，沒有記錄。
+7. 斷線失效保護：用地面站經 Wi-Fi 遙控時，自由飛行前先在地面、拆槳演練一次地面站斷線的失效保護（[GCS Failsafe](https://ardupilot.org/copter/docs/gcs-failsafe.html)，`FS_GCS_ENABLE`）。
 
 ## 韌體
 

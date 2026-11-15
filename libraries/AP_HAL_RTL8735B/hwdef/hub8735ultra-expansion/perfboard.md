@@ -86,7 +86,7 @@ The three grounds meet only at the development board's header pins: `GND_PWR` = 
 
 ![A finished expansion board, parts side up with the microSD end at the top: the three modules are chip side down, showing their printed pin names](perfboard/photo-parts-side.jpg)
 
-The photo is the board that later flew on the T5 quadcopter, taken before it was mounted. The figure above is the recommended layout: on the real board JP1 and some resistors sit elsewhere, and some resistors lie flat. The connections follow the wiring table in section 4.
+The photo is the board that later flew on the T5 quadcopter, taken before it was mounted. The figure above is the recommended layout: on the real board JP1, the GY-271 (H19–L19, one column right of the figure) and some resistors sit elsewhere, and some resistors lie flat. The connections follow the wiring table in section 4.
 
 Solder side, one figure per layer (seen from below, so left and right are swapped): [layer 1](perfboard/solder-layer1.png), [layer 2](perfboard/solder-layer2.png), [layer 3](perfboard/solder-layer3.png), [layer 4](perfboard/solder-layer4.png).
 

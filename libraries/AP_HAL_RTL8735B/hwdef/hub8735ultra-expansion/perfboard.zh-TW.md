@@ -86,7 +86,7 @@
 
 ![一塊焊好的擴充板，零件面朝上、microSD 端在上：三個模組晶片面朝下，看得到印腳名的那一面](perfboard/photo-parts-side.zh-TW.jpg)
 
-照片是後來裝上 T5 那台四軸飛過的那塊實板，裝機前拍的。上面的圖是整理過的建議擺法：JP1 和部分電阻在實板上的位置不同，有些電阻是平躺的。接法以第 4 節的接線表為準。
+照片是後來裝上 T5 那台四軸飛過的那塊實板，裝機前拍的。上面的圖是整理過的建議擺法：JP1、GY-271（實板在 H19～L19，比圖偏右一欄）與部分電阻在實板上的位置不同，有些電阻是平躺的。接法以第 4 節的接線表為準。
 
 焊接面每層一張（從底下看，左右相反）：[第 1 層](perfboard/solder-layer1.zh-TW.png)、[第 2 層](perfboard/solder-layer2.zh-TW.png)、[第 3 層](perfboard/solder-layer3.zh-TW.png)、[第 4 層](perfboard/solder-layer4.zh-TW.png)。
 

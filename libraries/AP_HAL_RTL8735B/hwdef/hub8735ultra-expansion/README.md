@@ -56,8 +56,9 @@ The T5 quadcopter is built from these parts:
 | Motors | HSKRC 1103 8000 kV |
 | Propellers | GEMFAN D90S-3, three-blade, 3.5-inch |
 | ESC | MicoAir Bluejay-4IN1-33A, 4-in-1, Bluejay firmware |
+| ESC cable | SH1.0-8P, from the ESC to J3, J4 and J5 pin 1, see *Wiring Diagram* |
 | Battery | TATTU ACE 2S 450 mAh 75C |
-| BEC | JHEMCU, 5 V |
+| BEC | JHEMCU 54560, 5 V |
 
 With the battery it weighs 240.7 g. The record is T5 in [BOARD_TESTS.md](../../BOARD_TESTS.md) (in Chinese).
 
@@ -324,10 +325,10 @@ In `defaults.parm` in this folder:
 
 These differ on each vehicle and are in neither file.
 
-- The propellers stay off until all six items below are done and the motor test has confirmed each motor's position and direction.
-- When the battery and the BEC are soldered to the ESC's battery pads, check their polarity.
+- The propellers stay off until all seven items below are done and the motor test has confirmed each motor's position and direction.
+- When the battery and the BEC are soldered to the ESC's battery pads, check their polarity, measured as in item 4 of [Checks before plugging in the development board](perfboard.md#6-checks-before-plugging-in-the-development-board).
 
-The six items:
+The seven items:
 
 1. Mounting orientation: `AHRS_ORIENTATION` and `COMPASS_ORIENT` for how the board sits on your frame, checked with the gravity and heading tests under *Wiring Diagram*.
 2. Motor test, with the propellers off: in the ground station's motor test, each motor's position and direction match ArduPilot's quad X. Where they do not, the `SERVOn_FUNCTION` values or the motor wires change.
@@ -335,6 +336,7 @@ The six items:
 4. Control method: `RC_OPTIONS` and the `RCn_OPTION` switches go with how you fly. The T5 quadcopter flew with a ground station joystick over Wi-Fi MAVLink, with `RC_OPTIONS` 33 (bit 0, ignore the RC receiver; bit 5, arming check throttle for 0 input) and `RC9_OPTION` 81 (Disarm). With an RC receiver on J11, these are set for your transmitter, and the failsafes are tried on the ground before flying.
 5. Battery: `BATT_CAPACITY` is set to your battery's capacity (mAh).
 6. Logs: `LOG_BACKEND_TYPE` (bitmask; bit 0 is File, on the microSD card). The T5 quadcopter flew with 0, no logs.
+7. Link-loss failsafe: when flying with a ground station joystick over Wi-Fi, the ground station link-loss failsafe ([GCS Failsafe](https://ardupilot.org/copter/docs/gcs-failsafe.html), `FS_GCS_ENABLE`) is rehearsed once on the ground, with the propellers off, before free flight.
 
 ## Firmware
 

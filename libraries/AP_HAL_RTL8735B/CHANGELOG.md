@@ -10,6 +10,8 @@ The status of each feature in a given version is what that version's feature sta
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-15
+
 ### Added
 
 - The board type `hub8735ultra-expansion`: the HUB 8735 ultra on an expansion board with a BMI160, a BMP280 and a QMC5883L, battery voltage on analog pin 2 and ESC current on analog pin 9, SERIAL3 receive-only for ESC telemetry, battery monitoring and GPS on SERIAL1 as defaults in `hwdef.dat`, and DShot300 in `defaults.parm`. See [its README](hwdef/hub8735ultra-expansion/README.md).
@@ -126,7 +128,8 @@ Compared with the public commits before this version number:
 
 - The old `HAL_RTL8735B_*` pin and bus `define`s (`HAL_RTL8735B_I2C1_*`, `HAL_RTL8735B_SPI1_*`, `HAL_RTL8735B_RCOUT_*` and others); use the keywords above. Overlays that still use them build without errors, but the settings have no effect.
 
-[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.1...v0.2.0

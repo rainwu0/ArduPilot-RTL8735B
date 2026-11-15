@@ -10,6 +10,8 @@
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-15
+
 ### 新增（Added）
 
 - 板型 `hub8735ultra-expansion`：HUB 8735 ultra 加擴充板，含 BMI160、BMP280、QMC5883L，電池電壓在類比腳 2、電調電流在類比腳 9，SERIAL3 只收電調遙測；電池監測與 SERIAL1 的 GPS 預設在 `hwdef.dat`，DShot300 在 `defaults.parm`。見[它的 README](hwdef/hub8735ultra-expansion/README.zh-TW.md)。
@@ -126,7 +128,8 @@
 
 - 舊的 `HAL_RTL8735B_*` 腳位與匯流排 `define`（`HAL_RTL8735B_I2C1_*`、`HAL_RTL8735B_SPI1_*`、`HAL_RTL8735B_RCOUT_*` 等），改用上面的關鍵字。還在用的疊加檔建置不會報錯，設定只會失效。
 
-[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.1...v0.2.0

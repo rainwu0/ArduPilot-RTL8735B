@@ -10,6 +10,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-15
+
 ### 變更（Changed）
 
 - 〈從零開始〉與 HUB 8735 ultra 的 README 改用板型 `hub8735ultra-expansion` 建置三個感測器模組，不再用 `hub8735ultra` 加另外的疊加檔。[描述自己的開發板](docs/custom-boards.zh-TW.md)改指向 `hub8735ultra-expansion` 的感測器寫法。
@@ -142,7 +144,8 @@
 
 - 舊的 `HAL_RTL8735B_*` 腳位與匯流排 `define`（`HAL_RTL8735B_I2C1_*`、`HAL_RTL8735B_SPI1_*`、`HAL_RTL8735B_RCOUT_*` 等），改用上面的關鍵字。還在用的疊加檔建置不會報錯，設定只會失效。
 
-[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.4...v0.3.0
 [0.2.4]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.1...v0.2.2

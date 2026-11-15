@@ -10,6 +10,8 @@ The status of each feature in a given version is what that version's feature sta
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-15
+
 ### Changed
 
 - Getting started and the HUB 8735 ultra README build the three sensor modules with the board type `hub8735ultra-expansion`, instead of `hub8735ultra` with a separate overlay. [Describe your own board](docs/custom-boards.md) points at the sensor lines of `hub8735ultra-expansion`.
@@ -142,7 +144,8 @@ Compared with the public commits before this version number:
 
 - The old `HAL_RTL8735B_*` pin and bus `define`s (`HAL_RTL8735B_I2C1_*`, `HAL_RTL8735B_SPI1_*`, `HAL_RTL8735B_RCOUT_*` and others); use the keywords above. Overlays that still use them build without errors, but the settings have no effect.
 
-[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.4...v0.3.0
 [0.2.4]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.1...v0.2.2

@@ -248,6 +248,11 @@ class Hub8735UltraExpansionTest(unittest.TestCase):
         # BMP280 在匯流排 1 已由 T5 的飛行確認（同一行 BARO，定高要用氣壓計）
         self.assertNotIn('待確認', (HAL / 'hwdef/hub8735ultra-expansion/hwdef.dat').read_text(encoding='utf-8'))
 
+    def test_no_link_to_the_examples_repository(self):
+        # hwdef 不連到範例庫
+        self.assertNotIn('ArduPilot-Hub8735Ultra',
+                         (HAL / 'hwdef/hub8735ultra-expansion/hwdef.dat').read_text(encoding='utf-8'))
+
     def test_orientation_comments_state_only_the_flown_mounting(self):
         # IMU 那一列對應哪種擺法沒有量過，不寫；只寫 T5 飛過的擺法：洞洞板零件面朝上、USB-C 端朝機頭、模組晶片面朝下
         for path in (HAL / 'hwdef/hub8735ultra-expansion/hwdef.dat',

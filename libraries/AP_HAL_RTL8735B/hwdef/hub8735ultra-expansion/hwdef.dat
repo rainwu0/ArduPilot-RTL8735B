@@ -1,6 +1,5 @@
 # HUB 8735 ultra 疊在擴充板上：擴充板有 IMU、氣壓計、羅盤三個感測器模組與一個外接 I²C 座。
 # 開發板的腳位照 hub8735ultra；擴充板的接點與模組見本資料夾的 README。
-# 三個感測器那幾列改寫自 rainwu0/ArduPilot-Hub8735Ultra 0c18d8c51a 的 examples/bmi160-bmp280-qmc5883l/overlay.dat。
 include ../hub8735ultra/hwdef.dat
 
 undef HAL_RTL8735B_BOARD_NAME

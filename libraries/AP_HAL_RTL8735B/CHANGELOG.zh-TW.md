@@ -10,6 +10,8 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-15
+
 和 v0.2.1 相容：原本的疊加檔、指令與參數照舊能用；改動要重新建置、燒錄才有。
 
 ### 變更（Changed）
@@ -118,7 +120,8 @@
 
 - 舊的 `HAL_RTL8735B_*` 腳位與匯流排 `define`（`HAL_RTL8735B_I2C1_*`、`HAL_RTL8735B_SPI1_*`、`HAL_RTL8735B_RCOUT_*` 等），改用上面的關鍵字。還在用的疊加檔建置不會報錯，設定只會失效。
 
-[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.1.0...v0.1.1

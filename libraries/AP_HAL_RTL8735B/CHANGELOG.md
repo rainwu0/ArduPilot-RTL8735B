@@ -12,7 +12,7 @@ The status of each feature in a given version is what that version's feature sta
 
 ### Changed
 
-- Getting started and the HUB 8735 ultra README build the three sensor modules with the board type `hub8735ultra-expansion`, instead of `hub8735ultra` with the overlay from the examples repository, which is no longer cloned. [Describe your own board](docs/custom-boards.md) points at the sensor lines of `hub8735ultra-expansion`.
+- Getting started and the HUB 8735 ultra README build the three sensor modules with the board type `hub8735ultra-expansion`, instead of `hub8735ultra` with a separate overlay. [Describe your own board](docs/custom-boards.md) points at the sensor lines of `hub8735ultra-expansion`.
 - Documentation: the home page lists what the project is made up of, and its status table has a row for firmware built from this repository on the expansion board. *What next* in Getting started leads to the expansion board README and ArduPilot's First Flight.
 - Documentation: [Building the expansion board](hwdef/hub8735ultra-expansion/perfboard.md), how to build the expansion board by hand on a perfboard: the parts, the development board's pins, where each part goes, the 85 wires in 4 layers, the soldering steps and the checks before plugging in the development board, with a figure of the parts side and of each solder layer. The expansion board README links to it.
 - Documentation: the expansion board README lists the parts of the T5 quadcopter, keeps the propellers off and checks the battery and BEC polarity during setup, and points at the build for update over Wi-Fi. The status tables say that the battery current reading is wrong.
@@ -70,11 +70,11 @@ Compatible with v0.2.0: existing overlays, commands and parameters keep working;
 
 ## [0.2.0] - 2026-10-22
 
-Two changes are incompatible with v0.1.1: the example overlay moves to the examples repository, and PF3 and PF4 now belong to SERIAL0 by default (the first two items below). Other overlays, commands and parameters keep working; the new features in this version need a new build and flash.
+Two changes are incompatible with v0.1.1: the example overlay is removed from this repository, and PF3 and PF4 now belong to SERIAL0 by default (the first two items below). Other overlays, commands and parameters keep working; the new features in this version need a new build and flash.
 
 ### Removed
 
-- **The example overlay `hwdef/hub8735ultra/sensors-example.dat` moves to the examples repository.** A build that names this file, as in the v0.1.1 README or Getting started, no longer finds it; use `examples/bmi160-bmp280-qmc5883l/overlay.dat` in the examples repository [rainwu0/ArduPilot-Hub8735Ultra](https://github.com/rainwu0/ArduPilot-Hub8735Ultra) instead, which has the same sensor settings. Settings for one particular board belong in the examples repository; the HAL repository keeps only the board types.
+- **The example overlay `hwdef/hub8735ultra/sensors-example.dat` is removed from this repository.** A build that names this file, as in the v0.1.1 README or Getting started, no longer finds it. The board type `hub8735ultra-expansion`, added in v0.2.3, has the same sensor lines.
 
 ### Changed
 

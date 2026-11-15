@@ -362,4 +362,3 @@ GY-271（羅盤，QST QMC5883L，I²C 位址 0x0D；資料表 QMC5883L 1.0 Table
   - Bosch BMI160，`BST-BMI160-DS000-09`，revision 1.0，2020 年 11 月：[bst-bmi160-ds000.pdf](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmi160-ds000.pdf)
   - Bosch BMP280，`BST-BMP280-DS001-26`，revision 1.26，2021 年 10 月：[bst-bmp280-ds001.pdf](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmp280-ds001.pdf)
   - QST QMC5883L 資料表，版本 1.0，2016 年 2 月
-- `hwdef.dat` 的感測器那幾列改寫自 [rainwu0/ArduPilot-Hub8735Ultra](https://github.com/rainwu0/ArduPilot-Hub8735Ultra) `0c18d8c51a` 的 `examples/bmi160-bmp280-qmc5883l/overlay.dat`。

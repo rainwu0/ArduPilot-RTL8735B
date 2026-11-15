@@ -362,4 +362,3 @@ As on the HUB 8735 ultra, see [its Loading Firmware](../hub8735ultra/README.md#l
   - Bosch BMI160, `BST-BMI160-DS000-09`, revision 1.0, November 2020: [bst-bmi160-ds000.pdf](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmi160-ds000.pdf)
   - Bosch BMP280, `BST-BMP280-DS001-26`, revision 1.26, October 2021: [bst-bmp280-ds001.pdf](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmp280-ds001.pdf)
   - QST QMC5883L datasheet, version 1.0, February 2016
-- The sensor lines in `hwdef.dat` are adapted from `examples/bmi160-bmp280-qmc5883l/overlay.dat` in [rainwu0/ArduPilot-Hub8735Ultra](https://github.com/rainwu0/ArduPilot-Hub8735Ultra) at `0c18d8c51a`.

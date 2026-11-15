@@ -10,6 +10,8 @@ The status of each feature in a given version is what that version's feature sta
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-15
+
 ### Added
 
 - Update over Wi-Fi: the board application `app/ota` takes an image signed with a key from ArduPilot's `generate_keys.py`, on TCP port 8266, writes it to the other firmware slot and boots it on trial; after three trial boots without confirmation it goes back to the previous slot. `Tools/scripts/rtl8735b_ota_sign.py` signs `firmware_ntz.bin`, and `Tools/scripts/rtl8735b_ota_send.py` sends it or asks which slot runs. `RTL8735B_OTA_PUBLIC_KEY` names the public key at build time. See [Update over Wi-Fi](docs/flashing.md#update-over-wi-fi).
@@ -133,7 +135,8 @@ Compared with the public commits before this version number:
 
 - The old `HAL_RTL8735B_*` pin and bus `define`s (`HAL_RTL8735B_I2C1_*`, `HAL_RTL8735B_SPI1_*`, `HAL_RTL8735B_RCOUT_*` and others); use the keywords above. Overlays that still use them build without errors, but the settings have no effect.
 
-[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/rainwu0/ArduPilot-RTL8735B/compare/v0.2.0...v0.2.1
